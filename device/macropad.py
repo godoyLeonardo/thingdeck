@@ -1026,27 +1026,18 @@ class Handler(BaseHTTPRequestHandler):
 
 def reconnect_usb(pad):
     """Software replug: detach from USB and attach again. If the controller is wedged and
-    the host still has not configured us 15 s later, reboot, which resets the USB hardware
+    the host still has not configured us 20 s later, reboot, which resets the USB hardware
     like pulling the cable does."""
     log('usb reconnect requested')
     pad.toast('Reconnecting USB…')
-    udc_file = '/sys/kernel/config/usb_gadget/g1/UDC'
-    udc = os.listdir('/sys/class/udc')[0]
     try:
-        with open(udc_file, 'w') as f:
+        with open('/sys/kernel/config/usb_gadget/g1/UDC', 'w') as f:
             f.write('\n')
     except OSError as e:
         log('unbind:', e)
     time.sleep(1.5)
-    try:
-        with open(udc_file) as f:
-            bound = f.read().strip()
-        if not bound:                  # usb_watchdog may have rebound it already
-            with open(udc_file, 'w') as f:
-                f.write(udc)
-    except OSError as e:
-        log('rebind:', e)
-    for _ in range(15):
+    # usb_watchdog rebinds it, the same clean way it recovers from a bus reset.
+    for _ in range(20):
         time.sleep(1)
         if pad.hid.status == 'connected':
             log('usb reconnected')
@@ -1131,34 +1122,44 @@ def usb_watchdog(pad):
     it: the device silently drops off USB. Rebind once both functions are ready again."""
     udc_file = '/sys/kernel/config/usb_gadget/g1/UDC'
     udc = os.listdir('/sys/class/udc')[0]
-    unbound_since = None
+    rebinds = []                      # monotonic times of recent rebinds
     while True:
         time.sleep(1)
         try:
             with open(udc_file) as f:
                 if f.read().strip():
-                    unbound_since = None
                     continue
         except OSError:
             continue
-        unbound_since = unbound_since or time.monotonic()
-        if not os.path.exists('/dev/usb-ffs/adb/ep1'):
-            if time.monotonic() - unbound_since > 5:     # adbd died instead of reopening
-                log('adbd is gone, restarting it')
-                subprocess.call(['killall', 'adbd'], stderr=subprocess.DEVNULL)
-                subprocess.Popen(['setsid', '/usr/bin/adbd'], stdin=subprocess.DEVNULL,
-                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                unbound_since = time.monotonic()
-            continue                  # adbd is still rewriting its descriptors
-        if not os.path.exists(os.path.join(FFS_DIR, 'ep1')):
+        now = time.monotonic()
+        rebinds = [t for t in rebinds if now - t < 30]
+        if len(rebinds) >= 3:
+            # Rebinding right after adbd's reopen made it reopen again, in a loop.
+            log('gadget keeps unbinding; backing off for 30 s')
+            time.sleep(30)
+            rebinds = []
             continue
-        log('gadget was unbound (bus reset?), rebinding')
+        # Same order as a clean start (gadget.sh): fresh adbd, wait until it has written
+        # its descriptors and settled, then bind. A half-reopened adbd unbinds us again.
+        log('gadget was unbound (bus reset?), restarting adbd and rebinding')
+        subprocess.call(['killall', 'adbd'], stderr=subprocess.DEVNULL)
+        time.sleep(1)
+        subprocess.Popen(['setsid', '/usr/bin/adbd'], stdin=subprocess.DEVNULL,
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        for _ in range(15):
+            time.sleep(1)
+            if os.path.exists('/dev/usb-ffs/adb/ep1') and os.path.exists(os.path.join(FFS_DIR, 'ep1')):
+                break
+        time.sleep(1)
+        rebinds.append(time.monotonic())
         try:
+            with open(udc_file) as f:
+                if f.read().strip():
+                    continue
             with open(udc_file, 'w') as f:
                 f.write(udc)
         except OSError as e:
             log('rebind failed:', e)
-            time.sleep(2)
 
 
 # ------------------------------------------------------------------- main
