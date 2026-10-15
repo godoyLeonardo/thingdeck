@@ -981,7 +981,42 @@ class Handler(BaseHTTPRequestHandler):
         self._send(200, {'ok': True})
 
 
-def system_action(what):
+def reconnect_usb(pad):
+    """Software replug: detach from USB and attach again. If the controller is wedged and
+    the host still has not configured us 15 s later, reboot, which resets the USB hardware
+    like pulling the cable does."""
+    log('usb reconnect requested')
+    pad.toast('Reconnecting USB…')
+    udc_file = '/sys/kernel/config/usb_gadget/g1/UDC'
+    udc = os.listdir('/sys/class/udc')[0]
+    try:
+        with open(udc_file, 'w') as f:
+            f.write('\n')
+    except OSError as e:
+        log('unbind:', e)
+    time.sleep(1.5)
+    try:
+        with open(udc_file) as f:
+            bound = f.read().strip()
+        if not bound:                  # usb_watchdog may have rebound it already
+            with open(udc_file, 'w') as f:
+                f.write(udc)
+    except OSError as e:
+        log('rebind:', e)
+    for _ in range(15):
+        time.sleep(1)
+        if pad.hid.status == 'connected':
+            log('usb reconnected')
+            pad.toast('USB reconnected', 'ok')
+            return
+    log('still not connected after reconnect, rebooting (same as unplugging)')
+    pad.toast('Still not connected: restarting the Car Thing', 'warn')
+    time.sleep(1.5)
+    subprocess.call(['sync'])
+    subprocess.call(['reboot'])
+
+
+def system_action(what, pad):
     time.sleep(0.5)          # let the HTTP reply go out first
     if what == 'restart':
         log('restart requested from settings')
@@ -1058,6 +1093,42 @@ def main():
         pad.publish_state()
         threading.Thread(target=input_loop, args=(pad, keys_path, rotary_path), name='input', daemon=True).start()
         offset = time.localtime().tm_gmtoff
+def usb_watchdog(pad):
+    """adbd closes and reopens its FunctionFS files after a bus reset (the PC resuming from
+    sleep, for example). With configfs that unbinds the whole gadget, and nothing rebinds
+    it: the device silently drops off USB. Rebind once both functions are ready again."""
+    udc_file = '/sys/kernel/config/usb_gadget/g1/UDC'
+    udc = os.listdir('/sys/class/udc')[0]
+    unbound_since = None
+    while True:
+        time.sleep(1)
+        try:
+            with open(udc_file) as f:
+                if f.read().strip():
+                    unbound_since = None
+                    continue
+        except OSError:
+            continue
+        unbound_since = unbound_since or time.monotonic()
+        if not os.path.exists('/dev/usb-ffs/adb/ep1'):
+            if time.monotonic() - unbound_since > 5:     # adbd died instead of reopening
+                log('adbd is gone, restarting it')
+                subprocess.call(['killall', 'adbd'], stderr=subprocess.DEVNULL)
+                subprocess.Popen(['setsid', '/usr/bin/adbd'], stdin=subprocess.DEVNULL,
+                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                unbound_since = time.monotonic()
+            continue                  # adbd is still rewriting its descriptors
+        if not os.path.exists(os.path.join(FFS_DIR, 'ep1')):
+            continue
+        log('gadget was unbound (bus reset?), rebinding')
+        try:
+            with open(udc_file, 'w') as f:
+                f.write(udc)
+        except OSError as e:
+            log('rebind failed:', e)
+            time.sleep(2)
+
+
         while True:
             time.sleep(2)
             if pad.load_config():
@@ -1071,3 +1142,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+                threading.Thread(target=usb_watchdog, args=(pad,), name='usb-watchdog', daemon=True).start()
