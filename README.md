@@ -83,11 +83,33 @@ All of these can be changed in `device/config.json`.
 gets the time over a small network link on the USB cable, which the computer has
 to share its internet connection with. Until then the clock shows `--:--`.
 
-- **Windows:** press Win+R, run `ncpa.cpl`. Right-click your internet adapter
-  (not the Car Thing one) → Properties → Sharing. Check "Allow other network
-  users to connect…" and pick the Car Thing adapter ("Remote NDIS Compatible
-  Device") as the home network. Windows sometimes drops this after a PC reboot;
-  if the clock stops syncing, turn the checkbox off and on.
+- **Windows:**
+  1. Make internet sharing survive reboots. By default the sharing service is
+     set to Manual and does not come back after a restart, so the clock stops
+     syncing. Open an **admin** Command Prompt or PowerShell (right-click Start →
+     Terminal (Admin)) and run:
+
+     ```cmd
+     sc.exe config SharedAccess start= auto
+     ```
+
+     ```cmd
+     reg add "HKLM\Software\Microsoft\Windows\CurrentVersion\SharedAccess" /v EnableRebootPersistConnection /t REG_DWORD /d 1 /f
+     ```
+
+     ```cmd
+     net start SharedAccess
+     ```
+
+     Keep the space after `start=`. Write `sc.exe`, not `sc`: in PowerShell,
+     `sc` means something else.
+  2. Turn sharing on: press Win+R, run `ncpa.cpl`. Right-click your internet
+     adapter (not the Car Thing one) → Properties → Sharing. Check "Allow other
+     network users to connect…" and pick the Car Thing adapter ("Remote NDIS
+     Compatible Device") as the home network.
+
+  If the clock ever stops syncing (for example after Windows gives the Car Thing
+  adapter a new name), turn that checkbox off and on again.
 - **Linux (NetworkManager, e.g. Fedora):**
 
   ```bash
