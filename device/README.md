@@ -8,6 +8,7 @@ the writable data partition. `../deploy.sh` copies it there.
 | `macropad.py` | The service: USB HID over FunctionFS, dial/button input, actions, web UI server, USB network + NTP, settings |
 | `gadget.sh` | Rebuilds the USB gadget (`prepare`, `bind-hid [net]`, `adb-only`) |
 | `start.sh` | Supervisor entry point. Always puts USB back to ADB-only when the service exits |
+| `hook.sh` | Installs/removes the boot hook on both A/B system slots (`install`, `uninstall`, `status`) |
 | `macropad.conf` | Supervisor program, installed to `/etc/supervisor.d/` |
 | `config.json` | Pages, tiles, presets, dial modes, hardware buttons, layout, timezone |
 | `web/index.html` | Touch UI shown in the kiosk browser |
@@ -76,8 +77,10 @@ suspended, `usb0` is taken down so no network traffic goes out.
 **After resume.** The host resets the bus. `adbd` then closes and reopens its
 FunctionFS files, and with configfs that unbinds the whole gadget. Nothing in the
 stock system rebinds it, so the device silently drops off USB. `usb_watchdog()`
-checks `UDC` every second and rebinds once both functions are ready. If `adbd`
-died instead, it restarts `adbd` after 5 s.
+checks `UDC` every second. When it is empty it restarts `adbd`, waits until
+both functions have written their descriptors, and rebinds, the same order as a
+clean start. Rebinding into a half-reopened `adbd` looped; after 3 rebinds in
+30 s it backs off.
 
 **Remote wakeup does not work on this hardware, so it is not advertised**
 (`bmAttributes 0x80`). Findings, so nobody has to repeat them:
@@ -97,16 +100,35 @@ died instead, it restarts `adbd` after 5 s.
 
 **Reconnect** (`POST /api/system {"do": "reconnect"}`, Settings → Reconnect USB,
 or the standby screen) unbinds and rebinds `UDC`, a software replug. If the host
-has not configured the device 15 s later, it reboots, which resets the
+has not configured the device 20 s later, it reboots, which resets the
 controller and PHY like pulling the cable.
 
 ### Kiosk takeover
 
 At start the service bind-mounts `web/shim.html` over
-`/usr/share/qt-superbird-app/webapp/index.html`, stops the stock `superbird`
-backend and restarts Chromium. The rootfs stays untouched, and a reboot without
-the service brings back the stock UI. The UI is served from
-`http://127.0.0.1:8765/` and receives live updates over Server-Sent Events.
+`/usr/share/qt-superbird-app/webapp/index.html` and restarts Chromium. The rootfs
+stays untouched, and a reboot without the service brings back the stock UI. The
+UI is served from `http://127.0.0.1:8765/` and receives live updates over
+Server-Sent Events.
+
+The stock `superbird` backend is stopped only **after it has marked the boot
+successful**. The bootloader keeps two system slots (`system_a`, `system_b`). Its
+A/B data, at `/dev/misc` offset 2048 (`"\0AB0"`, then per slot: priority, tries
+left, successful), gets "successful" cleared on every boot and one try used up.
+`qt-superbird-app` sets it back about 24 s after it starts ("Boot marked as
+successful" in `/var/log/superbird.info`). If nothing marks 7 boots in a row,
+the bootloader falls back to the other slot. Stopping the app too early caused
+exactly that, and the boot hook on the old slot was gone with it. So
+`wait_for_boot_marked_successful()` waits for that log line (90 s at most), and
+`hook.sh` installs the hook on both slots.
+
+### Theme
+
+`web/index.html` defines each theme as CSS variables under
+`:root[data-theme=…]`. Settings saves `theme` and `accent` in `state.json`, and
+the page sets `data-theme` and the `--acc`/`--acc-soft` accent variables.
+Accent `theme` uses the color scheme's own accent; the fixed accents have a
+lighter and a darker shade for dark and light themes.
 
 ### Clock and timezone
 

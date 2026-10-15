@@ -17,7 +17,10 @@ as you plug it in.
   (Latin American and US are included).
 - **Clock:** synced from internet time servers over the same USB cable.
 - **Settings tab:** brightness (auto light sensor or manual), host OS, layout,
-  dial direction, 24h/12h clock, device stats, restart/reboot.
+  dial direction, 24h/12h clock, device stats, reconnect/restart/reboot.
+- **Themes:** Dark, Black, Light, and the editor color schemes Nord, Dracula,
+  Catppuccin, Gruvbox, Tokyo Night and Solarized, each with its own accent or
+  one of six accent colors (Settings → Appearance).
 - **Notifications:** scripts on the computer can show a message on the screen
   with `curl`.
 
@@ -40,7 +43,9 @@ built-in browser. Details are in [device/README.md](device/README.md).
 
 This copies `device/` to `/var/macropad` on the Car Thing, then adds one file,
 `/etc/supervisor.d/macropad.conf`, so the pad starts on boot, and reboots.
-No stock file is changed.
+No stock file is changed. The file goes on **both** system partitions: the
+bootloader keeps two copies of the system (slots A and B) and can switch between
+them. Check with `./deploy.sh status`.
 
 After editing code:
 
@@ -180,6 +185,8 @@ switching, per-OS overrides) is in [device/README.md](device/README.md#configjso
 - **Safe mode:** hold the back button while the Car Thing boots. The pad then
   leaves USB as ADB only.
 - `./deploy.sh uninstall` removes the boot hook and restores the stock UI.
+- **Stock UI came back by itself?** The bootloader switched system slots and the
+  hook is missing there. Run `./deploy.sh status`, then `./deploy.sh install`.
 
 ## Known limitations
 
