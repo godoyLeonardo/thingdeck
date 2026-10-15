@@ -25,6 +25,8 @@ GADGET_SH = os.path.join(BASE, 'gadget.sh')
 FFS_DIR = '/dev/usb-ffs/hid'
 WEBAPP_DIR = '/usr/share/qt-superbird-app/webapp'
 BACKLIGHT = '/sys/class/backlight/aml-bl/brightness'
+THEMES = ('dark', 'black', 'light', 'nord', 'dracula', 'catppuccin', 'gruvbox', 'tokyonight', 'solarized')
+ACCENTS = ('theme', 'green', 'blue', 'purple', 'orange', 'pink', 'red')   # palettes: web/index.html
 HTTP_PORT = 8765
 
 
@@ -399,7 +401,8 @@ class Pad:
         # Device settings changed from the Settings tab; kept in state.json.
         # None means "use config.json".
         self.settings = {'os_mode': 'auto', 'layout': None, 'dial_invert': None,
-                         'brightness_auto': True, 'brightness': 180, 'clock_24h': True}
+                         'brightness_auto': True, 'brightness': 180, 'clock_24h': True,
+                         'theme': 'dark', 'accent': 'theme'}
         self.lock = threading.RLock()
         self.hid.on_report_request = self.detect_os
         self.load_saved()
@@ -440,6 +443,8 @@ class Pad:
             'layout': lambda v: v is None or v in LAYOUTS,
             'dial_invert': lambda v: v is None or isinstance(v, bool),
             'clock_24h': lambda v: isinstance(v, bool),
+            'theme': lambda v: v in THEMES,
+            'accent': lambda v: v in ACCENTS,
             'brightness_auto': lambda v: isinstance(v, bool),
             'brightness': lambda v: isinstance(v, int) and 5 <= v <= 255,
         }

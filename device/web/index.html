@@ -7,14 +7,22 @@
 <style>
   @font-face { font-family: Geist; src: url(/fonts/GeistVF.ttf); font-weight: 100 900; }
   @font-face { font-family: GeistMono; src: url(/fonts/GeistMonoVF.ttf); font-weight: 100 900; }
+  /* Themes: Settings → Appearance sets data-theme on <html>; the accent (--acc, --acc-soft)
+     is set from JS because its tint depends on the theme. */
   :root {
     --bg: #0b0c0f;
     --panel: #15171c;
     --tile: #1a1d23;
     --tile-hi: #23272f;
     --line: #2a2e37;
+    --edge: #1a1d23;
     --text: #eef0f3;
     --muted: #7d8492;
+    --faint: #3a3f49;
+    --toast: #262a33;
+    --shadow: rgba(0,0,0,.5);
+    --veil: rgba(11,12,15,.92);
+    --standby: #000;
     --media: #1ed760;
     --key: #5b9cff;
     --type: #f5b942;
@@ -22,6 +30,80 @@
     --mouse: #2dd4bf;
     --bad: #ff5d5d;
     --warn: #f5b942;
+    --on-acc: #0b0c0f;
+    --acc: #1ed760;
+    --acc-soft: rgba(30,215,96,.16);
+  }
+  :root[data-theme="black"] {
+    --bg: #000;
+    --panel: #0c0d0f;
+    --tile: #101215;
+    --tile-hi: #191c21;
+    --line: #23262d;
+    --edge: #111316;
+    --faint: #2a2e35;
+    --toast: #191c21;
+    --veil: rgba(0,0,0,.92);
+  }
+  :root[data-theme="light"] {
+    --bg: #eceef2;
+    --panel: #fff;
+    --tile: #fff;
+    --tile-hi: #e2e5ea;
+    --line: #d2d6dd;
+    --edge: #dde1e7;
+    --text: #15171b;
+    --muted: #697080;
+    --faint: #c2c7cf;
+    --toast: #fff;
+    --shadow: rgba(20,23,27,.16);
+    --veil: rgba(236,238,242,.92);
+    --standby: #eceef2;
+    --media: #12a150;
+    --key: #2f6fe0;
+    --type: #c98a0b;
+    --nav: #7c5cdb;
+    --mouse: #0f9f8f;
+    --bad: #e03e3e;
+    --warn: #c98a0b;
+    --on-acc: #fff;
+  }
+  /* Editor color schemes, from each scheme's published palette */
+  :root[data-theme="nord"] {
+    --bg: #2e3440; --panel: #3b4252; --tile: #3b4252; --tile-hi: #434c5e; --line: #4c566a; --edge: #3b4252;
+    --text: #eceff4; --muted: #9aa5b8; --faint: #4c566a; --toast: #434c5e; --veil: rgba(46,52,64,.92); --standby: #242933;
+    --media: #a3be8c; --key: #81a1c1; --type: #ebcb8b; --nav: #b48ead; --mouse: #88c0d0; --bad: #bf616a; --warn: #d08770;
+    --on-acc: #2e3440;
+  }
+  :root[data-theme="dracula"] {
+    --bg: #282a36; --panel: #343746; --tile: #343746; --tile-hi: #44475a; --line: #4d5066; --edge: #343746;
+    --text: #f8f8f2; --muted: #8b93c0; --faint: #4d5066; --toast: #44475a; --veil: rgba(40,42,54,.92); --standby: #1e1f29;
+    --media: #50fa7b; --key: #8be9fd; --type: #f1fa8c; --nav: #bd93f9; --mouse: #ff79c6; --bad: #ff5555; --warn: #ffb86c;
+    --on-acc: #282a36;
+  }
+  :root[data-theme="catppuccin"] {
+    --bg: #181825; --panel: #1e1e2e; --tile: #1e1e2e; --tile-hi: #313244; --line: #45475a; --edge: #313244;
+    --text: #cdd6f4; --muted: #9399b2; --faint: #585b70; --toast: #313244; --veil: rgba(24,24,37,.92); --standby: #11111b;
+    --media: #a6e3a1; --key: #89b4fa; --type: #f9e2af; --nav: #cba6f7; --mouse: #94e2d5; --bad: #f38ba8; --warn: #fab387;
+    --on-acc: #1e1e2e;
+  }
+  :root[data-theme="gruvbox"] {
+    --bg: #282828; --panel: #32302f; --tile: #3c3836; --tile-hi: #504945; --line: #665c54; --edge: #3c3836;
+    --text: #ebdbb2; --muted: #a89984; --faint: #665c54; --toast: #504945; --veil: rgba(40,40,40,.92); --standby: #1d2021;
+    --media: #b8bb26; --key: #83a598; --type: #fabd2f; --nav: #d3869b; --mouse: #8ec07c; --bad: #fb4934; --warn: #fe8019;
+    --on-acc: #282828;
+  }
+  :root[data-theme="tokyonight"] {
+    --bg: #1a1b26; --panel: #1f2335; --tile: #24283b; --tile-hi: #2f3549; --line: #3b4261; --edge: #24283b;
+    --text: #c0caf5; --muted: #7f88b3; --faint: #3b4261; --toast: #2f3549; --veil: rgba(26,27,38,.92); --standby: #16161e;
+    --media: #9ece6a; --key: #7aa2f7; --type: #e0af68; --nav: #bb9af7; --mouse: #7dcfff; --bad: #f7768e; --warn: #ff9e64;
+    --on-acc: #1a1b26;
+  }
+  :root[data-theme="solarized"] {
+    --bg: #002b36; --panel: #073642; --tile: #073642; --tile-hi: #0d4453; --line: #24505b; --edge: #073642;
+    --text: #eee8d5; --muted: #93a1a1; --faint: #586e75; --toast: #0d4453; --veil: rgba(0,43,54,.92); --standby: #00212b;
+    --media: #859900; --key: #268bd2; --type: #b58900; --nav: #6c71c4; --mouse: #2aa198; --bad: #dc322f; --warn: #cb4b16;
+    --on-acc: #fdf6e3;
   }
   * { box-sizing: border-box; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); overflow: hidden;
@@ -51,7 +133,7 @@
   .tile { position: relative; background: var(--tile); border-radius: 16px; padding: 12px 14px; display: flex;
     flex-direction: column; justify-content: space-between; overflow: hidden; border: 1px solid transparent;
     transition: background .12s, transform .08s, border-color .12s; }
-  .tile.blank { background: transparent; border: 1px dashed #1c1f25; }
+  .tile.blank { background: transparent; border: 1px dashed var(--edge); }
   .tile .icon { font-size: 26px; line-height: 1; color: var(--accent); font-family: 'Noto Color Emoji', Geist, sans-serif; }
   .tile .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
   .tile .label { font-size: 20px; font-weight: 600; line-height: 1.15; letter-spacing: -.01em; }
@@ -60,13 +142,35 @@
   .tile.down, .preset.down, #dial.down { background: var(--tile-hi); transform: scale(.97); }
   .tile.fire { border-color: var(--accent); background: var(--tile-hi); }
   .preset.fire { background: var(--tile-hi); }
-  .preset.fire b { background: var(--key); color: #0b0c0f; }
+  .preset.fire b { background: var(--acc); color: var(--on-acc); }
   #dial.fire { background: var(--tile-hi); }
 
   /* settings */
-  #settings { flex: 1; display: none; grid-template-columns: 1fr 1fr; grid-gap: 8px; padding: 8px 0; min-height: 0; }
-  body.settings #settings { display: grid; }
+  #settings { flex: 1; display: none; flex-direction: column; padding: 8px 0; min-height: 0; }
+  body.settings #settings { display: flex; }
   body.settings #grid { display: none; }
+  #snav { align-self: flex-start; margin-bottom: 8px; }
+  #snav div { padding: 0 16px; }
+  .sec { flex: 1; display: none; grid-template-columns: 1fr 1fr; grid-gap: 8px; min-height: 0; }
+  .sec.on { display: grid; }
+  #themes { display: grid; grid-template-columns: repeat(3, 1fr); grid-gap: 8px; margin-top: 4px; }
+  .theme { border-radius: 10px; padding: 8px; border: 2px solid transparent; }
+  .theme.on { border-color: var(--acc); }
+  .theme i { display: flex; align-items: center; height: 26px; border-radius: 6px; padding: 0 6px; margin-bottom: 5px; }
+  .theme i b { width: 26px; height: 10px; border-radius: 3px; margin-right: 6px; }
+  .theme i u { width: 10px; height: 10px; border-radius: 50%; }
+  .theme span { display: block; font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #accents { display: grid; grid-template-columns: repeat(4, 1fr); grid-gap: 10px 8px; margin-top: 8px; }
+  .swatch { display: flex; flex-direction: column; align-items: center; padding: 6px 0; border-radius: 10px; }
+  .swatch i { width: 40px; height: 40px; border-radius: 50%; border: 3px solid transparent; background-clip: padding-box;
+    box-shadow: 0 0 0 2px var(--tile); }
+  .swatch.on i { box-shadow: 0 0 0 2px var(--tile), 0 0 0 4px var(--text); }
+  .swatch span { font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .swatch.on span { color: var(--text); font-weight: 600; }
+  .hint-text { margin-top: auto; font-size: 12px; color: var(--muted); }
+  .action { display: flex; align-items: center; margin-top: 10px; }
+  .action .btn { flex: none; width: 150px; }
+  .action small { margin-left: 12px; font-size: 12px; color: var(--muted); line-height: 1.3; }
   .card { background: var(--tile); border-radius: 16px; padding: 10px 14px; display: flex; flex-direction: column; }
   .card h3 { margin: 0 0 4px; font: 600 11px GeistMono, monospace; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
   .row { display: flex; align-items: center; justify-content: space-between; min-height: 46px; }
@@ -74,14 +178,14 @@
   .row label small { display: block; font: 500 11px GeistMono, monospace; color: var(--muted); margin-top: 2px; }
   .seg { display: flex; background: var(--bg); border-radius: 10px; padding: 3px; flex: none; }
   .seg div { padding: 0 12px; height: 34px; line-height: 34px; border-radius: 8px; font-size: 14px; font-weight: 500; color: var(--muted); }
-  .seg div.on { background: var(--tile-hi); color: var(--text); }
+  .seg div.on { background: var(--acc-soft); color: var(--acc); }
   .slider { display: flex; align-items: center; min-height: 46px; transition: opacity .15s; }
   .slider.dim { opacity: .45; }
   .slider span { font-size: 16px; width: 26px; text-align: center; }
   input[type=range] { -webkit-appearance: none; flex: 1; height: 40px; background: transparent; margin: 0 8px; }
   input[type=range]::-webkit-slider-runnable-track { height: 8px; border-radius: 4px; background: var(--line); }
   input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 30px; height: 30px; border-radius: 50%;
-    background: var(--text); margin-top: -11px; box-shadow: 0 2px 8px rgba(0,0,0,.5); }
+    background: var(--acc); margin-top: -11px; box-shadow: 0 2px 8px var(--shadow); }
   .kv { display: grid; grid-template-columns: auto 1fr; grid-gap: 5px 12px; font: 500 13px GeistMono, monospace; color: var(--muted);
     padding: 6px 0; }
   .kv b { color: var(--text); font-weight: 500; text-align: right; }
@@ -90,14 +194,14 @@
     font-size: 14px; font-weight: 600; }
   .btn + .btn { margin-left: 8px; }
   .btn.danger { color: var(--bad); }
-  .btn.armed { background: var(--bad); color: #0b0c0f; }
+  .btn.armed { background: var(--bad); color: var(--on-acc); }
 
   /* bottom bar */
-  #bar { flex: none; height: 52px; display: flex; align-items: center; border-top: 1px solid #1a1d23; }
+  #bar { flex: none; height: 52px; display: flex; align-items: center; border-top: 1px solid var(--edge); }
   #tabs { flex: 1; display: flex; overflow: hidden; min-width: 0; }
   .tab { flex: none; padding: 0 14px; height: 34px; line-height: 34px; border-radius: 17px; font-size: 15px; font-weight: 500;
     color: var(--muted); margin-right: 4px; }
-  .tab.on { background: var(--panel); color: var(--text); }
+  .tab.on { background: var(--acc-soft); color: var(--acc); }
   #clock { flex: none; font-size: 19px; font-weight: 600; font-variant-numeric: tabular-nums; margin: 0 4px 0 10px; letter-spacing: -.01em; }
   #clock.unset { color: var(--muted); }
   #status { flex: none; display: flex; align-items: center; font: 500 12px GeistMono, monospace; color: var(--muted); margin-left: 8px; }
@@ -107,25 +211,25 @@
   #status.bad i { background: var(--bad); }
 
   #toast { position: fixed; left: 50%; top: 66px; transform: translate(-50%, -8px); opacity: 0; pointer-events: none;
-    background: #262a33; color: var(--text); padding: 10px 18px; border-radius: 12px; font-size: 16px; font-weight: 500;
+    background: var(--toast); color: var(--text); padding: 10px 18px; border-radius: 12px; font-size: 16px; font-weight: 500;
     max-width: 680px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: opacity .15s, transform .15s;
-    box-shadow: 0 8px 30px rgba(0,0,0,.5); border-left: 4px solid var(--key); }
+    box-shadow: 0 8px 30px var(--shadow); border-left: 4px solid var(--acc); }
   #toast.show { opacity: 1; transform: translate(-50%, 0); }
   #toast.ok { border-left-color: var(--media); }
   #toast.fail { border-left-color: var(--bad); }
   #toast.warn { border-left-color: var(--warn); }
 
-  #standby { position: fixed; left: 0; top: 0; right: 0; bottom: 0; background: #000; display: none; z-index: 5;
+  #standby { position: fixed; left: 0; top: 0; right: 0; bottom: 0; background: var(--standby); display: none; z-index: 5;
     flex-direction: column; align-items: center; justify-content: center; }
   #standby.show { display: flex; }
   #sbclock { font-size: 150px; font-weight: 300; line-height: 1; letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
-  #sbclock.unset { color: #3a3f49; }
+  #sbclock.unset { color: var(--faint); }
   #sbsuffix { font-size: 36px; font-weight: 400; letter-spacing: 0; margin-left: 10px; color: var(--muted); }
   #sbdate { font-size: 22px; color: var(--muted); margin-top: 8px; }
   #sbhint { margin-top: 28px; font-size: 15px; color: var(--muted); max-width: 640px; text-align: center; }
-  #sbstuck { position: absolute; bottom: 22px; font-size: 13px; color: #4b515c; display: flex; align-items: center; }
+  #sbstuck { position: absolute; bottom: 22px; font-size: 13px; color: var(--faint); display: flex; align-items: center; }
   #sbstuck .btn { flex: none; height: 34px; line-height: 34px; padding: 0 14px; margin-left: 10px; font-size: 13px; color: var(--muted); }
-  #offline { position: fixed; left: 0; top: 0; right: 0; bottom: 0; background: rgba(11,12,15,.92); display: none;
+  #offline { position: fixed; left: 0; top: 0; right: 0; bottom: 0; background: var(--veil); display: none;
     align-items: center; justify-content: center; font-size: 20px; color: var(--muted); }
   #offline.show { display: flex; }
 </style>
@@ -134,12 +238,27 @@
   <div id="top">
     <div id="presets"></div>
     <div id="dial">
-      <svg viewBox="0 0 26 26" fill="none"><circle cx="13" cy="13" r="10.5" stroke="#7d8492" stroke-width="2"/><line x1="13" y1="4.5" x2="13" y2="9.5" stroke="#eef0f3" stroke-width="2.4" stroke-linecap="round"/></svg>
+      <svg viewBox="0 0 26 26" fill="none"><circle cx="13" cy="13" r="10.5" style="stroke:var(--muted)" stroke-width="2"/><line x1="13" y1="4.5" x2="13" y2="9.5" style="stroke:var(--acc)" stroke-width="2.4" stroke-linecap="round"/></svg>
       <div class="t"><small>Dial</small><strong id="dialname">–</strong></div>
     </div>
   </div>
   <div id="grid"></div>
   <div id="settings">
+    <div id="snav" class="seg"><div data-sec="general">General</div><div data-sec="appearance">Appearance</div><div data-sec="device">Device</div></div>
+    <div class="sec" id="sec-appearance">
+      <div class="card"><h3>Theme</h3><div id="themes"></div></div>
+      <div class="card"><h3>Accent</h3><div id="accents"></div>
+        <div class="hint-text">“Theme” uses the color scheme’s own accent.</div></div>
+    </div>
+    <div class="sec" id="sec-device">
+      <div class="card"><h3>Device</h3><div class="kv" id="kv"></div></div>
+      <div class="card"><h3>Actions</h3>
+        <div class="action"><div class="btn" data-sys="reconnect">Reconnect USB</div><small>Detach and reattach, like pulling the cable</small></div>
+        <div class="action"><div class="btn" data-sys="restart">Restart service</div><small>Reload the macro pad (USB reconnects)</small></div>
+        <div class="action"><div class="btn danger" data-sys="reboot">Reboot</div><small>Restart the Car Thing (~25 s)</small></div>
+      </div>
+    </div>
+    <div class="sec" id="sec-general">
     <div class="card">
       <h3>Display</h3>
       <div class="row"><label>Brightness<small id="bnow"></small></label>
@@ -155,11 +274,10 @@
       <h3>Dial</h3>
       <div class="row"><label>Direction</label>
         <div class="seg"><div data-set="dial_invert" data-val="false">Normal</div><div data-set="dial_invert" data-val="true">Reversed</div></div></div>
-      <div class="row"><label>Clock<small id="tzname"></small></label>
+      <h3 style="margin-top:10px">Clock</h3>
+      <div class="row"><label>Format<small id="tzname"></small></label>
         <div class="seg"><div data-set="clock_24h" data-val="true">24h</div><div data-set="clock_24h" data-val="false">12h</div></div></div>
-      <h3 style="margin-top:10px">Device</h3>
-      <div class="kv" id="kv"></div>
-      <div class="btns"><div class="btn" data-sys="reconnect">Reconnect USB</div><div class="btn" data-sys="restart">Restart service</div><div class="btn danger" data-sys="reboot">Reboot</div></div>
+    </div>
     </div>
   </div>
   <div id="bar">
@@ -274,6 +392,7 @@ function render() {
   var on = $('tabs').querySelector('.on');
   if (on) on.scrollIntoView({ inline: 'nearest', block: 'nearest' });
 
+  applyTheme();
   document.body.classList.toggle('settings', showSettings);
   if (showSettings) renderSettings();
   renderStatus();
@@ -296,11 +415,66 @@ function renderStatus() {
   $('statustext').textContent = text;
 }
 
+// ---- themes (palettes live in the CSS; this is for the picker and the accent)
+var THEMES = {
+  dark:       { name: 'Dark',        bg: '#0b0c0f', tile: '#1a1d23', text: '#eef0f3', acc: '#1ed760' },
+  black:      { name: 'Black',       bg: '#000000', tile: '#101215', text: '#f2f3f5', acc: '#1ed760' },
+  light:      { name: 'Light',       bg: '#eceef2', tile: '#ffffff', text: '#15171b', acc: '#12a150', light: true },
+  nord:       { name: 'Nord',        bg: '#2e3440', tile: '#3b4252', text: '#eceff4', acc: '#88c0d0' },
+  dracula:    { name: 'Dracula',     bg: '#282a36', tile: '#44475a', text: '#f8f8f2', acc: '#bd93f9' },
+  catppuccin: { name: 'Catppuccin',  bg: '#181825', tile: '#313244', text: '#cdd6f4', acc: '#cba6f7' },
+  gruvbox:    { name: 'Gruvbox',     bg: '#282828', tile: '#3c3836', text: '#ebdbb2', acc: '#fabd2f' },
+  tokyonight: { name: 'Tokyo Night', bg: '#1a1b26', tile: '#24283b', text: '#c0caf5', acc: '#7aa2f7' },
+  solarized:  { name: 'Solarized',   bg: '#002b36', tile: '#073642', text: '#eee8d5', acc: '#2aa198' }
+};
+var ACCENTS = {   // [on dark themes, on light themes]
+  green: ['#1ed760', '#12a150'], blue: ['#5b9cff', '#2f6fe0'], purple: ['#a78bfa', '#7c5cdb'],
+  orange: ['#ff9f43', '#d9730d'], pink: ['#f472b6', '#d6407f'], red: ['#ff5d5d', '#e03e3e']
+};
+function rgba(hex, a) {
+  var n = parseInt(hex.slice(1), 16);
+  return 'rgba(' + (n >> 16) + ',' + (n >> 8 & 255) + ',' + (n & 255) + ',' + a + ')';
+}
+function themeAccent(themeKey, accent) {
+  var th = THEMES[themeKey] || THEMES.dark;
+  return ACCENTS[accent] ? ACCENTS[accent][th.light ? 1 : 0] : th.acc;
+}
+var appliedTheme = '';
+function applyTheme() {
+  var s = st.settings || {}, t = THEMES[s.theme] ? s.theme : 'dark', key = t + '/' + s.accent;
+  if (key === appliedTheme) return;
+  appliedTheme = key;
+  var acc = themeAccent(t, s.accent), root = document.documentElement;
+  root.setAttribute('data-theme', t);
+  root.style.setProperty('--acc', acc);
+  root.style.setProperty('--acc-soft', rgba(acc, THEMES[t].light ? .14 : .18));
+}
+function buildAppearance() {
+  $('themes').innerHTML = Object.keys(THEMES).map(function (k) {
+    var t = THEMES[k];
+    return '<div class="theme" data-set="theme" data-val="&quot;' + k + '&quot;" style="background:' + t.bg + '">' +
+      '<i style="background:' + t.tile + '"><b style="background:' + t.text + ';opacity:.5"></b><u style="background:' + t.acc + '"></u></i>' +
+      '<span style="color:' + t.text + '">' + t.name + '</span></div>';
+  }).join('');
+  var themeKey = THEMES[(st.settings || {}).theme] ? st.settings.theme : 'dark';
+  $('accents').innerHTML = ['theme'].concat(Object.keys(ACCENTS)).map(function (k) {
+    return '<div class="swatch" data-set="accent" data-val="&quot;' + k + '&quot;"><i style="background:' + themeAccent(themeKey, k) +
+      '"></i><span>' + (k === 'theme' ? 'Theme' : k.charAt(0).toUpperCase() + k.slice(1)) + '</span></div>';
+  }).join('');
+}
+
 // ---- settings tab
-var showSettings = false, info = null, dragging = false, infoTimer = null;
+var showSettings = false, settingsSec = 'general', info = null, dragging = false, infoTimer = null, builtFor = '';
 function renderSettings() {
   var s = st.settings || {};
-  var current = { clock_24h: s.clock_24h, brightness_auto: s.brightness_auto, os_mode: st.os_mode, layout: st.layout, dial_invert: st.dial_invert };
+  if (builtFor !== s.theme) { builtFor = s.theme; buildAppearance(); }   // swatches show the theme's tints
+  var secs = ['general', 'appearance', 'device'];
+  for (var j = 0; j < secs.length; j++) {
+    $('sec-' + secs[j]).classList.toggle('on', secs[j] === settingsSec);
+    $('snav').children[j].classList.toggle('on', secs[j] === settingsSec);
+  }
+  var current = { clock_24h: s.clock_24h, brightness_auto: s.brightness_auto, os_mode: st.os_mode, layout: st.layout,
+    dial_invert: st.dial_invert, theme: THEMES[s.theme] ? s.theme : 'dark', accent: ACCENTS[s.accent] ? s.accent : 'theme' };
   var opts = $('settings').querySelectorAll('[data-set]');
   for (var i = 0; i < opts.length; i++) {
     var key = opts[i].getAttribute('data-set');
@@ -462,7 +636,7 @@ $('clock').addEventListener('pointerup', function () {
 var startX = 0, startY = 0, downEl = null;
 document.addEventListener('pointerdown', function (e) {
   startX = e.clientX; startY = e.clientY;
-  downEl = e.target.closest('.tile[data-i], .preset[data-i], #dial, .tab, #status, [data-set], [data-sys]');
+  downEl = e.target.closest('.tile[data-i], .preset[data-i], #dial, .tab, #status, [data-set], [data-sys], [data-sec]');
   if (downEl) downEl.classList.add('down');
 });
 document.addEventListener('pointercancel', function () { if (downEl) downEl.classList.remove('down'); downEl = null; });
@@ -486,6 +660,7 @@ document.addEventListener('pointerup', function (e) {
     post('/api/settings', body);
   }
   else if (el.hasAttribute('data-sys')) system(el);
+  else if (el.hasAttribute('data-sec')) { settingsSec = el.getAttribute('data-sec'); renderSettings(); }
   else if (el.hasAttribute('data-settings')) openSettings(true);
   else if (el.classList.contains('tile')) post('/api/tap', { page: st.page, index: i });
   else if (el.classList.contains('preset')) post('/api/preset', { index: i });
