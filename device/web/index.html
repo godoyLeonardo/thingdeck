@@ -1,0 +1,480 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Macro Pad</title>
+<style>
+  @font-face { font-family: Geist; src: url(/fonts/GeistVF.ttf); font-weight: 100 900; }
+  @font-face { font-family: GeistMono; src: url(/fonts/GeistMonoVF.ttf); font-weight: 100 900; }
+  :root {
+    --bg: #0b0c0f;
+    --panel: #15171c;
+    --tile: #1a1d23;
+    --tile-hi: #23272f;
+    --line: #2a2e37;
+    --text: #eef0f3;
+    --muted: #7d8492;
+    --media: #1ed760;
+    --key: #5b9cff;
+    --type: #f5b942;
+    --nav: #a78bfa;
+    --mouse: #2dd4bf;
+    --bad: #ff5d5d;
+    --warn: #f5b942;
+  }
+  * { box-sizing: border-box; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); overflow: hidden;
+    font-family: Geist, 'Circular Sp UI v3 T', 'Noto Sans', sans-serif; touch-action: none; cursor: none; }
+  body { display: flex; flex-direction: column; padding: 8px 10px 0; }
+
+  /* top strip: mirrors the 4 preset buttons on the top edge + the dial */
+  #top { display: flex; height: 50px; flex: none; }
+  #presets { flex: 1; display: grid; grid-template-columns: repeat(4, 1fr); grid-gap: 8px; margin-right: 8px; }
+  .preset { display: flex; align-items: center; background: var(--panel); border-radius: 12px; padding: 0 10px;
+    min-width: 0; transition: background .15s; }
+  .preset b { flex: none; width: 22px; height: 22px; border-radius: 6px; background: var(--line); color: var(--muted);
+    font: 600 12px/22px GeistMono, monospace; text-align: center; margin-right: 8px; }
+  .preset span { font-size: 15px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .preset.empty span { color: var(--muted); }
+  #dial { flex: none; width: 168px; display: flex; align-items: center; background: var(--panel); border-radius: 12px;
+    padding: 0 12px; transition: background .15s; }
+  #dial svg { flex: none; width: 26px; height: 26px; margin-right: 10px; transition: transform .12s; }
+  #dial .t { min-width: 0; }
+  #dial small { display: block; font: 500 10px GeistMono, monospace; color: var(--muted); letter-spacing: .08em; text-transform: uppercase; }
+  #dial strong { display: block; font-size: 16px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* tile grid */
+  #grid { flex: 1; display: grid; grid-gap: 8px; padding: 8px 0; min-height: 0; transition: opacity .12s, transform .12s; }
+  #grid.swipe-l { transform: translateX(-24px); opacity: 0; }
+  #grid.swipe-r { transform: translateX(24px); opacity: 0; }
+  .tile { position: relative; background: var(--tile); border-radius: 16px; padding: 12px 14px; display: flex;
+    flex-direction: column; justify-content: space-between; overflow: hidden; border: 1px solid transparent;
+    transition: background .12s, transform .08s, border-color .12s; }
+  .tile.blank { background: transparent; border: 1px dashed #1c1f25; }
+  .tile .icon { font-size: 26px; line-height: 1; color: var(--accent); font-family: 'Noto Color Emoji', Geist, sans-serif; }
+  .tile .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+  .tile .label { font-size: 20px; font-weight: 600; line-height: 1.15; letter-spacing: -.01em; }
+  .tile .hint { font: 500 12px GeistMono, monospace; color: var(--muted); margin-top: 4px; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis; }
+  .tile.down, .preset.down, #dial.down { background: var(--tile-hi); transform: scale(.97); }
+  .tile.fire { border-color: var(--accent); background: var(--tile-hi); }
+  .preset.fire { background: var(--tile-hi); }
+  .preset.fire b { background: var(--key); color: #0b0c0f; }
+  #dial.fire { background: var(--tile-hi); }
+
+  /* settings */
+  #settings { flex: 1; display: none; grid-template-columns: 1fr 1fr; grid-gap: 8px; padding: 8px 0; min-height: 0; }
+  body.settings #settings { display: grid; }
+  body.settings #grid { display: none; }
+  .card { background: var(--tile); border-radius: 16px; padding: 10px 14px; display: flex; flex-direction: column; }
+  .card h3 { margin: 0 0 4px; font: 600 11px GeistMono, monospace; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  .row { display: flex; align-items: center; justify-content: space-between; min-height: 46px; }
+  .row label { font-size: 15px; font-weight: 600; }
+  .row label small { display: block; font: 500 11px GeistMono, monospace; color: var(--muted); margin-top: 2px; }
+  .seg { display: flex; background: var(--bg); border-radius: 10px; padding: 3px; flex: none; }
+  .seg div { padding: 0 12px; height: 34px; line-height: 34px; border-radius: 8px; font-size: 14px; font-weight: 500; color: var(--muted); }
+  .seg div.on { background: var(--tile-hi); color: var(--text); }
+  .slider { display: flex; align-items: center; min-height: 46px; transition: opacity .15s; }
+  .slider.dim { opacity: .45; }
+  .slider span { font-size: 16px; width: 26px; text-align: center; }
+  input[type=range] { -webkit-appearance: none; flex: 1; height: 40px; background: transparent; margin: 0 8px; }
+  input[type=range]::-webkit-slider-runnable-track { height: 8px; border-radius: 4px; background: var(--line); }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 30px; height: 30px; border-radius: 50%;
+    background: var(--text); margin-top: -11px; box-shadow: 0 2px 8px rgba(0,0,0,.5); }
+  .kv { display: grid; grid-template-columns: auto 1fr; grid-gap: 5px 12px; font: 500 13px GeistMono, monospace; color: var(--muted);
+    padding: 6px 0; }
+  .kv b { color: var(--text); font-weight: 500; text-align: right; }
+  .btns { display: flex; margin-top: auto; padding-top: 6px; }
+  .btn { flex: 1; height: 40px; line-height: 40px; text-align: center; border-radius: 10px; background: var(--tile-hi);
+    font-size: 14px; font-weight: 600; }
+  .btn + .btn { margin-left: 8px; }
+  .btn.danger { color: var(--bad); }
+  .btn.armed { background: var(--bad); color: #0b0c0f; }
+
+  /* bottom bar */
+  #bar { flex: none; height: 52px; display: flex; align-items: center; border-top: 1px solid #1a1d23; }
+  #tabs { flex: 1; display: flex; overflow: hidden; min-width: 0; }
+  .tab { flex: none; padding: 0 14px; height: 34px; line-height: 34px; border-radius: 17px; font-size: 15px; font-weight: 500;
+    color: var(--muted); margin-right: 4px; }
+  .tab.on { background: var(--panel); color: var(--text); }
+  #clock { flex: none; font-size: 19px; font-weight: 600; font-variant-numeric: tabular-nums; margin: 0 4px 0 10px; letter-spacing: -.01em; }
+  #clock.unset { color: var(--muted); }
+  #status { flex: none; display: flex; align-items: center; font: 500 12px GeistMono, monospace; color: var(--muted); margin-left: 8px; }
+  #status i { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); margin-right: 7px; }
+  #status.connected i { background: var(--media); box-shadow: 0 0 8px var(--media); }
+  #status.suspended i { background: var(--warn); }
+  #status.bad i { background: var(--bad); }
+
+  #toast { position: fixed; left: 50%; top: 66px; transform: translate(-50%, -8px); opacity: 0; pointer-events: none;
+    background: #262a33; color: var(--text); padding: 10px 18px; border-radius: 12px; font-size: 16px; font-weight: 500;
+    max-width: 680px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: opacity .15s, transform .15s;
+    box-shadow: 0 8px 30px rgba(0,0,0,.5); border-left: 4px solid var(--key); }
+  #toast.show { opacity: 1; transform: translate(-50%, 0); }
+  #toast.ok { border-left-color: var(--media); }
+  #toast.fail { border-left-color: var(--bad); }
+  #toast.warn { border-left-color: var(--warn); }
+
+  #offline { position: fixed; left: 0; top: 0; right: 0; bottom: 0; background: rgba(11,12,15,.92); display: none;
+    align-items: center; justify-content: center; font-size: 20px; color: var(--muted); }
+  #offline.show { display: flex; }
+</style>
+</head>
+<body>
+  <div id="top">
+    <div id="presets"></div>
+    <div id="dial">
+      <svg viewBox="0 0 26 26" fill="none"><circle cx="13" cy="13" r="10.5" stroke="#7d8492" stroke-width="2"/><line x1="13" y1="4.5" x2="13" y2="9.5" stroke="#eef0f3" stroke-width="2.4" stroke-linecap="round"/></svg>
+      <div class="t"><small>Dial</small><strong id="dialname">–</strong></div>
+    </div>
+  </div>
+  <div id="grid"></div>
+  <div id="settings">
+    <div class="card">
+      <h3>Display</h3>
+      <div class="row"><label>Brightness<small id="bnow"></small></label>
+        <div class="seg"><div data-set="brightness_auto" data-val="true">Auto</div><div data-set="brightness_auto" data-val="false">Manual</div></div></div>
+      <div class="slider" id="bslider"><span>☀</span><input type="range" id="bright" min="5" max="255" step="1"><span>☀️</span></div>
+      <h3 style="margin-top:10px">Input</h3>
+      <div class="row"><label>Host OS<small id="osdet"></small></label>
+        <div class="seg"><div data-set="os_mode" data-val="&quot;auto&quot;">Auto</div><div data-set="os_mode" data-val="&quot;windows&quot;">Windows</div><div data-set="os_mode" data-val="&quot;linux&quot;">Linux</div></div></div>
+      <div class="row"><label>Keyboard layout</label>
+        <div class="seg"><div data-set="layout" data-val="&quot;latam&quot;">Latin Am.</div><div data-set="layout" data-val="&quot;us&quot;">US</div></div></div>
+    </div>
+    <div class="card">
+      <h3>Dial</h3>
+      <div class="row"><label>Direction</label>
+        <div class="seg"><div data-set="dial_invert" data-val="false">Normal</div><div data-set="dial_invert" data-val="true">Reversed</div></div></div>
+      <div class="row"><label>Clock<small id="tzname"></small></label>
+        <div class="seg"><div data-set="clock_24h" data-val="true">24h</div><div data-set="clock_24h" data-val="false">12h</div></div></div>
+      <h3 style="margin-top:10px">Device</h3>
+      <div class="kv" id="kv"></div>
+      <div class="btns"><div class="btn" data-sys="restart">Restart service</div><div class="btn danger" data-sys="reboot">Reboot</div></div>
+    </div>
+  </div>
+  <div id="bar">
+    <div id="tabs"></div>
+    <div id="clock" class="unset">--:--</div>
+    <div id="status"><i></i><span id="statustext">…</span></div>
+  </div>
+  <div id="toast"></div>
+  <div id="offline">Reconnecting to macro pad service…</div>
+
+<script>
+'use strict';
+var cfg = { pages: [], dial_modes: [] }, st = { page: 0, dial: 0, usb: 'off' }, presets = [];
+var $ = function (id) { return document.getElementById(id); };
+
+function post(path, body) {
+  return fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) })
+    .catch(function () {});
+}
+
+function load() {
+  return fetch('/api/state').then(function (r) { return r.json(); }).then(function (j) {
+    cfg = j.config || cfg; st = j.state || st; presets = j.presets || [];
+    render();
+  });
+}
+
+// ---- labels for what an action does
+var PRETTY = { ctrl: 'Ctrl', shift: 'Shift', alt: 'Alt', win: 'Win', gui: 'Win', cmd: '⌘', meta: 'Win', super: 'Win',
+  esc: 'Esc', enter: '⏎', tab: 'Tab', space: 'Space', left: '←', right: '→', up: '↑', down: '↓',
+  pageup: 'PgUp', pagedown: 'PgDn', delete: 'Del', backspace: '⌫', grave: '`' };
+function prettyKey(k) {
+  return k.split('+').map(function (p) {
+    p = p.trim(); var l = p.toLowerCase();
+    if (PRETTY[l]) return PRETTY[l];
+    if (/^f\d+$/.test(l)) return l.toUpperCase();
+    return p.length === 1 ? p.toUpperCase() : p.charAt(0).toUpperCase() + p.slice(1);
+  }).join('+');
+}
+function hint(a) {
+  if (!a) return '';
+  if (a.hint !== undefined) return a.hint;
+  if (a.key) return prettyKey(a.key);
+  if (a.media) return '';
+  if (a.type !== undefined) { var t = a.type.replace(/\n/g, '⏎'); return '“' + (t.length > 18 ? t.slice(0, 17) + '…' : t) + '”'; }
+  if (a.seq) return a.seq.map(hint).join(' → ');
+  if (a.wheel || a.hwheel) return (a.mods ? prettyKey(a.mods) + '+' : '') + 'wheel';
+  if (a.click) return a.click + ' click';
+  if (a.mic_mute) return 'mic mute key';
+  if (a.page !== undefined) return 'page → ' + a.page;
+  if (a.dial !== undefined) return 'dial → ' + a.dial;
+  return '';
+}
+// per-OS override: {"key": "win+tab", "linux": {"key": "win"}}
+function variant(a) {
+  var o = a && a[st.os];
+  if (!o || typeof o !== 'object') return a;
+  var r = {};
+  ['label', 'icon', 'color'].forEach(function (k) { if (a[k] !== undefined) r[k] = a[k]; });
+  for (var k in o) r[k] = o[k];
+  return r;
+}
+function kind(a) {
+  if (!a) return 'key';
+  if (a.color) return a.color;
+  if (a.media) return 'var(--media)';
+  if (a.type !== undefined || a.seq) return 'var(--type)';
+  if (a.page !== undefined || a.dial !== undefined) return 'var(--nav)';
+  if (a.wheel || a.hwheel || a.click) return 'var(--mouse)';
+  return 'var(--key)';
+}
+
+// ---- rendering
+function render() {
+  var pages = cfg.pages || [];
+  var page = pages[st.page] || { tiles: [] };
+  var grid = page.grid || cfg.grid || [4, 2];
+  var g = $('grid');
+  g.style.gridTemplateColumns = 'repeat(' + grid[0] + ', 1fr)';
+  g.style.gridTemplateRows = 'repeat(' + grid[1] + ', 1fr)';
+  var html = '';
+  var tiles = page.tiles || [];
+  for (var i = 0; i < grid[0] * grid[1]; i++) {
+    var t = variant(tiles[i]);
+    if (!t) { html += '<div class="tile blank"></div>'; continue; }
+    html += '<div class="tile" data-i="' + i + '" style="--accent:' + kind(t) + '">' +
+      (t.icon ? '<div class="icon">' + esc(t.icon) + '</div>' : '<div class="dot"></div>') +
+      '<div><div class="label">' + esc(t.label || '') + '</div><div class="hint">' + esc(hint(t)) + '</div></div></div>';
+  }
+  g.innerHTML = html;
+
+  var ph = '';
+  for (var p = 0; p < 4; p++) {
+    var pr = variant(presets[p]);
+    ph += '<div class="preset' + (pr ? '' : ' empty') + '" data-i="' + p + '"><b>' + (p + 1) + '</b><span>' +
+      esc(pr ? pr.label || hint(pr) : '—') + '</span></div>';
+  }
+  $('presets').innerHTML = ph;
+
+  var modes = cfg.dial_modes || [];
+  $('dialname').textContent = modes[st.dial] ? modes[st.dial].name : '–';
+
+  $('tabs').innerHTML = pages.map(function (pg, i) {
+    return '<div class="tab' + (i === st.page && !showSettings ? ' on' : '') + '" data-i="' + i + '">' + esc(pg.name || 'Page ' + (i + 1)) + '</div>';
+  }).join('') + '<div class="tab' + (showSettings ? ' on' : '') + '" data-settings="1">⚙ Settings</div>';
+  var on = $('tabs').querySelector('.on');
+  if (on) on.scrollIntoView({ inline: 'nearest', block: 'nearest' });
+
+  document.body.classList.toggle('settings', showSettings);
+  if (showSettings) renderSettings();
+  renderStatus();
+  tick();
+}
+
+function renderStatus() {
+  var s = $('status'), text;
+  s.className = '';
+  if (st.mode === 'safe') { text = 'SAFE MODE'; s.className = 'suspended'; }
+  else if (st.mode === 'error') { text = 'USB ERROR'; s.className = 'bad'; }
+  else if (st.mode === 'starting') { text = 'STARTING'; }
+  else if (st.usb === 'connected') { text = 'USB'; s.className = 'connected'; }
+  else if (st.usb === 'suspended') { text = 'HOST ASLEEP'; s.className = 'suspended'; }
+  else { text = 'NO HOST'; s.className = 'bad'; }
+  if (st.mode === 'ok' && st.usb === 'connected') {
+    text += ' · ' + (st.os === 'linux' ? 'LINUX' : 'WIN') + (st.os_mode === 'auto' ? ' (auto)' : '');
+  }
+  $('statustext').textContent = text;
+}
+
+// ---- settings tab
+var showSettings = false, info = null, dragging = false, infoTimer = null;
+function renderSettings() {
+  var s = st.settings || {};
+  var current = { clock_24h: s.clock_24h, brightness_auto: s.brightness_auto, os_mode: st.os_mode, layout: st.layout, dial_invert: st.dial_invert };
+  var opts = $('settings').querySelectorAll('[data-set]');
+  for (var i = 0; i < opts.length; i++) {
+    var key = opts[i].getAttribute('data-set');
+    opts[i].classList.toggle('on', JSON.stringify(current[key]) === opts[i].getAttribute('data-val'));
+  }
+  $('bslider').classList.toggle('dim', !!s.brightness_auto);
+  if (!dragging) {
+    $('bright').value = s.brightness_auto && info ? info.brightness_now : s.brightness;
+  }
+  $('tzname').textContent = st.timezone || 'UTC';
+  $('osdet').textContent = st.os_detected ? 'detected: ' + st.os_detected : 'not detected yet';
+  $('bnow').textContent = s.brightness_auto ? 'light sensor' : Math.round((s.brightness || 0) / 2.55) + '%';
+  if (info) {
+    var up = Math.floor(info.uptime), h = Math.floor(up / 3600), m = Math.floor(up % 3600 / 60);
+    $('kv').innerHTML =
+      '<span>Uptime</span><b>' + h + 'h ' + m + 'm</b>' +
+      '<span>SoC temp</span><b>' + info.temp_c.toFixed(1) + ' °C</b>' +
+      '<span>Memory free</span><b>' + info.mem_avail_mb + ' / ' + info.mem_total_mb + ' MB</b>' +
+      '<span>Load</span><b>' + info.load.join(' ') + '</b>' +
+      '<span>USB</span><b>' + st.usb + '</b>' +
+      '<span>Network</span><b>' + esc(netText()) + '</b>' +
+      '<span>Time</span><b>' + esc(syncText()) + '</b>';
+  }
+}
+function pollInfo() {
+  fetch('/api/info').then(function (r) { return r.json(); }).then(function (j) {
+    info = j;
+    if (j.net) st.net = j.net;
+    if (showSettings) renderSettings();
+  }).catch(function () {});
+}
+function openSettings(open) {
+  showSettings = open;
+  clearInterval(infoTimer);
+  if (open) { pollInfo(); infoTimer = setInterval(pollInfo, 5000); }
+  render();
+}
+var lastSent = 0, pendingBright = null;
+$('bright').addEventListener('pointerdown', function () { dragging = true; });
+$('bright').addEventListener('input', function () {
+  pendingBright = parseInt(this.value, 10);
+  var now = Date.now();
+  if (now - lastSent > 120) { lastSent = now; post('/api/settings', { brightness_auto: false, brightness: pendingBright }); }
+});
+$('bright').addEventListener('change', function () {
+  dragging = false;
+  post('/api/settings', { brightness_auto: false, brightness: parseInt(this.value, 10) });
+});
+var armed = null;
+function system(el) {
+  var what = el.getAttribute('data-sys');
+  if (armed !== el) {           // two taps: arm, then confirm
+    if (armed) { armed.classList.remove('armed'); armed.textContent = armed._label; }
+    armed = el; el._label = el.textContent; el.classList.add('armed'); el.textContent = 'Tap again';
+    setTimeout(function () { if (armed === el) { el.classList.remove('armed'); el.textContent = el._label; armed = null; } }, 3000);
+    return;
+  }
+  armed = null;
+  el.textContent = what === 'reboot' ? 'Rebooting…' : 'Restarting…';
+  post('/api/system', { do: what });
+}
+
+function esc(s) {
+  return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; });
+}
+
+// ---- feedback
+function fire(el) {
+  if (!el) return;
+  el.classList.add('fire');
+  clearTimeout(el._t);
+  el._t = setTimeout(function () { el.classList.remove('fire'); }, 220);
+}
+var toastTimer;
+function toast(text, level) {
+  var t = $('toast');
+  t.textContent = text;
+  t.className = 'show ' + (level || 'info');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function () { t.className = level || 'info'; }, level === 'fail' ? 6000 : 2500);
+}
+var angle = 0;
+function spin(dir) {
+  angle += dir * 30;
+  $('dial').querySelector('svg').style.transform = 'rotate(' + angle + 'deg)';
+  fire($('dial'));
+}
+
+// ---- clock: the device has no RTC, so the time only exists once NTP over the USB network worked
+function netText() {
+  var n = st.net || {};
+  if (!n.ip) return 'no address yet';
+  return n.ip + (n.gateway ? '' : ' (no gateway)');
+}
+function syncText() {
+  var n = st.net || {};
+  if (n.synced_ago != null) {
+    var m = Math.floor(n.synced_ago / 60);
+    return 'synced ' + (m < 1 ? 'just now' : m < 60 ? m + ' min ago' : Math.floor(m / 60) + ' h ago');
+  }
+  if (n.sync_error) return 'sync failed';
+  return n.time_valid ? 'set, not synced' : 'waiting for network';
+}
+// This Chromium has no Intl, so the service sends the current UTC offset (it follows DST).
+function tick() {
+  var el = $('clock'), n = st.net || {};
+  if (!n.time_valid) { el.textContent = '--:--'; el.className = 'unset'; return; }
+  var d = new Date(Date.now() + (st.utc_offset || 0) * 1000);
+  var h = d.getUTCHours(), m = d.getUTCMinutes();
+  var mm = (m < 10 ? '0' : '') + m;
+  if (st.settings && st.settings.clock_24h === false) {
+    el.textContent = ((h + 11) % 12 + 1) + ':' + mm + (h < 12 ? ' AM' : ' PM');
+  } else {
+    el.textContent = (h < 10 ? '0' : '') + h + ':' + mm;
+  }
+  el.className = '';
+}
+setInterval(tick, 1000);
+$('clock').addEventListener('pointerup', function () {
+  var n = st.net || {};
+  if (!n.time_valid) toast(n.ip ? 'Network up, waiting for the time servers' :
+    'No time yet: turn on internet sharing to the Car Thing’s USB network on your PC', 'warn');
+});
+
+// ---- touch: tap on release, swipe the grid to change page
+var startX = 0, startY = 0, downEl = null;
+document.addEventListener('pointerdown', function (e) {
+  startX = e.clientX; startY = e.clientY;
+  downEl = e.target.closest('.tile[data-i], .preset[data-i], #dial, .tab, #status, [data-set], [data-sys]');
+  if (downEl) downEl.classList.add('down');
+});
+document.addEventListener('pointercancel', function () { if (downEl) downEl.classList.remove('down'); downEl = null; });
+document.addEventListener('pointerup', function (e) {
+  var dx = e.clientX - startX, dy = e.clientY - startY, el = downEl;
+  downEl = null;
+  if (el) el.classList.remove('down');
+  if (!showSettings && Math.abs(dx) > 70 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+    var g = $('grid');
+    g.className = dx < 0 ? 'swipe-l' : 'swipe-r';
+    setTimeout(function () { g.className = ''; }, 140);
+    post('/api/page', { page: dx < 0 ? 'next' : 'prev' });
+    return;
+  }
+  if (!el || Math.abs(dx) > 25 || Math.abs(dy) > 25) return;
+  var i = parseInt(el.getAttribute('data-i'), 10);
+  if (el.hasAttribute('data-set')) {
+    var body = {};
+    body[el.getAttribute('data-set')] = JSON.parse(el.getAttribute('data-val'));
+    post('/api/settings', body);
+  }
+  else if (el.hasAttribute('data-sys')) system(el);
+  else if (el.hasAttribute('data-settings')) openSettings(true);
+  else if (el.classList.contains('tile')) post('/api/tap', { page: st.page, index: i });
+  else if (el.classList.contains('preset')) post('/api/preset', { index: i });
+  else if (el.classList.contains('tab')) {
+    if (showSettings && i === st.page) openSettings(false);
+    else { showSettings = false; clearInterval(infoTimer); post('/api/page', { page: i }); }
+  }
+  else if (el.id === 'dial') post('/api/dial', { dial: 'next' });
+  else if (el.id === 'status') post('/api/os', { os: 'next' });
+});
+document.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+
+// ---- live updates from the service
+function connect() {
+  var es = new EventSource('/api/events');
+  es.onopen = function () { $('offline').className = ''; load(); };
+  es.onerror = function () { $('offline').className = 'show'; };
+  es.onmessage = function (e) {
+    var m = JSON.parse(e.data), d = m.data;
+    if (m.type === 'state') {
+      var pageChanged = d.page !== st.page;
+      st = d;
+      if (pageChanged) { if (showSettings) openSettings(false); load(); } else render();
+      if (d.message) toast(d.message, d.mode === 'error' ? 'fail' : 'warn');
+    } else if (m.type === 'config') {
+      load().then(function () { toast('Config reloaded', 'ok'); });
+    } else if (m.type === 'fired') {
+      if (d.where === 'tile' && d.page === st.page) fire($('grid').querySelector('.tile[data-i="' + d.index + '"]'));
+      if (d.where === 'preset') fire($('presets').querySelector('.preset[data-i="' + d.index + '"]'));
+    } else if (m.type === 'turn') {
+      spin(d.dir);
+    } else if (m.type === 'hw') {
+      if (d.button === 'knob' || d.button === 'back') fire($('dial'));
+    } else if (m.type === 'toast') {
+      toast(d.text, d.level);
+    }
+  };
+}
+load().then(function () { if (st.message) toast(st.message, st.mode === 'error' ? 'fail' : 'warn'); });
+connect();
+</script>
+</body>
+</html>

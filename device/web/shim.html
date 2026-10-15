@@ -1,0 +1,17 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Macro Pad</title></head>
+<body style="margin:0;height:100vh;display:flex;align-items:center;justify-content:center;background:#0c0d10;color:#6b7280;font:22px 'Circular Sp UI v3 T',sans-serif">
+<div>Starting macro pad…</div>
+<script>
+  // The kiosk browser opens this file; hop to the macro pad UI once its server is up.
+  function go() {
+    fetch('http://127.0.0.1:8765/api/ping').then(function (r) {
+      if (r.ok) location.replace('http://127.0.0.1:8765/'); else retry();
+    }).catch(retry);
+  }
+  function retry() { setTimeout(go, 1000); }
+  go();
+</script>
+</body>
+</html>
