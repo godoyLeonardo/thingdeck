@@ -49,12 +49,13 @@ case "$1" in
             echo RNDIS > $R/os_desc/interface.rndis/compatible_id
             echo 5162001 > $R/os_desc/interface.rndis/sub_compatible_id
             ln -s $R $G/configs/c.1/rndis.usb0
-            echo 0x0102 > $G/bcdDevice   # new layout: keeps Windows from reusing a cached one
+            echo 0x0106 > $G/bcdDevice   # new layout: keeps Windows from reusing a cached one
         else
-            echo 0x0101 > $G/bcdDevice
+            echo 0x0105 > $G/bcdDevice
         fi
         ln -s $G/functions/ffs.adb $G/configs/c.1/ffs.adb
         ln -s $G/functions/ffs.hid $G/configs/c.1/ffs.hid
+        echo 0x80 > $G/configs/c.1/bmAttributes   # bus powered, no remote wakeup (this PHY cannot send it)
         echo 0x0104 > $G/idProduct
         echo "Car Thing Macro Pad" > $G/strings/0x409/product
         bind
@@ -65,6 +66,7 @@ case "$1" in
         [ -L $G/configs/c.1/ffs.adb ] || ln -s $G/functions/ffs.adb $G/configs/c.1/ffs.adb
         echo 0x1014 > $G/idProduct
         echo 0x0100 > $G/bcdDevice
+        echo 0x80 > $G/configs/c.1/bmAttributes
         echo Superbird > $G/strings/0x409/product
         [ -e /dev/usb-ffs/adb/ep1 ] || restart_adbd
         bind
