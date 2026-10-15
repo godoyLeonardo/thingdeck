@@ -7,7 +7,7 @@
 #   ./deploy.sh uninstall    remove the boot hook and reboot to the stock UI
 #   ./deploy.sh status       show whether the boot hook is on each system slot
 #
-# Works in Git Bash on Windows and on Linux. Set ADB=/path/to/adb if adb is not on PATH.
+# Works in Git Bash on Windows, Linux and macOS (its bash 3.2 too). Set ADB=/path/to/adb if adb is not on PATH.
 set -euo pipefail
 export MSYS_NO_PATHCONV=1          # stop Git Bash rewriting /var/... into C:/Program Files/Git/var/...
 
@@ -32,6 +32,13 @@ detached() {
     "$ADB" shell "setsid sh -c '$1' </dev/null >/dev/null 2>&1 & sleep 1"   # let it detach before adb exits
 }
 
+command -v "$ADB" >/dev/null || {
+    echo "adb not found. Install Android platform-tools:"
+    echo "  macOS:   brew install android-platform-tools"
+    echo "  Fedora:  sudo dnf install android-tools      Debian/Ubuntu: sudo apt install adb"
+    echo "  Windows: winget install Google.PlatformTools (or set ADB=/path/to/adb.exe)"
+    exit 1
+}
 "$ADB" get-state >/dev/null || { echo "no device: is the Car Thing plugged in with ADB enabled?"; exit 1; }
 
 case "${1:-}" in
