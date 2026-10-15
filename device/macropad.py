@@ -478,9 +478,10 @@ class Pad:
 
     def save(self):
         try:
-            with open(STATE_PATH + '.tmp', 'w') as f:
-                json.dump(self.settings, f)
-            os.rename(STATE_PATH + '.tmp', STATE_PATH)
+            with self.lock:    # HTTP requests save concurrently (e.g. dragging the brightness slider)
+                with open(STATE_PATH + '.tmp', 'w') as f:
+                    json.dump(self.settings, f)
+                os.rename(STATE_PATH + '.tmp', STATE_PATH)
         except OSError as e:
             log('could not save state:', e)
 
