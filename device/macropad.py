@@ -1088,9 +1088,41 @@ def take_over_kiosk():
         mounted = any(line.split()[1] == target for line in f if len(line.split()) > 1)
     if not mounted:
         subprocess.call(['mount', '--bind', shim, target])
-    subprocess.call(['supervisorctl', 'stop', 'superbird'], stdout=subprocess.DEVNULL)
     subprocess.call(['supervisorctl', 'restart', 'chromium'], stdout=subprocess.DEVNULL)
     log('kiosk now shows the macro pad')
+    wait_for_boot_marked_successful()
+    subprocess.call(['supervisorctl', 'stop', 'superbird'], stdout=subprocess.DEVNULL)
+    log('stock superbird app stopped')
+
+
+SUPERBIRD_LOG = '/var/log/superbird.info'
+BOOT_OK_MARKER = b'Boot marked as successful'
+
+
+def wait_for_boot_marked_successful(timeout=90):
+    """The bootloader keeps A/B slots: every boot spends one "try" of the active slot
+    until something marks the boot successful, and after 7 unmarked boots it falls back
+    to the other slot. On this system qt-superbird-app does the marking, ~24 s after it
+    starts. Stopping it earlier made the device switch slots, losing the boot hook.
+    So let it run until its log says so (or a timeout) before stopping it."""
+    def marks():
+        try:
+            with open(SUPERBIRD_LOG, 'rb') as f:
+                return f.read().count(BOOT_OK_MARKER)
+        except OSError:
+            return 0
+    with open('/proc/uptime') as f:
+        uptime = float(f.read().split()[0])
+    if uptime > 180:
+        return            # booted long ago (service restart): already marked
+    before = marks()
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        time.sleep(2)
+        if marks() > before:
+            log('boot slot marked successful by the stock app')
+            return
+    log('no boot-success mark after %d s; stopping the stock app anyway' % timeout)
 
 
 def usb_watchdog(pad):
