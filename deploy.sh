@@ -5,6 +5,7 @@
 #   ./deploy.sh config       copy config.json only (reloaded live, no restart)
 #   ./deploy.sh install      first install: copy files + enable start on boot + reboot
 #   ./deploy.sh uninstall    remove the boot hook and reboot to the stock UI
+#   ./deploy.sh status       show whether the boot hook is on each system slot
 #
 # Works in Git Bash on Windows and on Linux. Set ADB=/path/to/adb if adb is not on PATH.
 set -euo pipefail
@@ -14,7 +15,7 @@ ADB=${ADB:-adb}
 # Git Bash: adb.exe needs a Windows path (pwd -W); elsewhere plain pwd.
 SRC="$(cd "$(dirname "$0")/device" && { pwd -W 2>/dev/null || pwd; })"
 DEST=/var/macropad
-FILES="macropad.py gadget.sh start.sh macropad.conf config.json web/index.html web/shim.html tools/cdp.py"
+FILES="macropad.py gadget.sh start.sh hook.sh macropad.conf config.json web/index.html web/shim.html tools/cdp.py"
 
 push_files() {
     "$ADB" shell "mkdir -p $DEST/web $DEST/tools"
@@ -45,16 +46,20 @@ case "${1:-}" in
         ;;
     install)
         push_files
-        "$ADB" shell "mount -o remount,rw / && cp $DEST/macropad.conf /etc/supervisor.d/macropad.conf && sync; mount -o remount,ro /"
+        "$ADB" shell "sh $DEST/hook.sh install"     # both A/B system slots
         detached "sleep 2; sync; reboot"
         echo "installed; rebooting"
         ;;
+    status)
+        "$ADB" push -q "$SRC/hook.sh" "$DEST/hook.sh"
+        "$ADB" shell "sh $DEST/hook.sh status"
+        ;;
     uninstall)
-        "$ADB" shell "mount -o remount,rw / && rm -f /etc/supervisor.d/macropad.conf && sync; mount -o remount,ro /"
+        "$ADB" shell "sh $DEST/hook.sh uninstall"
         detached "sleep 2; sync; reboot"
         echo "boot hook removed (files stay in $DEST); rebooting to the stock UI"
         ;;
     *)
-        sed -n '2,8p' "$0"; exit 2
+        sed -n '2,9p' "$0"; exit 2
         ;;
 esac
