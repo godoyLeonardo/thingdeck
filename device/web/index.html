@@ -200,8 +200,6 @@
   .tab { flex: none; padding: 0 14px; height: 34px; line-height: 34px; border-radius: 17px; font-size: 15px; font-weight: 500;
     color: var(--muted); margin-right: 4px; }
   .tab.on { background: var(--acc-soft); color: var(--acc); }
-  #clock { flex: none; font-size: 19px; font-weight: 600; font-variant-numeric: tabular-nums; margin: 0 4px 0 10px; letter-spacing: -.01em; }
-  #clock.unset { color: var(--muted); }
   #status { flex: none; display: flex; align-items: center; font: 500 12px GeistMono, monospace; color: var(--muted); margin-left: 8px; }
   #status i { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); margin-right: 7px; }
   #status.connected i { background: var(--media); box-shadow: 0 0 8px var(--media); }
@@ -220,11 +218,9 @@
   #standby { position: fixed; left: 0; top: 0; right: 0; bottom: 0; background: var(--standby); display: none; z-index: 5;
     flex-direction: column; align-items: center; justify-content: center; }
   #standby.show { display: flex; }
-  #sbclock { font-size: 150px; font-weight: 300; line-height: 1; letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
-  #sbclock.unset { color: var(--faint); }
-  #sbsuffix { font-size: 36px; font-weight: 400; letter-spacing: 0; margin-left: 10px; color: var(--muted); }
-  #sbdate { font-size: 22px; color: var(--muted); margin-top: 8px; }
-  #sbhint { margin-top: 28px; font-size: 15px; color: var(--muted); max-width: 640px; text-align: center; }
+  #sbicon { font-size: 64px; line-height: 1; font-family: 'Noto Color Emoji', sans-serif; }
+  #sbtitle { font-size: 32px; font-weight: 600; margin-top: 18px; letter-spacing: -.01em; }
+  #sbhint { margin-top: 10px; font-size: 15px; color: var(--muted); max-width: 640px; text-align: center; }
   #sbstuck { position: absolute; bottom: 22px; font-size: 13px; color: var(--faint); display: flex; align-items: center; }
   #sbstuck .btn { flex: none; height: 34px; line-height: 34px; padding: 0 14px; margin-left: 10px; font-size: 13px; color: var(--muted); }
   #offline { position: fixed; left: 0; top: 0; right: 0; bottom: 0; background: var(--veil); display: none;
@@ -272,22 +268,18 @@
       <h3>Dial</h3>
       <div class="row"><label>Direction</label>
         <div class="seg"><div data-set="dial_invert" data-val="false">Normal</div><div data-set="dial_invert" data-val="true">Reversed</div></div></div>
-      <h3 style="margin-top:10px">Clock</h3>
-      <div class="row"><label>Format<small id="tzname"></small></label>
-        <div class="seg"><div data-set="clock_24h" data-val="true">24h</div><div data-set="clock_24h" data-val="false">12h</div></div></div>
     </div>
     </div>
   </div>
   <div id="bar">
     <div id="tabs"></div>
-    <div id="clock" class="unset">--:--</div>
     <div id="status"><i></i><span id="statustext">…</span></div>
   </div>
   <div id="toast"></div>
   <div id="standby">
-    <div id="sbclock"><span id="sbtime">--:--</span><span id="sbsuffix"></span></div>
-    <div id="sbdate"></div>
-    <div id="sbhint"></div>
+    <div id="sbicon">💤</div>
+    <div id="sbtitle"></div>
+    <div id="sbhint">The pad comes back when the computer wakes up</div>
     <div id="sbstuck">Stuck here while your PC is on? <span class="btn" data-sys="reconnect">Reconnect</span></div>
   </div>
   <div id="offline">Reconnecting to macro pad service…</div>
@@ -395,7 +387,6 @@ function render() {
   if (showSettings) renderSettings();
   renderStatus();
   updateStandby();
-  tick();
 }
 
 function renderStatus() {
@@ -471,7 +462,7 @@ function renderSettings() {
     $('sec-' + secs[j]).classList.toggle('on', secs[j] === settingsSec);
     $('snav').children[j].classList.toggle('on', secs[j] === settingsSec);
   }
-  var current = { clock_24h: s.clock_24h, brightness_auto: s.brightness_auto, os_mode: st.os_mode, layout: st.layout,
+  var current = { brightness_auto: s.brightness_auto, os_mode: st.os_mode, layout: st.layout,
     dial_invert: st.dial_invert, theme: THEMES[s.theme] ? s.theme : 'dark', accent: ACCENTS[s.accent] ? s.accent : 'theme' };
   var opts = $('settings').querySelectorAll('[data-set]');
   for (var i = 0; i < opts.length; i++) {
@@ -482,7 +473,6 @@ function renderSettings() {
   if (!dragging) {
     $('bright').value = s.brightness_auto && info ? info.brightness_now : s.brightness;
   }
-  $('tzname').textContent = st.timezone || 'UTC';
   $('osdet').textContent = st.os_detected ? 'detected: ' + st.os_detected : 'not detected yet';
   $('bnow').textContent = s.brightness_auto ? 'light sensor' : Math.round((s.brightness || 0) / 2.55) + '%';
   if (info) {
@@ -492,15 +482,12 @@ function renderSettings() {
       '<span>SoC temp</span><b>' + info.temp_c.toFixed(1) + ' °C</b>' +
       '<span>Memory free</span><b>' + info.mem_avail_mb + ' / ' + info.mem_total_mb + ' MB</b>' +
       '<span>Load</span><b>' + info.load.join(' ') + '</b>' +
-      '<span>USB</span><b>' + st.usb + '</b>' +
-      '<span>Network</span><b>' + esc(netText()) + '</b>' +
-      '<span>Time</span><b>' + esc(syncText()) + '</b>';
+      '<span>USB</span><b>' + st.usb + '</b>';
   }
 }
 function pollInfo() {
   fetch('/api/info').then(function (r) { return r.json(); }).then(function (j) {
     info = j;
-    if (j.net) st.net = j.net;
     if (showSettings) renderSettings();
   }).catch(function () {});
 }
@@ -562,73 +549,24 @@ function spin(dir) {
   fire($('dial'));
 }
 
-// ---- clock: the device has no RTC, so the time only exists once NTP over the USB network worked
-function netText() {
-  var n = st.net || {};
-  if (!n.ip) return 'no address yet';
-  return n.ip + (n.gateway ? '' : ' (no gateway)');
-}
-function syncText() {
-  var n = st.net || {};
-  if (n.synced_ago != null) {
-    var m = Math.floor(n.synced_ago / 60);
-    return 'synced ' + (m < 1 ? 'just now' : m < 60 ? m + ' min ago' : Math.floor(m / 60) + ' h ago');
-  }
-  if (n.sync_error) return 'sync failed';
-  return n.time_valid ? 'set, not synced' : 'waiting for network';
-}
-// This Chromium has no Intl, so the service sends the current UTC offset (it follows DST).
-var DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-var MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September',
-  'October', 'November', 'December'];
-function localTime() {
-  if (!(st.net || {}).time_valid) return null;
-  var d = new Date(Date.now() + (st.utc_offset || 0) * 1000);
-  var h = d.getUTCHours(), m = d.getUTCMinutes(), mm = (m < 10 ? '0' : '') + m;
-  var h12 = st.settings && st.settings.clock_24h === false;
-  return {
-    time: h12 ? ((h + 11) % 12 + 1) + ':' + mm : (h < 10 ? '0' : '') + h + ':' + mm,
-    suffix: h12 ? (h < 12 ? 'AM' : 'PM') : '',
-    date: DAYS[d.getUTCDay()] + ', ' + d.getUTCDate() + ' ' + MONTHS[d.getUTCMonth()]
-  };
-}
-function tick() {
-  var t = localTime(), el = $('clock');
-  el.textContent = t ? t.time + (t.suffix ? ' ' + t.suffix : '') : '--:--';
-  el.className = t ? '' : 'unset';
-  if (standbyShown) {
-    $('sbtime').textContent = t ? t.time : '--:--';
-    $('sbsuffix').textContent = t ? t.suffix : '';
-    $('sbclock').className = t ? '' : 'unset';
-    $('sbdate').textContent = t ? t.date : 'Clock not set yet';
-  }
-}
-
-// ---- standby: computer asleep or off -> big clock (the Car Thing cannot wake the computer)
+// ---- standby: computer asleep or off (the Car Thing cannot wake it; see README)
 var standbyShown = false, standbyTimer = null;
 function updateStandby() {
   var want = st.mode === 'ok' && st.usb !== 'connected';
   if (want) {
-    $('sbhint').textContent = st.usb === 'suspended' ? 'Computer is asleep' : 'Computer is off';
+    $('sbtitle').textContent = st.usb === 'suspended' ? 'Computer is asleep' : 'No computer connected';
   }
   if (want && !standbyShown && !standbyTimer) {
     standbyTimer = setTimeout(function () {      // skip short drops (service restart, replug)
       standbyTimer = null;
       standbyShown = true;
       $('standby').className = 'show';
-      tick();
     }, 3000);
   } else if (!want) {
     clearTimeout(standbyTimer); standbyTimer = null;
     if (standbyShown) { standbyShown = false; $('standby').className = ''; }
   }
 }
-setInterval(tick, 1000);
-$('clock').addEventListener('pointerup', function () {
-  var n = st.net || {};
-  if (!n.time_valid) toast(n.ip ? 'Network up, waiting for the time servers' :
-    'No time yet: turn on internet sharing to the Car Thing’s USB network on your PC', 'warn');
-});
 
 // ---- touch: tap on release, swipe the grid to change page
 var startX = 0, startY = 0, downEl = null;

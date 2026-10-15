@@ -4,9 +4,6 @@
   "grid": [4, 2],
   "layout": "latam",
   "default_os": "windows",
-  "timezone": "America/Santiago",
-  "tz": "<-04>4<-03>,M9.1.6/24,M4.1.6/24",
-  "usb_network": true,
 
   "hardware": {
     "dial_invert": false,

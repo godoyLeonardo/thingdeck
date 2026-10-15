@@ -389,8 +389,7 @@ class Broadcaster:
 class Pad:
     def __init__(self):
         self.ui = Broadcaster()
-        self.hid = Hid(lambda status: self.on_usb_status(status))
-        self.net = Net(self.publish_state)
+        self.hid = Hid(lambda status: self.publish_state())
         self.config = {}
         self.config_mtime = 0
         self.page = 0
@@ -401,7 +400,7 @@ class Pad:
         # Device settings changed from the Settings tab; kept in state.json.
         # None means "use config.json".
         self.settings = {'os_mode': 'auto', 'layout': None, 'dial_invert': None,
-                         'brightness_auto': True, 'brightness': 180, 'clock_24h': True,
+                         'brightness_auto': True, 'brightness': 180,
                          'theme': 'dark', 'accent': 'theme'}
         self.lock = threading.RLock()
         self.hid.on_report_request = self.detect_os
@@ -442,7 +441,6 @@ class Pad:
             'os_mode': lambda v: v in ('auto', 'windows', 'linux'),
             'layout': lambda v: v is None or v in LAYOUTS,
             'dial_invert': lambda v: v is None or isinstance(v, bool),
-            'clock_24h': lambda v: isinstance(v, bool),
             'theme': lambda v: v in THEMES,
             'accent': lambda v: v in ACCENTS,
             'brightness_auto': lambda v: isinstance(v, bool),
@@ -510,7 +508,6 @@ class Pad:
             'load': read('/proc/loadavg').split()[:3],
             'brightness_now': 260 - int(read(BACKLIGHT, '255') or 255),
             'layouts': sorted(LAYOUTS),
-            'net': self.net.status(),
         }
 
     def variant(self, a):
@@ -537,10 +534,6 @@ class Pad:
         with self.lock:
             self.config = cfg
             self.config_mtime = mtime
-            # POSIX TZ rule: the device has no zoneinfo database, and its browser has no Intl.
-            if cfg.get('tz'):
-                os.environ['TZ'] = cfg['tz']
-                time.tzset()
             self.page = min(self.page, max(0, len(self.pages()) - 1))
             self.dial = min(self.dial, max(0, len(self.dials()) - 1))
         log('config loaded: %d pages, %d dial modes' % (len(self.pages()), len(self.dials())))
@@ -556,9 +549,7 @@ class Pad:
         return {'page': self.page, 'dial': self.dial, 'usb': self.hid.status,
                 'mode': self.mode, 'message': self.message,
                 'os': self.host_os(), 'os_mode': self.settings['os_mode'], 'os_detected': self.os_detected,
-                'settings': self.settings, 'layout': self.layout_name(), 'dial_invert': self.dial_invert(),
-                'net': self.net.status(), 'timezone': self.config.get('timezone', 'UTC'),
-                'utc_offset': time.localtime().tm_gmtoff}
+                'settings': self.settings, 'layout': self.layout_name(), 'dial_invert': self.dial_invert()}
 
     def publish_state(self):
         self.ui.publish('state', self.state())
@@ -665,20 +656,12 @@ class Pad:
                     self.dial = idx
         self.publish_state()
 
-    # -- standby: the computer is asleep or off, the screen shows a clock.
+    # -- standby: the computer is asleep or off; the screen says so and input is ignored.
     # The Car Thing cannot wake the computer: with the host asleep the Amlogic USB PHY is
     # in low-power mode and never drives the resume signal, and asking the controller to
     # send it locked it up until a power cycle. So nothing touches the controller here.
     def standby(self):
         return self.mode == 'ok' and self.hid.status != 'connected'
-
-    def on_usb_status(self, status):
-        # While the host sleeps, keep the USB network quiet.
-        if status == 'suspended':
-            self.net.suspend()
-        elif status == 'connected':
-            self.net.resume()
-        self.publish_state()
 
     # -- triggers
     def tap_tile(self, page, index):
@@ -717,114 +700,6 @@ class Pad:
         if action:
             self.ui.publish('hw', {'button': name, 'kind': kind})
             self.run(action)
-
-
-# ------------------------------------------------------- USB network + clock
-
-NTP_PEERS = ['pool.ntp.org', 'time.cloudflare.com', '162.159.200.1']   # last one needs no DNS
-VALID_TIME = 1735689600       # 2025-01-01: anything earlier means the clock was never set
-RESYNC_SECONDS = 3600
-
-
-class Net:
-    """DHCP on the RNDIS interface (the PC shares its internet connection), then NTP."""
-
-    def __init__(self, on_change):
-        self.on_change = on_change
-        self.ip = None
-        self.gateway = None
-        self.synced_at = None      # monotonic time of the last good sync
-        self.sync_error = None
-        self.dhcp = None
-        self.started = False
-        self.paused = False
-
-    def suspend(self):
-        """Host went to sleep: take usb0 down so no packet goes out and wakes it."""
-        if self.started and not self.paused and os.path.exists('/sys/class/net/usb0'):
-            subprocess.call(['ip', 'link', 'set', 'usb0', 'down'])
-            self.paused = True
-            log('usb network paused while the host sleeps')
-
-    def resume(self):
-        if self.paused:
-            self.paused = False
-            subprocess.call(['ip', 'link', 'set', 'usb0', 'up'])
-            if self.dhcp and self.dhcp.poll() is None:
-                self.dhcp.send_signal(signal.SIGUSR1)    # renew: link down dropped the routes
-            log('usb network resumed')
-
-    def status(self):
-        return {'ip': self.ip, 'gateway': self.gateway, 'time_valid': time.time() > VALID_TIME,
-                'synced_ago': None if self.synced_at is None else int(time.monotonic() - self.synced_at),
-                'sync_error': self.sync_error}
-
-    def start(self):
-        self.started = True
-        threading.Thread(target=self._loop, name='net', daemon=True).start()
-
-    def _addresses(self):
-        out = subprocess.run(['ip', '-4', 'addr', 'show', 'usb0'], stdout=subprocess.PIPE,
-                             stderr=subprocess.DEVNULL, universal_newlines=True).stdout
-        ip = None
-        for line in out.splitlines():
-            parts = line.split()
-            if parts and parts[0] == 'inet':
-                ip = parts[1].split('/')[0]
-        route = subprocess.run(['ip', 'route', 'show', 'default'], stdout=subprocess.PIPE,
-                               stderr=subprocess.DEVNULL, universal_newlines=True).stdout.split()
-        gateway = route[route.index('via') + 1] if 'via' in route else None
-        return ip, gateway
-
-    def _loop(self):
-        while not os.path.exists('/sys/class/net/usb0'):
-            time.sleep(2)
-        subprocess.call(['ifconfig', 'usb0', 'up'])
-        # A previous run's udhcpc survives a service restart; two clients fight over usb0.
-        subprocess.call(['killall', 'udhcpc'], stderr=subprocess.DEVNULL)
-        dhcp_started = 0
-        while True:
-            if self.paused:
-                time.sleep(2)
-                continue
-            # udhcpc can sit in a back-off and miss a DHCP server that appears later
-            # (sharing turned on, laptop moved to another PC): restart it while unleased.
-            if self.ip is None and time.monotonic() - dhcp_started > 30:
-                if self.dhcp:
-                    self.dhcp.kill()
-                    self.dhcp.wait()
-                self.dhcp = subprocess.Popen(['udhcpc', '-f', '-i', 'usb0', '-s', '/etc/udhcpc/default.script',
-                                              '-x', 'hostname:carthing', '-t', '4', '-T', '3', '-A', '5'],
-                                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                dhcp_started = time.monotonic()
-            ip, gateway = self._addresses()
-            if (ip, gateway) != (self.ip, self.gateway):
-                self.ip, self.gateway = ip, gateway
-                log('usb network: ip=%s gateway=%s' % (ip, gateway))
-                if ip is None:
-                    self.synced_at = None
-                self.on_change()
-            due = self.synced_at is None or time.monotonic() - self.synced_at > RESYNC_SECONDS
-            if gateway and due:
-                self._sync()
-            time.sleep(5 if self.synced_at is None else 30)
-
-    def _sync(self):
-        cmd = ['ntpd', '-n', '-q']
-        for peer in NTP_PEERS:
-            cmd += ['-p', peer]
-        try:
-            rc = subprocess.call(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=25)
-        except subprocess.TimeoutExpired:
-            rc = -1
-        if rc == 0 and time.time() > VALID_TIME:
-            self.synced_at = time.monotonic()
-            self.sync_error = None
-            log('clock synced:', time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime()))
-        else:
-            self.sync_error = 'no reply from time servers (is internet sharing on?)'
-            log('ntp failed, rc', rc)
-        self.on_change()
 
 
 # ------------------------------------------------------------- hardware input
@@ -929,7 +804,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header('Content-Type', ctype)
         self.send_header('Content-Length', str(len(body)))
         self.send_header('Cache-Control', 'no-store')
-        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Origin', '*')   # web/shim.html pings from file://
         for k, v in (extra or {}).items():
             self.send_header(k, v)
         self.end_headers()
@@ -945,8 +820,6 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         pad = self.pad
         path = self.path.split('?')[0]
-        if not self._allowed(path):
-            return self._send(403, {'error': 'only /api/ping and /api/notify are reachable over the network'})
         if path in ('/', '/index.html'):
             self._file(os.path.join(BASE, 'web', 'index.html'), 'text/html; charset=utf-8')
         elif path.startswith('/fonts/') and '..' not in path:
@@ -985,10 +858,6 @@ class Handler(BaseHTTPRequestHandler):
             self.pad.ui.unsubscribe(q)
             self.close_connection = True
 
-    def _allowed(self, path):
-        """Over the USB network only notifications are accepted; keystrokes stay local to the UI."""
-        return self.client_address[0] == '127.0.0.1' or path in ('/api/ping', '/api/notify')
-
     def do_POST(self):
         pad = self.pad
         length = int(self.headers.get('Content-Length') or 0)
@@ -999,8 +868,6 @@ class Handler(BaseHTTPRequestHandler):
         if not isinstance(body, dict):
             return self._send(400, {'error': 'expected a JSON object'})
         path = self.path.split('?')[0]
-        if not self._allowed(path):
-            return self._send(403, {'error': 'only /api/ping and /api/notify are reachable over the network'})
         if path == '/api/tap':
             threading.Thread(target=pad.tap_tile, args=(int(body.get('page', -1)), int(body.get('index', -1))),
                              daemon=True).start()
@@ -1010,8 +877,6 @@ class Handler(BaseHTTPRequestHandler):
             pad.set_page(body.get('page', 'next'))
         elif path == '/api/dial':
             pad.set_dial(body.get('dial', 'next'))
-        elif path == '/api/notify':
-            pad.toast(str(body.get('text', ''))[:200], body.get('level', 'info'))
         elif path == '/api/settings':
             try:
                 for key, value in body.items():
@@ -1070,7 +935,7 @@ def system_action(what, pad):
 
 def serve_ui(pad):
     Handler.pad = pad
-    server = ThreadingHTTPServer(('0.0.0.0', HTTP_PORT), Handler)
+    server = ThreadingHTTPServer(('127.0.0.1', HTTP_PORT), Handler)
     server.daemon_threads = True
     threading.Thread(target=server.serve_forever, name='http', daemon=True).start()
     log('ui on http://127.0.0.1:%d/' % HTTP_PORT)
@@ -1204,12 +1069,9 @@ def main():
             try:
                 gadget('prepare')
                 pad.hid.open()
-                use_net = pad.config.get('usb_network', True)
-                gadget('bind-hid', 'net' if use_net else '')
+                gadget('bind-hid')
                 pad.mode = 'ok'
                 threading.Thread(target=usb_watchdog, args=(pad,), name='usb-watchdog', daemon=True).start()
-                if use_net:
-                    pad.net.start()
             except Exception as e:
                 log('HID setup failed:', e)
                 pad.hid.close()
@@ -1217,14 +1079,10 @@ def main():
                 pad.mode, pad.message = 'error', 'USB HID setup failed: %s' % e
         pad.publish_state()
         threading.Thread(target=input_loop, args=(pad, keys_path, rotary_path), name='input', daemon=True).start()
-        offset = time.localtime().tm_gmtoff
         while True:
             time.sleep(2)
             if pad.load_config():
                 pad.ui.publish('config', {})
-            if time.localtime().tm_gmtoff != offset:     # DST switch: the clock needs the new offset
-                offset = time.localtime().tm_gmtoff
-                pad.publish_state()
     finally:
         pad.hid.close()
 

@@ -36,33 +36,25 @@ case "$1" in
         restart_adbd
         ;;
     bind-hid)
-        # bind-hid [net]: with "net", add an RNDIS network interface (usb0) first;
-        # Windows only loads RNDIS when it is the first function.
         wait_adb
         [ -e /dev/usb-ffs/hid/ep1 ] || { echo "hid function not ready"; exit 1; }
-        rm -f $G/configs/c.1/rndis.usb0 $G/configs/c.1/ffs.adb $G/configs/c.1/ffs.hid
-        if [ "$2" = "net" ]; then
-            R=$G/functions/rndis.usb0
-            mkdir -p $R
-            echo 02:ca:7b:00:00:02 > $R/dev_addr 2>/dev/null
-            echo 02:ca:7b:00:00:01 > $R/host_addr 2>/dev/null
-            echo RNDIS > $R/os_desc/interface.rndis/compatible_id
-            echo 5162001 > $R/os_desc/interface.rndis/sub_compatible_id
-            ln -s $R $G/configs/c.1/rndis.usb0
-            echo 0x0106 > $G/bcdDevice   # new layout: keeps Windows from reusing a cached one
-        else
-            echo 0x0105 > $G/bcdDevice
-        fi
-        ln -s $G/functions/ffs.adb $G/configs/c.1/ffs.adb
+        # Exactly two functions, ADB then HID; drop anything else linked earlier.
+        for l in $G/configs/c.1/*; do
+            [ -L "$l" ] && [ "${l##*/}" != ffs.adb ] && rm -f "$l"
+        done
+        [ -L $G/configs/c.1/ffs.adb ] || ln -s $G/functions/ffs.adb $G/configs/c.1/ffs.adb
         ln -s $G/functions/ffs.hid $G/configs/c.1/ffs.hid
         echo 0x80 > $G/configs/c.1/bmAttributes   # bus powered, no remote wakeup (this PHY cannot send it)
         echo 0x0104 > $G/idProduct
+        echo 0x0107 > $G/bcdDevice                # new value per layout change, so hosts don't reuse a cached one
         echo "Car Thing Macro Pad" > $G/strings/0x409/product
         bind
         ;;
     adb-only)
         unbind
-        rm -f $G/configs/c.1/ffs.hid $G/configs/c.1/rndis.usb0
+        for l in $G/configs/c.1/*; do
+            [ -L "$l" ] && [ "${l##*/}" != ffs.adb ] && rm -f "$l"
+        done
         [ -L $G/configs/c.1/ffs.adb ] || ln -s $G/functions/ffs.adb $G/configs/c.1/ffs.adb
         echo 0x1014 > $G/idProduct
         echo 0x0100 > $G/bcdDevice
