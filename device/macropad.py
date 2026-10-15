@@ -775,6 +775,8 @@ class Net:
             self.sync_error = 'no reply from time servers (is internet sharing on?)'
             log('ntp failed, rc', rc)
         self.on_change()
+        # A previous run's udhcpc survives a service restart; two clients fight over usb0.
+        subprocess.call(['killall', 'udhcpc'], stderr=subprocess.DEVNULL)
 
 
 # ------------------------------------------------------------- hardware input
