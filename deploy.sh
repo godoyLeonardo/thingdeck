@@ -28,7 +28,7 @@ push_files() {
 # Restarting re-creates the USB device, which drops ADB for a few seconds,
 # so the command runs detached on the device.
 detached() {
-    "$ADB" shell "setsid sh -c '$1' </dev/null >/dev/null 2>&1 &"
+    "$ADB" shell "setsid sh -c '$1' </dev/null >/dev/null 2>&1 & sleep 1"   # let it detach before adb exits
 }
 
 "$ADB" get-state >/dev/null || { echo "no device: is the Car Thing plugged in with ADB enabled?"; exit 1; }
