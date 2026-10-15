@@ -1091,34 +1091,39 @@ def take_over_kiosk():
     log('stock superbird app stopped')
 
 
-SUPERBIRD_LOG = '/var/log/superbird.info'
-BOOT_OK_MARKER = b'Boot marked as successful'
+def boot_slot_marked():
+    """Is the running A/B slot marked successful? The bootloader's A/B data sits in
+    /dev/misc at offset 2048: magic "\\0AB0", version, then 4 bytes per slot
+    (priority, tries left, successful, reserved) for slot a at +8 and slot b at +12.
+    Returns None if it can't be read."""
+    try:
+        with open('/proc/cmdline') as f:
+            slot = f.read().split('androidboot.slot_suffix=_', 1)[1][:1]
+        with open('/dev/misc', 'rb') as f:
+            f.seek(2048)
+            data = f.read(16)
+    except (OSError, IndexError):
+        return None
+    if data[:4] != b'\0AB0' or slot not in 'ab':
+        return None
+    return data[(8 if slot == 'a' else 12) + 2] == 1
 
 
-def wait_for_boot_marked_successful(timeout=90):
-    """The bootloader keeps A/B slots: every boot spends one "try" of the active slot
-    until something marks the boot successful, and after 7 unmarked boots it falls back
-    to the other slot. On this system qt-superbird-app does the marking, ~24 s after it
-    starts. Stopping it earlier made the device switch slots, losing the boot hook.
-    So let it run until its log says so (or a timeout) before stopping it."""
-    def marks():
-        try:
-            with open(SUPERBIRD_LOG, 'rb') as f:
-                return f.read().count(BOOT_OK_MARKER)
-        except OSError:
-            return 0
+def wait_for_boot_marked_successful(timeout=120):
+    """Every boot clears the running slot's "successful" flag and spends one of its tries;
+    after 7 unmarked boots the bootloader falls back to the other slot. On this system
+    qt-superbird-app sets the flag, ~25 s after it starts. Stopping it earlier made the
+    device switch slots and lose the boot hook. So let it run until the flag is set."""
     with open('/proc/uptime') as f:
-        uptime = float(f.read().split()[0])
-    if uptime > 180:
-        return            # booted long ago (service restart): already marked
-    before = marks()
+        if float(f.read().split()[0]) > 180:
+            return            # booted long ago (service restart): already marked
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
-        time.sleep(2)
-        if marks() > before:
-            log('boot slot marked successful by the stock app')
+        if boot_slot_marked():
+            log('boot slot marked successful')
             return
-    log('no boot-success mark after %d s; stopping the stock app anyway' % timeout)
+        time.sleep(2)
+    log('boot slot still not marked after %d s; stopping the stock app anyway' % timeout)
 
 
 def usb_watchdog(pad):
