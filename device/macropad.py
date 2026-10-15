@@ -27,6 +27,7 @@ WEBAPP_DIR = '/usr/share/qt-superbird-app/webapp'
 BACKLIGHT = '/sys/class/backlight/aml-bl/brightness'
 THEMES = ('dark', 'black', 'light', 'nord', 'dracula', 'catppuccin', 'gruvbox', 'tokyonight', 'solarized')
 ACCENTS = ('theme', 'green', 'blue', 'purple', 'orange', 'pink', 'red')   # palettes: web/index.html
+OS_MODES = ('auto', 'windows', 'mac', 'linux')
 HTTP_PORT = 8765
 
 
@@ -110,7 +111,8 @@ def _layout_us():
 
 
 def _layout_latam():
-    """Latin American (Windows 'Latin American', xkb 'latam'). Identical on both OSes."""
+    """Latin American: the Windows 'Latin American' and xkb 'latam' layouts, which match.
+    macOS's 'Latin American' layout puts symbols elsewhere (Option, not AltGr); use 'us' there."""
     layout = _base_layout()
     space = (0x2C, 0)
     keys = {
@@ -407,18 +409,23 @@ class Pad:
         self.load_saved()
         self.load_config()
 
-    # -- host OS: detected from how the host asks for the HID report descriptor
-    # (Windows asks for more bytes than the descriptor has, Linux asks for the exact size)
+    # -- host OS: detected from how the host asks for the HID report descriptor.
+    # Windows asks for more bytes than the descriptor has; Linux and macOS ask for the
+    # exact size, so they look the same here. "other" then means config.other_os, and on
+    # a Mac the user picks macOS in Settings.
     def detect_os(self, length):
-        detected = 'windows' if length > len(REPORT_DESCRIPTOR) else 'linux'
+        detected = 'windows' if length > len(REPORT_DESCRIPTOR) else 'other'
         log('report descriptor requested with wLength=%d -> %s' % (length, detected))
         if detected != self.os_detected:
             self.os_detected = detected
             self.publish_state()
 
     def host_os(self):
+        """'windows', 'mac' or 'linux': selects per-OS action overrides and the layout."""
         if self.settings['os_mode'] != 'auto':
             return self.settings['os_mode']
+        if self.os_detected == 'other':
+            return self.config.get('other_os', 'linux')
         return self.os_detected or self.config.get('default_os', 'windows')
 
     def layout_name(self):
@@ -431,14 +438,13 @@ class Pad:
         return bool(self.config.get('hardware', {}).get('dial_invert'))
 
     def set_os(self, ref):
-        order = ['auto', 'windows', 'linux']
         if ref == 'next':
-            ref = order[(order.index(self.settings['os_mode']) + 1) % 3]
+            ref = OS_MODES[(OS_MODES.index(self.settings['os_mode']) + 1) % len(OS_MODES)]
         self.set_setting('os_mode', ref)
 
     def set_setting(self, key, value):
         valid = {
-            'os_mode': lambda v: v in ('auto', 'windows', 'linux'),
+            'os_mode': lambda v: v in OS_MODES,
             'layout': lambda v: v is None or v in LAYOUTS,
             'dial_invert': lambda v: v is None or isinstance(v, bool),
             'theme': lambda v: v in THEMES,

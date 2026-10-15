@@ -260,7 +260,7 @@
       <div class="slider" id="bslider"><span>☀</span><input type="range" id="bright" min="5" max="255" step="1"><span>☀️</span></div>
       <h3 style="margin-top:10px">Input</h3>
       <div class="row"><label>Host OS<small id="osdet"></small></label>
-        <div class="seg"><div data-set="os_mode" data-val="&quot;auto&quot;">Auto</div><div data-set="os_mode" data-val="&quot;windows&quot;">Windows</div><div data-set="os_mode" data-val="&quot;linux&quot;">Linux</div></div></div>
+        <div class="seg"><div data-set="os_mode" data-val="&quot;auto&quot;">Auto</div><div data-set="os_mode" data-val="&quot;windows&quot;">Windows</div><div data-set="os_mode" data-val="&quot;mac&quot;">macOS</div><div data-set="os_mode" data-val="&quot;linux&quot;">Linux</div></div></div>
       <div class="row"><label>Keyboard layout</label>
         <div class="seg"><div data-set="layout" data-val="&quot;latam&quot;">Latin Am.</div><div data-set="layout" data-val="&quot;us&quot;">US</div></div></div>
     </div>
@@ -302,16 +302,22 @@ function load() {
 }
 
 // ---- labels for what an action does
-var PRETTY = { ctrl: 'Ctrl', shift: 'Shift', alt: 'Alt', win: 'Win', gui: 'Win', cmd: '⌘', meta: 'Win', super: 'Win',
-  esc: 'Esc', enter: '⏎', tab: 'Tab', space: 'Space', left: '←', right: '→', up: '↑', down: '↓',
-  pageup: 'PgUp', pagedown: 'PgDn', delete: 'Del', backspace: '⌫', grave: '`' };
+var PRETTY = { ctrl: 'Ctrl', shift: 'Shift', alt: 'Alt', option: 'Alt', win: 'Win', gui: 'Win', cmd: 'Win',
+  meta: 'Win', super: 'Win', esc: 'Esc', enter: '⏎', tab: 'Tab', space: 'Space', left: '←', right: '→',
+  up: '↑', down: '↓', pageup: 'PgUp', pagedown: 'PgDn', delete: 'Del', backspace: '⌫', grave: '`',
+  equal: '=', minus: '-', plus: '+' };
+// macOS writes shortcuts with symbols and no separators: ⌃⇧⌘P
+var PRETTY_MAC = { ctrl: '⌃', control: '⌃', shift: '⇧', alt: '⌥', option: '⌥', cmd: '⌘', win: '⌘', gui: '⌘',
+  meta: '⌘', super: '⌘', esc: '⎋', tab: '⇥', space: 'Space', delete: '⌦' };
 function prettyKey(k) {
+  var mac = st.os === 'mac';
   return k.split('+').map(function (p) {
     p = p.trim(); var l = p.toLowerCase();
+    if (mac && PRETTY_MAC[l]) return PRETTY_MAC[l];
     if (PRETTY[l]) return PRETTY[l];
     if (/^f\d+$/.test(l)) return l.toUpperCase();
     return p.length === 1 ? p.toUpperCase() : p.charAt(0).toUpperCase() + p.slice(1);
-  }).join('+');
+  }).join(mac ? '' : '+');
 }
 function hint(a) {
   if (!a) return '';
@@ -399,7 +405,7 @@ function renderStatus() {
   else if (st.usb === 'suspended') { text = 'HOST ASLEEP'; s.className = 'suspended'; }
   else { text = 'NO HOST'; s.className = 'bad'; }
   if (st.mode === 'ok' && st.usb === 'connected') {
-    text += ' · ' + (st.os === 'linux' ? 'LINUX' : 'WIN') + (st.os_mode === 'auto' ? ' (auto)' : '');
+    text += ' · ' + ({ linux: 'LINUX', mac: 'MAC' }[st.os] || 'WIN') + (st.os_mode === 'auto' ? ' (auto)' : '');
   }
   $('statustext').textContent = text;
 }
@@ -473,7 +479,7 @@ function renderSettings() {
   if (!dragging) {
     $('bright').value = s.brightness_auto && info ? info.brightness_now : s.brightness;
   }
-  $('osdet').textContent = st.os_detected ? 'detected: ' + st.os_detected : 'not detected yet';
+  $('osdet').textContent = { windows: 'detected: Windows', other: 'detected: Linux or macOS' }[st.os_detected] || 'not detected yet';
   $('bnow').textContent = s.brightness_auto ? 'light sensor' : Math.round((s.brightness || 0) / 2.55) + '%';
   if (info) {
     var up = Math.floor(info.uptime), h = Math.floor(up / 3600), m = Math.floor(up % 3600 / 60);

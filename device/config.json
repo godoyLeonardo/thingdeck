@@ -1,9 +1,10 @@
 {
-  "_help": "Any action can carry per-OS overrides, e.g. {\"key\": \"win+tab\", \"linux\": {\"key\": \"win\"}}. Linux variants assume GNOME.",
+  "_help": "Any action can carry per-OS overrides: {\"key\": \"win+tab\", \"mac\": {\"key\": \"ctrl+up\"}, \"linux\": {\"key\": \"win\"}}. Linux overrides assume GNOME. See device/README.md.",
   "kiosk": true,
   "grid": [4, 2],
   "layout": "latam",
   "default_os": "windows",
+  "other_os": "linux",
 
   "hardware": {
     "dial_invert": false,
@@ -15,10 +16,17 @@
   "dial_modes": [
     { "name": "Volume", "cw": { "media": "vol_up" }, "ccw": { "media": "vol_down" }, "press": { "media": "mute" } },
     { "name": "Scroll", "cw": { "wheel": -1 }, "ccw": { "wheel": 1 }, "press": { "click": "middle" } },
-    { "name": "Zoom", "cw": { "wheel": 1, "mods": "ctrl" }, "ccw": { "wheel": -1, "mods": "ctrl" }, "press": { "key": "ctrl+0" } },
+    { "name": "Zoom",
+      "cw": { "wheel": 1, "mods": "ctrl", "mac": { "key": "cmd+equal" } },
+      "ccw": { "wheel": -1, "mods": "ctrl", "mac": { "key": "cmd+minus" } },
+      "press": { "key": "ctrl+0", "mac": { "key": "cmd+0" } } },
     { "name": "Scrub", "cw": { "key": "right" }, "ccw": { "key": "left" }, "press": { "key": "space" } },
-    { "name": "Tabs", "cw": { "key": "ctrl+tab" }, "ccw": { "key": "ctrl+shift+tab" }, "press": { "key": "ctrl+shift+t" } },
-    { "name": "Undo / Redo", "cw": { "key": "ctrl+y", "linux": { "key": "ctrl+shift+z" } }, "ccw": { "key": "ctrl+z" }, "press": { "key": "ctrl+s" } }
+    { "name": "Tabs", "cw": { "key": "ctrl+tab" }, "ccw": { "key": "ctrl+shift+tab" },
+      "press": { "key": "ctrl+shift+t", "mac": { "key": "cmd+shift+t" } } },
+    { "name": "Undo / Redo",
+      "cw": { "key": "ctrl+y", "mac": { "key": "cmd+shift+z" }, "linux": { "key": "ctrl+shift+z" } },
+      "ccw": { "key": "ctrl+z", "mac": { "key": "cmd+z" } },
+      "press": { "key": "ctrl+s", "mac": { "key": "cmd+s" } } }
   ],
 
   "presets": [
@@ -39,26 +47,32 @@
         { "label": "Volume down", "icon": "🔉", "media": "vol_down" },
         { "label": "Mute", "icon": "🔇", "media": "mute" },
         { "label": "Volume up", "icon": "🔊", "media": "vol_up" },
-        { "label": "Mic toggle", "icon": "🎙️", "key": "win+alt+k", "linux": { "mic_mute": true } }
+        { "label": "Mic toggle", "icon": "🎙️", "key": "win+alt+k",
+          "mac": { "key": "cmd+shift+m", "hint": "Teams mute" }, "linux": { "mic_mute": true } }
       ]
     },
     {
       "name": "Desktop",
       "presets": [
-        { "label": "◀ Desktop", "key": "ctrl+win+left", "linux": { "key": "win+pageup" } },
-        { "label": "Task view", "key": "win+tab", "linux": { "label": "Overview", "key": "win" } },
-        { "label": "Desktop ▶", "key": "ctrl+win+right", "linux": { "key": "win+pagedown" } },
-        { "label": "Show desktop", "key": "win+d" }
+        { "label": "◀ Desktop", "key": "ctrl+win+left", "mac": { "key": "ctrl+left" }, "linux": { "key": "win+pageup" } },
+        { "label": "Task view", "key": "win+tab", "mac": { "label": "Mission Control", "key": "ctrl+up" },
+          "linux": { "label": "Overview", "key": "win" } },
+        { "label": "Desktop ▶", "key": "ctrl+win+right", "mac": { "key": "ctrl+right" }, "linux": { "key": "win+pagedown" } },
+        { "label": "Show desktop", "key": "win+d", "mac": { "key": "f11" } }
       ],
       "tiles": [
-        { "label": "Task view", "icon": "🪟", "key": "win+tab", "linux": { "label": "Overview", "key": "win" } },
-        { "label": "Show desktop", "icon": "🖥️", "key": "win+d" },
-        { "label": "Snip", "icon": "✂️", "key": "win+shift+s", "linux": { "key": "printscreen" } },
-        { "label": "Clipboard", "icon": "📋", "key": "win+v" },
-        { "label": "Files", "icon": "📁", "key": "win+e", "linux": { "seq": [{ "key": "win" }, { "type": "files\n" }], "delay": 0.5, "hint": "Super → files" } },
-        { "label": "Emoji", "icon": "😀", "key": "win+.", "linux": { "key": "ctrl+." } },
-        { "label": "Task Manager", "icon": "📈", "key": "ctrl+shift+esc", "linux": { "label": "System Monitor", "seq": [{ "key": "win" }, { "type": "system monitor\n" }], "delay": 0.5, "hint": "Super → system monitor" } },
-        { "label": "Lock", "icon": "🔒", "key": "win+l" }
+        { "label": "Task view", "icon": "🪟", "key": "win+tab", "mac": { "label": "Mission Control", "key": "ctrl+up" },
+          "linux": { "label": "Overview", "key": "win" } },
+        { "label": "Show desktop", "icon": "🖥️", "key": "win+d", "mac": { "key": "f11" } },
+        { "label": "Snip", "icon": "✂️", "key": "win+shift+s", "mac": { "key": "cmd+shift+4" }, "linux": { "key": "printscreen" } },
+        { "label": "Clipboard", "icon": "📋", "key": "win+v", "mac": { "label": "Spotlight", "icon": "🔎", "key": "cmd+space" } },
+        { "label": "Files", "icon": "📁", "key": "win+e", "mac": { "label": "Finder", "key": "cmd+option+space" },
+          "linux": { "seq": [{ "key": "win" }, { "type": "files\n" }], "delay": 0.5, "hint": "Super → files" } },
+        { "label": "Emoji", "icon": "😀", "key": "win+.", "mac": { "key": "ctrl+cmd+space" }, "linux": { "key": "ctrl+." } },
+        { "label": "Task Manager", "icon": "📈", "key": "ctrl+shift+esc",
+          "mac": { "label": "Activity Monitor", "seq": [{ "key": "cmd+space" }, { "type": "activity monitor\n" }], "delay": 0.5, "hint": "Spotlight → Activity Monitor" },
+          "linux": { "label": "System Monitor", "seq": [{ "key": "win" }, { "type": "system monitor\n" }], "delay": 0.5, "hint": "Super → system monitor" } },
+        { "label": "Lock", "icon": "🔒", "key": "win+l", "mac": { "key": "ctrl+cmd+q" } }
       ]
     },
     {
@@ -70,14 +84,15 @@
         { "label": "Stop", "key": "shift+f5" }
       ],
       "tiles": [
-        { "label": "Command palette", "icon": "🎛️", "key": "ctrl+shift+p" },
-        { "label": "Quick open", "icon": "🔎", "key": "ctrl+p" },
-        { "label": "Terminal", "icon": "⌨️", "seq": [{ "key": "ctrl+shift+p" }, { "type": "View: Toggle Terminal\n" }], "delay": 0.3, "hint": "palette → Toggle Terminal" },
-        { "label": "Find in files", "icon": "🗂️", "key": "ctrl+shift+f" },
+        { "label": "Command palette", "icon": "🎛️", "key": "ctrl+shift+p", "mac": { "key": "cmd+shift+p" } },
+        { "label": "Quick open", "icon": "🔎", "key": "ctrl+p", "mac": { "key": "cmd+p" } },
+        { "label": "Terminal", "icon": "⌨️", "seq": [{ "key": "ctrl+shift+p", "mac": { "key": "cmd+shift+p" } }, { "type": "View: Toggle Terminal\n" }],
+          "delay": 0.3, "hint": "palette → Toggle Terminal" },
+        { "label": "Find in files", "icon": "🗂️", "key": "ctrl+shift+f", "mac": { "key": "cmd+shift+f" } },
         { "label": "Go to definition", "icon": "🎯", "key": "f12" },
         { "label": "Rename symbol", "icon": "✏️", "key": "f2" },
-        { "label": "Format", "icon": "🧹", "key": "shift+alt+f", "linux": { "key": "ctrl+shift+i" } },
-        { "label": "Toggle sidebar", "icon": "📐", "key": "ctrl+b" }
+        { "label": "Format", "icon": "🧹", "key": "shift+alt+f", "mac": { "key": "shift+option+f" }, "linux": { "key": "ctrl+shift+i" } },
+        { "label": "Toggle sidebar", "icon": "📐", "key": "ctrl+b", "mac": { "key": "cmd+b" } }
       ]
     },
     {
@@ -102,20 +117,20 @@
     {
       "name": "Meetings",
       "presets": [
-        { "label": "Teams mic", "key": "ctrl+shift+m" },
-        { "label": "Teams cam", "key": "ctrl+shift+o" },
-        { "label": "Zoom mic", "key": "alt+a" },
-        { "label": "Zoom cam", "key": "alt+v" }
+        { "label": "Teams mic", "key": "ctrl+shift+m", "mac": { "key": "cmd+shift+m" } },
+        { "label": "Teams cam", "key": "ctrl+shift+o", "mac": { "key": "cmd+shift+o" } },
+        { "label": "Zoom mic", "key": "alt+a", "mac": { "key": "cmd+shift+a" } },
+        { "label": "Zoom cam", "key": "alt+v", "mac": { "key": "cmd+shift+v" } }
       ],
       "tiles": [
-        { "label": "Teams mic", "icon": "🎙️", "key": "ctrl+shift+m" },
-        { "label": "Teams camera", "icon": "📷", "key": "ctrl+shift+o" },
-        { "label": "Teams hand", "icon": "✋", "key": "ctrl+shift+k" },
-        { "label": "Teams leave", "icon": "📞", "key": "ctrl+shift+h", "color": "#ff5d5d" },
-        { "label": "Zoom mic", "icon": "🎙️", "key": "alt+a" },
-        { "label": "Zoom camera", "icon": "📷", "key": "alt+v" },
-        { "label": "Meet mic", "icon": "🎙️", "key": "ctrl+d" },
-        { "label": "Meet camera", "icon": "📷", "key": "ctrl+e" }
+        { "label": "Teams mic", "icon": "🎙️", "key": "ctrl+shift+m", "mac": { "key": "cmd+shift+m" } },
+        { "label": "Teams camera", "icon": "📷", "key": "ctrl+shift+o", "mac": { "key": "cmd+shift+o" } },
+        { "label": "Teams hand", "icon": "✋", "key": "ctrl+shift+k", "mac": { "key": "cmd+shift+k" } },
+        { "label": "Teams leave", "icon": "📞", "key": "ctrl+shift+h", "mac": { "key": "cmd+shift+h" }, "color": "#ff5d5d" },
+        { "label": "Zoom mic", "icon": "🎙️", "key": "alt+a", "mac": { "key": "cmd+shift+a" } },
+        { "label": "Zoom camera", "icon": "📷", "key": "alt+v", "mac": { "key": "cmd+shift+v" } },
+        { "label": "Meet mic", "icon": "🎙️", "key": "ctrl+d", "mac": { "key": "cmd+d" } },
+        { "label": "Meet camera", "icon": "📷", "key": "ctrl+e", "mac": { "key": "cmd+e" } }
       ]
     }
   ]
