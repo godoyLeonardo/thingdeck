@@ -67,6 +67,39 @@ more than the descriptor's length, while Linux requests exactly that length.
 `detect_os()` uses this on every connection. Settings can override it, and so can
 tapping the status pill.
 
+### Standby, resume and reconnect
+
+When the HID function is not `connected` (host suspended or gone), the UI shows
+the standby clock after 3 s, and hardware input is ignored. While the host is
+suspended, `usb0` is taken down so no network traffic goes out.
+
+**After resume.** The host resets the bus. `adbd` then closes and reopens its
+FunctionFS files, and with configfs that unbinds the whole gadget. Nothing in the
+stock system rebinds it, so the device silently drops off USB. `usb_watchdog()`
+checks `UDC` every second and rebinds once both functions are ready. If `adbd`
+died instead, it restarts `adbd` after 5 s.
+
+**Remote wakeup does not work on this hardware, so it is not advertised**
+(`bmAttributes 0x80`). Findings, so nobody has to repeat them:
+
+- The controller is Amlogic's vendor Synopsys `dwc_otg`. Its sysfs attributes
+  (`/sys/devices/platform/ff400000.dwc2_a/`: `remote_wakeup`, `regoffset`,
+  `regvalue`, …) give register access. The kernel has no `/dev/mem`.
+- With `bmAttributes 0xa0`, Windows arms the device, and at suspend the driver
+  reports `Remote Wakeup … Enabled = 1`.
+- `srp` (the `usb_gadget_wakeup()` path) did nothing. Setting
+  `DCTL.RmtWkUpSig` directly cleared `DSTS.SuspSts`, but the host stayed asleep.
+  The controller then stopped seeing bus resets, even after the PC woke, until a
+  power cycle. The Amlogic USB2 PHY (`ffe09000.usb2phy`) is in its low-power
+  "recovery tuning" state during suspend and does not drive the resume K-state.
+  Its registers are not reachable from user space.
+- `soft_connect` returns `EOPNOTSUPP`.
+
+**Reconnect** (`POST /api/system {"do": "reconnect"}`, Settings → Reconnect USB,
+or the standby screen) unbinds and rebinds `UDC`, a software replug. If the host
+has not configured the device 15 s later, it reboots, which resets the
+controller and PHY like pulling the cable.
+
 ### Kiosk takeover
 
 At start the service bind-mounts `web/shim.html` over
@@ -156,7 +189,7 @@ Served on port 8765. From the computer over the USB network, only `ping` and
 | POST | `/api/page`, `/api/dial`, `/api/os` | `{"page"}` / `{"dial"}` / `{"os"}` | Switch page / dial mode / host OS |
 | POST | `/api/settings` | `{"brightness": 200, …}` | Change settings (saved in `state.json`) |
 | POST | `/api/run` | any action | Run an action (local only) |
-| POST | `/api/system` | `{"do": "restart" \| "reboot"}` | Restart service / reboot |
+| POST | `/api/system` | `{"do": "reconnect" \| "restart" \| "reboot"}` | Reconnect USB (software replug) / restart service / reboot |
 
 ## Debugging
 

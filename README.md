@@ -121,6 +121,35 @@ to share its internet connection with. Until then the clock shows `--:--`.
 The timezone is set in `device/config.json` (`timezone` for display, `tz` for the
 POSIX rule actually used; see [device/README.md](device/README.md#clock-and-timezone)).
 
+## When the computer is off
+
+When the computer sleeps or shuts down, and the Car Thing still has power, the
+screen switches to a standby view: a large clock and the date. The buttons do
+nothing until the computer is back. When the computer wakes up, the Car Thing
+reconnects by itself and the normal screen returns.
+
+The clock keeps running from the last sync while the computer is off. It can
+drift a little until the next sync.
+
+**The Car Thing cannot turn the computer on.** Waking from USB was tried and
+does not work on this hardware:
+
+- **From sleep:** Windows arms the device and enables remote wakeup, and the
+  USB controller accepts the request. But the Amlogic USB PHY stays in
+  low-power mode while the bus is suspended, so the wake signal never reaches the
+  wire. Forcing it also locked up the controller until a power cycle.
+- **From shutdown:** many boards, Gigabyte B450 included, power-cycle USB at
+  shutdown even with ErP disabled. The Car Thing reboots, and a device the
+  computer never configured is not allowed to wake it.
+
+Wake the computer with its keyboard or power button.
+
+**If it ever gets stuck** on the standby screen while the computer is on, tap
+**Reconnect** at the bottom of the standby screen, or use **Reconnect USB** in
+Settings. That detaches and reattaches USB, like pulling the cable. If the
+computer still has not configured the Car Thing 15 seconds later, the Car Thing
+reboots, which resets its USB hardware like a real replug.
+
 ## Notifications from scripts
 
 Once the network link is up, the Car Thing's address is shown in Settings → Device
