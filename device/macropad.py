@@ -971,7 +971,7 @@ class Handler(BaseHTTPRequestHandler):
             except ValueError as e:
                 return self._send(400, {'error': str(e)})
         elif path == '/api/system':
-            threading.Thread(target=system_action, args=(body.get('do'),), daemon=True).start()
+            threading.Thread(target=system_action, args=(body.get('do'), pad), daemon=True).start()
         elif path == '/api/os':
             pad.set_os(body.get('os', 'next'))
         elif path == '/api/run':
@@ -1018,7 +1018,9 @@ def reconnect_usb(pad):
 
 def system_action(what, pad):
     time.sleep(0.5)          # let the HTTP reply go out first
-    if what == 'restart':
+    if what == 'reconnect':
+        reconnect_usb(pad)
+    elif what == 'restart':
         log('restart requested from settings')
         os.kill(os.getpid(), signal.SIGTERM)
     elif what == 'reboot':

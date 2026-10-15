@@ -149,7 +149,7 @@
         <div class="seg"><div data-set="clock_24h" data-val="true">24h</div><div data-set="clock_24h" data-val="false">12h</div></div></div>
       <h3 style="margin-top:10px">Device</h3>
       <div class="kv" id="kv"></div>
-      <div class="btns"><div class="btn" data-sys="restart">Restart service</div><div class="btn danger" data-sys="reboot">Reboot</div></div>
+      <div class="btns"><div class="btn" data-sys="reconnect">Reconnect USB</div><div class="btn" data-sys="restart">Restart service</div><div class="btn danger" data-sys="reboot">Reboot</div></div>
     </div>
   </div>
   <div id="bar">
@@ -342,7 +342,8 @@ function system(el) {
     return;
   }
   armed = null;
-  el.textContent = what === 'reboot' ? 'Rebooting…' : 'Restarting…';
+  el.textContent = { reboot: 'Rebooting…', restart: 'Restarting…', reconnect: 'Reconnecting…' }[what];
+  setTimeout(function () { el.textContent = el._label; }, 20000);
   post('/api/system', { do: what });
 }
 
