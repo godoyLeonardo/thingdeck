@@ -115,6 +115,16 @@
   #toast.fail { border-left-color: var(--bad); }
   #toast.warn { border-left-color: var(--warn); }
 
+  #standby { position: fixed; left: 0; top: 0; right: 0; bottom: 0; background: #000; display: none; z-index: 5;
+    flex-direction: column; align-items: center; justify-content: center; }
+  #standby.show { display: flex; }
+  #sbclock { font-size: 150px; font-weight: 300; line-height: 1; letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
+  #sbclock.unset { color: #3a3f49; }
+  #sbsuffix { font-size: 36px; font-weight: 400; letter-spacing: 0; margin-left: 10px; color: var(--muted); }
+  #sbdate { font-size: 22px; color: var(--muted); margin-top: 8px; }
+  #sbhint { margin-top: 28px; font-size: 15px; color: var(--muted); max-width: 640px; text-align: center; }
+  #sbstuck { position: absolute; bottom: 22px; font-size: 13px; color: #4b515c; display: flex; align-items: center; }
+  #sbstuck .btn { flex: none; height: 34px; line-height: 34px; padding: 0 14px; margin-left: 10px; font-size: 13px; color: var(--muted); }
   #offline { position: fixed; left: 0; top: 0; right: 0; bottom: 0; background: rgba(11,12,15,.92); display: none;
     align-items: center; justify-content: center; font-size: 20px; color: var(--muted); }
   #offline.show { display: flex; }
@@ -158,6 +168,12 @@
     <div id="status"><i></i><span id="statustext">…</span></div>
   </div>
   <div id="toast"></div>
+  <div id="standby">
+    <div id="sbclock"><span id="sbtime">--:--</span><span id="sbsuffix"></span></div>
+    <div id="sbdate"></div>
+    <div id="sbhint"></div>
+    <div id="sbstuck">Stuck here while your PC is on? <span class="btn" data-sys="reconnect">Reconnect</span></div>
+  </div>
   <div id="offline">Reconnecting to macro pad service…</div>
 
 <script>
@@ -261,6 +277,7 @@ function render() {
   document.body.classList.toggle('settings', showSettings);
   if (showSettings) renderSettings();
   renderStatus();
+  updateStandby();
   tick();
 }
 
@@ -389,18 +406,50 @@ function syncText() {
   return n.time_valid ? 'set, not synced' : 'waiting for network';
 }
 // This Chromium has no Intl, so the service sends the current UTC offset (it follows DST).
-function tick() {
-  var el = $('clock'), n = st.net || {};
-  if (!n.time_valid) { el.textContent = '--:--'; el.className = 'unset'; return; }
+var DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+var MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September',
+  'October', 'November', 'December'];
+function localTime() {
+  if (!(st.net || {}).time_valid) return null;
   var d = new Date(Date.now() + (st.utc_offset || 0) * 1000);
-  var h = d.getUTCHours(), m = d.getUTCMinutes();
-  var mm = (m < 10 ? '0' : '') + m;
-  if (st.settings && st.settings.clock_24h === false) {
-    el.textContent = ((h + 11) % 12 + 1) + ':' + mm + (h < 12 ? ' AM' : ' PM');
-  } else {
-    el.textContent = (h < 10 ? '0' : '') + h + ':' + mm;
+  var h = d.getUTCHours(), m = d.getUTCMinutes(), mm = (m < 10 ? '0' : '') + m;
+  var h12 = st.settings && st.settings.clock_24h === false;
+  return {
+    time: h12 ? ((h + 11) % 12 + 1) + ':' + mm : (h < 10 ? '0' : '') + h + ':' + mm,
+    suffix: h12 ? (h < 12 ? 'AM' : 'PM') : '',
+    date: DAYS[d.getUTCDay()] + ', ' + d.getUTCDate() + ' ' + MONTHS[d.getUTCMonth()]
+  };
+}
+function tick() {
+  var t = localTime(), el = $('clock');
+  el.textContent = t ? t.time + (t.suffix ? ' ' + t.suffix : '') : '--:--';
+  el.className = t ? '' : 'unset';
+  if (standbyShown) {
+    $('sbtime').textContent = t ? t.time : '--:--';
+    $('sbsuffix').textContent = t ? t.suffix : '';
+    $('sbclock').className = t ? '' : 'unset';
+    $('sbdate').textContent = t ? t.date : 'Clock not set yet';
   }
-  el.className = '';
+}
+
+// ---- standby: computer asleep or off -> big clock (the Car Thing cannot wake the computer)
+var standbyShown = false, standbyTimer = null;
+function updateStandby() {
+  var want = st.mode === 'ok' && st.usb !== 'connected';
+  if (want) {
+    $('sbhint').textContent = st.usb === 'suspended' ? 'Computer is asleep' : 'Computer is off';
+  }
+  if (want && !standbyShown && !standbyTimer) {
+    standbyTimer = setTimeout(function () {      // skip short drops (service restart, replug)
+      standbyTimer = null;
+      standbyShown = true;
+      $('standby').className = 'show';
+      tick();
+    }, 3000);
+  } else if (!want) {
+    clearTimeout(standbyTimer); standbyTimer = null;
+    if (standbyShown) { standbyShown = false; $('standby').className = ''; }
+  }
 }
 setInterval(tick, 1000);
 $('clock').addEventListener('pointerup', function () {
@@ -418,6 +467,7 @@ document.addEventListener('pointerdown', function (e) {
 });
 document.addEventListener('pointercancel', function () { if (downEl) downEl.classList.remove('down'); downEl = null; });
 document.addEventListener('pointerup', function (e) {
+  if (standbyShown && !(downEl && downEl.hasAttribute('data-sys'))) { downEl = null; return; }  // standby: only Reconnect
   var dx = e.clientX - startX, dy = e.clientY - startY, el = downEl;
   downEl = null;
   if (el) el.classList.remove('down');

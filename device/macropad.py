@@ -387,7 +387,7 @@ class Broadcaster:
 class Pad:
     def __init__(self):
         self.ui = Broadcaster()
-        self.hid = Hid(lambda status: self.publish_state())
+        self.hid = Hid(lambda status: self.on_usb_status(status))
         self.net = Net(self.publish_state)
         self.config = {}
         self.config_mtime = 0
@@ -660,6 +660,21 @@ class Pad:
                     self.dial = idx
         self.publish_state()
 
+    # -- standby: the computer is asleep or off, the screen shows a clock.
+    # The Car Thing cannot wake the computer: with the host asleep the Amlogic USB PHY is
+    # in low-power mode and never drives the resume signal, and asking the controller to
+    # send it locked it up until a power cycle. So nothing touches the controller here.
+    def standby(self):
+        return self.mode == 'ok' and self.hid.status != 'connected'
+
+    def on_usb_status(self, status):
+        # While the host sleeps, keep the USB network quiet.
+        if status == 'suspended':
+            self.net.suspend()
+        elif status == 'connected':
+            self.net.resume()
+        self.publish_state()
+
     # -- triggers
     def tap_tile(self, page, index):
         pages = self.pages()
@@ -670,12 +685,16 @@ class Pad:
                 self.run(tiles[index])
 
     def press_preset(self, index):
+        if self.standby():
+            return
         preset = self.presets()[index] if 0 <= index < 4 else None
         if preset:
             self.flash('preset', index, preset.get('label'))
             self.run(preset)
 
     def turn(self, steps):
+        if self.standby():
+            return
         if self.dial_invert():
             steps = -steps
         mode = self.dials()[self.dial] if self.dials() else {}
@@ -686,6 +705,8 @@ class Pad:
 
     def hardware(self, name, kind):
         """name: back|menu|knob, kind: tap|hold."""
+        if self.standby():
+            return
         binding = self.config.get('hardware', {}).get(name, {})
         action = binding.get(kind)
         if action:
@@ -710,6 +731,23 @@ class Net:
         self.synced_at = None      # monotonic time of the last good sync
         self.sync_error = None
         self.dhcp = None
+        self.started = False
+        self.paused = False
+
+    def suspend(self):
+        """Host went to sleep: take usb0 down so no packet goes out and wakes it."""
+        if self.started and not self.paused and os.path.exists('/sys/class/net/usb0'):
+            subprocess.call(['ip', 'link', 'set', 'usb0', 'down'])
+            self.paused = True
+            log('usb network paused while the host sleeps')
+
+    def resume(self):
+        if self.paused:
+            self.paused = False
+            subprocess.call(['ip', 'link', 'set', 'usb0', 'up'])
+            if self.dhcp and self.dhcp.poll() is None:
+                self.dhcp.send_signal(signal.SIGUSR1)    # renew: link down dropped the routes
+            log('usb network resumed')
 
     def status(self):
         return {'ip': self.ip, 'gateway': self.gateway, 'time_valid': time.time() > VALID_TIME,
@@ -717,6 +755,7 @@ class Net:
                 'sync_error': self.sync_error}
 
     def start(self):
+        self.started = True
         threading.Thread(target=self._loop, name='net', daemon=True).start()
 
     def _addresses(self):
@@ -736,8 +775,13 @@ class Net:
         while not os.path.exists('/sys/class/net/usb0'):
             time.sleep(2)
         subprocess.call(['ifconfig', 'usb0', 'up'])
+        # A previous run's udhcpc survives a service restart; two clients fight over usb0.
+        subprocess.call(['killall', 'udhcpc'], stderr=subprocess.DEVNULL)
         dhcp_started = 0
         while True:
+            if self.paused:
+                time.sleep(2)
+                continue
             # udhcpc can sit in a back-off and miss a DHCP server that appears later
             # (sharing turned on, laptop moved to another PC): restart it while unleased.
             if self.ip is None and time.monotonic() - dhcp_started > 30:
@@ -776,8 +820,6 @@ class Net:
             self.sync_error = 'no reply from time servers (is internet sharing on?)'
             log('ntp failed, rc', rc)
         self.on_change()
-        # A previous run's udhcpc survives a service restart; two clients fight over usb0.
-        subprocess.call(['killall', 'udhcpc'], stderr=subprocess.DEVNULL)
 
 
 # ------------------------------------------------------------- hardware input
@@ -1051,51 +1093,6 @@ def take_over_kiosk():
     log('kiosk now shows the macro pad')
 
 
-# ------------------------------------------------------------------- main
-
-def gadget(*args):
-    rc = subprocess.call(['sh', GADGET_SH] + list(args))
-    if rc != 0:
-        raise RuntimeError('gadget.sh %s failed (%d)' % (' '.join(args), rc))
-
-
-def main():
-    pad = Pad()
-    serve_ui(pad)
-    if not pad.settings['brightness_auto']:
-        pad.apply_brightness()
-    if pad.config.get('kiosk', True) and '--no-kiosk' not in sys.argv:
-        threading.Thread(target=take_over_kiosk, daemon=True).start()
-
-    keys_path = find_input('gpio-keys')
-    rotary_path = find_input('rotary@0')
-    log('inputs:', keys_path, rotary_path)
-
-    def stop(signum, frame):
-        raise SystemExit(0)
-    signal.signal(signal.SIGTERM, stop)
-
-    try:
-        if key_held(keys_path, KEY_ESC):
-            pad.mode, pad.message = 'safe', 'Safe mode: back button held at start, USB left as ADB only'
-            log(pad.message)
-        else:
-            try:
-                gadget('prepare')
-                pad.hid.open()
-                use_net = pad.config.get('usb_network', True)
-                gadget('bind-hid', 'net' if use_net else '')
-                pad.mode = 'ok'
-                if use_net:
-                    pad.net.start()
-            except Exception as e:
-                log('HID setup failed:', e)
-                pad.hid.close()
-                subprocess.call(['sh', GADGET_SH, 'adb-only'])
-                pad.mode, pad.message = 'error', 'USB HID setup failed: %s' % e
-        pad.publish_state()
-        threading.Thread(target=input_loop, args=(pad, keys_path, rotary_path), name='input', daemon=True).start()
-        offset = time.localtime().tm_gmtoff
 def usb_watchdog(pad):
     """adbd closes and reopens its FunctionFS files after a bus reset (the PC resuming from
     sleep, for example). With configfs that unbinds the whole gadget, and nothing rebinds
@@ -1132,6 +1129,52 @@ def usb_watchdog(pad):
             time.sleep(2)
 
 
+# ------------------------------------------------------------------- main
+
+def gadget(*args):
+    rc = subprocess.call(['sh', GADGET_SH] + list(args))
+    if rc != 0:
+        raise RuntimeError('gadget.sh %s failed (%d)' % (' '.join(args), rc))
+
+
+def main():
+    pad = Pad()
+    serve_ui(pad)
+    if not pad.settings['brightness_auto']:
+        pad.apply_brightness()
+    if pad.config.get('kiosk', True) and '--no-kiosk' not in sys.argv:
+        threading.Thread(target=take_over_kiosk, daemon=True).start()
+
+    keys_path = find_input('gpio-keys')
+    rotary_path = find_input('rotary@0')
+    log('inputs:', keys_path, rotary_path)
+
+    def stop(signum, frame):
+        raise SystemExit(0)
+    signal.signal(signal.SIGTERM, stop)
+
+    try:
+        if key_held(keys_path, KEY_ESC):
+            pad.mode, pad.message = 'safe', 'Safe mode: back button held at start, USB left as ADB only'
+            log(pad.message)
+        else:
+            try:
+                gadget('prepare')
+                pad.hid.open()
+                use_net = pad.config.get('usb_network', True)
+                gadget('bind-hid', 'net' if use_net else '')
+                pad.mode = 'ok'
+                threading.Thread(target=usb_watchdog, args=(pad,), name='usb-watchdog', daemon=True).start()
+                if use_net:
+                    pad.net.start()
+            except Exception as e:
+                log('HID setup failed:', e)
+                pad.hid.close()
+                subprocess.call(['sh', GADGET_SH, 'adb-only'])
+                pad.mode, pad.message = 'error', 'USB HID setup failed: %s' % e
+        pad.publish_state()
+        threading.Thread(target=input_loop, args=(pad, keys_path, rotary_path), name='input', daemon=True).start()
+        offset = time.localtime().tm_gmtoff
         while True:
             time.sleep(2)
             if pad.load_config():
@@ -1145,4 +1188,3 @@ def usb_watchdog(pad):
 
 if __name__ == '__main__':
     main()
-                threading.Thread(target=usb_watchdog, args=(pad,), name='usb-watchdog', daemon=True).start()
