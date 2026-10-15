@@ -1,0 +1,4 @@
+# Everything here runs on the Car Thing (Linux): keep LF even in Windows checkouts,
+# otherwise deploy.sh would push CRLF shell scripts that fail on the device.
+* text=auto eol=lf
+*.png binary

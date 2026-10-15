@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.pyc
+
+# Written by the device at runtime (Settings tab choices); not part of the source
+state.json
+*.tmp
+*.log
+
+# Local tooling and scratch output
+platform-tools/
+screen*.png
+*.zip
+*.new
+
+# Editors / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
