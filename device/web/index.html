@@ -1051,7 +1051,7 @@ function renderWidgets(page, g) {
   var key = 'w|' + page.widgets.join(',') + '|' + !!page.kill + '|' + st.page;
   if (g.getAttribute('data-np') !== key) {
     g.setAttribute('data-np', key);
-    g.style.gridTemplateColumns = '1fr';
+    g.style.gridTemplateColumns = 'minmax(0, 1fr)';  // long lines cut off instead of widening the page
     g.style.gridTemplateRows = 'minmax(0, 1fr)';     // the lists scroll inside instead of growing the page
     g.innerHTML = '<div class="dash-wrap"><div class="dash">' + page.widgets.map(function (w) {
       if (w === 'agenda' && page.widgets.length === 1) return '<div class="agenda cols" id="agenda"></div>';   // a column per day
