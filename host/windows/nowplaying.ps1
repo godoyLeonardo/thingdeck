@@ -1007,6 +1007,8 @@ if ($Once) {
 }
 
 $adbExe = Find-Adb
+# This script's fingerprint: deploy.sh puts the repo's on the Car Thing, which says when they differ.
+$AgentVersion = (Get-FileHash $PSCommandPath -Algorithm SHA1).Hash.Substring(0, 12).ToLower()
 
 # Run adb as a plain process and go by its exit code. Not "& adb ... 2>$null": after a
 # reboot adb first prints "daemon not running; starting now" on stderr, which Windows
@@ -1083,6 +1085,7 @@ while ($true) {
                 time_ms = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
                 utc_offset_min = $offset
                 locked = $locked
+                agent = @{ os = 'windows'; version = $AgentVersion }      # the Car Thing compares it with the repo's
             })
             $lastHost = "$locked|$offset"
             $lastHostSent = Get-Date
