@@ -268,8 +268,15 @@
     flex-direction: column; align-items: center; justify-content: center; }
   #lockscreen.show { display: flex; }
   #lktitle { margin-top: 16px; font-size: 17px; color: var(--muted); }
-  #lknp { margin-top: 14px; font-size: 18px; font-weight: 600; max-width: 660px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  #lknp:empty { display: none; }
+  #lknp { display: flex; align-items: center; margin-top: 16px; max-width: 620px; min-width: 0; }
+  #lknp.hidden, #lkart.hidden { display: none; }
+  #lkart { flex: none; width: 64px; height: 64px; border-radius: 10px; object-fit: cover; margin-right: 14px; background: var(--tile); }
+  .lknp-text { min-width: 0; }
+  #lknpt { font-size: 19px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #lknpa { font-size: 15px; color: var(--muted); margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .lkbtn { color: var(--text); }
+  .lkbtn svg { width: 28px; height: 28px; }
+  .lkbtn.wide { width: 120px; background: var(--acc); color: var(--on-acc); }
   #lkcontrols { display: flex; margin-top: 22px; }
   .lkbtn { width: 84px; height: 62px; border-radius: 14px; background: var(--tile); margin: 0 5px; display: flex; align-items: center;
     justify-content: center; font-size: 26px; font-family: 'Noto Color Emoji', sans-serif; transition: background .1s, transform .08s; }
@@ -345,10 +352,9 @@
     <div class="bigclock"><span class="bc-time"></span><span class="bc-suffix"></span></div>
     <div class="bigdate"></div>
     <div id="lktitle">🔒 Computer locked</div>
-    <div id="lknp"></div>
+    <div id="lknp" class="hidden"><img id="lkart" class="hidden" alt=""><div class="lknp-text"><div id="lknpt"></div><div id="lknpa"></div></div></div>
     <div id="lkcontrols">
-      <div class="lkbtn" data-media="prev">⏮️</div><div class="lkbtn" data-media="play_pause" id="lkplay">⏯️</div><div class="lkbtn" data-media="next">⏭️</div>
-      <div class="lkbtn" data-media="vol_down">🔉</div><div class="lkbtn" data-media="mute">🔇</div><div class="lkbtn" data-media="vol_up">🔊</div>
+      <div class="lkbtn" data-media="prev" data-sym="prev"></div><div class="lkbtn wide" data-media="play_pause" id="lkplay"></div><div class="lkbtn" data-media="next" data-sym="next"></div><div class="lkbtn" data-media="mute" data-sym="mute"></div>
     </div>
   </div>
   <div id="standby">
@@ -850,8 +856,18 @@ function updateLock() {
   lockShown = st.mode === 'ok' && st.usb === 'connected' && !!st.locked;
   $('lockscreen').className = lockShown ? 'show' : '';
   if (!lockShown) return;
-  $('lknp').textContent = np ? '♪ ' + np.title + (np.artist ? ' — ' + np.artist : '') : '';
-  $('lkplay').textContent = np && np.playing ? '⏸️' : '▶️';
+  $('lknp').classList.toggle('hidden', !np);
+  if (np) {
+    var art = np.art ? '/api/nowplaying/art?k=' + encodeURIComponent(np.art) : '';
+    if ($('lkart').getAttribute('src') !== art) {       // only reload the image on a new cover
+      if (art) $('lkart').setAttribute('src', art); else $('lkart').removeAttribute('src');
+    }
+    $('lkart').classList.toggle('hidden', !art);
+    $('lknpt').textContent = np.title;
+    $('lknpa').textContent = [np.artist, np.album].filter(function (x) { return x; }).join(' · ');
+  }
+  $('lkplay').innerHTML = np && np.playing ? icon('pause') : icon('play');
+  each('.lkbtn[data-sym]', function (el) { el.innerHTML = icon(el.getAttribute('data-sym')); });
 }
 
 // ---- touch: tap on release, swipe the grid to change page
