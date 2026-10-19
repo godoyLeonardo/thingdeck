@@ -25,6 +25,7 @@ GADGET_SH = os.path.join(BASE, 'gadget.sh')
 FFS_DIR = '/dev/usb-ffs/hid'
 WEBAPP_DIR = '/usr/share/qt-superbird-app/webapp'
 BACKLIGHT = '/sys/class/backlight/aml-bl/brightness'
+BRIGHTNESS_MIN = 5          # brightness levels run 5..255 (Settings slider)
 THEMES = ('dark', 'black', 'light', 'nord', 'dracula', 'catppuccin', 'gruvbox', 'tokyonight', 'solarized')
 ACCENTS = ('theme', 'green', 'blue', 'purple', 'orange', 'pink', 'red')   # palettes: web/index.html
 OS_MODES = ('auto', 'windows', 'mac', 'linux')
@@ -386,12 +387,22 @@ class Broadcaster:
                     pass
 
 
+def write_backlight(level):
+    """Set the backlight to level 5..255. The panel PWM is inverted: the sysfs value is
+    260 - level, so 255 is dimmest and 5 brightest."""
+    try:
+        with open(BACKLIGHT, 'w') as f:
+            f.write(str(260 - level))
+    except OSError as e:
+        log('brightness:', e)
+
+
 # ------------------------------------------------------------------ the pad
 
 class Pad:
     def __init__(self):
         self.ui = Broadcaster()
-        self.hid = Hid(lambda status: self.publish_state())
+        self.hid = Hid(lambda status: self.on_usb_status(status))
         self.config = {}
         self.config_mtime = 0
         self.page = 0
@@ -404,6 +415,9 @@ class Pad:
         self.settings = {'os_mode': 'auto', 'layout': None, 'dial_invert': None,
                          'brightness_auto': True, 'brightness': 180,
                          'theme': 'dark', 'accent': 'theme'}
+        self._als_running = None    # stock light-sensor service state, as last set by us
+        self._dimmed = False
+        self._dim_timer = None
         self.lock = threading.RLock()
         self.hid.on_report_request = self.detect_os
         self.load_saved()
@@ -450,7 +464,7 @@ class Pad:
             'theme': lambda v: v in THEMES,
             'accent': lambda v: v in ACCENTS,
             'brightness_auto': lambda v: isinstance(v, bool),
-            'brightness': lambda v: isinstance(v, int) and 5 <= v <= 255,
+            'brightness': lambda v: isinstance(v, int) and BRIGHTNESS_MIN <= v <= 255,
         }
         if key not in valid or not valid[key](value):
             raise ValueError('bad setting %s=%r' % (key, value))
@@ -461,19 +475,42 @@ class Pad:
         self.publish_state()
 
     def apply_brightness(self):
-        # The stock sp-als-backlight service drives the backlight from the light
-        # sensor; manual mode stops it. supervisorctl is slow, so only on a switch.
-        auto = self.settings['brightness_auto']
-        if auto != getattr(self, '_als_running', None):
-            subprocess.call(['supervisorctl', 'start' if auto else 'stop', 'backlight'], stdout=subprocess.DEVNULL)
-            self._als_running = auto
-        if auto:
+        """Apply the brightness setting (not while dimmed for standby)."""
+        if self._dimmed:
             return
-        try:
-            with open(BACKLIGHT, 'w') as f:
-                f.write(str(260 - self.settings['brightness']))   # panel PWM is inverted: 5 = brightest
-        except OSError as e:
-            log('brightness:', e)
+        self._light_sensor(self.settings['brightness_auto'])
+        if not self.settings['brightness_auto']:
+            write_backlight(self.settings['brightness'])
+
+    def _light_sensor(self, on):
+        # The stock sp-als-backlight service drives the backlight from the light
+        # sensor; manual levels need it stopped. supervisorctl is slow, so only on a switch.
+        if on != self._als_running:
+            subprocess.call(['supervisorctl', 'start' if on else 'stop', 'backlight'], stdout=subprocess.DEVNULL)
+            self._als_running = on
+
+    # -- standby dimming: minimum brightness while the computer sleeps or is gone
+    def on_usb_status(self, status):
+        self.publish_state()
+        if self._dim_timer:
+            self._dim_timer.cancel()
+            self._dim_timer = None
+        if self.standby():
+            # Same 3 s grace as the standby screen, so re-enumerations don't flicker.
+            self._dim_timer = threading.Timer(3, self._dim)
+            self._dim_timer.daemon = True
+            self._dim_timer.start()
+        elif self._dimmed:
+            self._dimmed = False
+            self.apply_brightness()
+            log('computer back: brightness restored')
+
+    def _dim(self):
+        if self.standby() and not self._dimmed:
+            self._dimmed = True
+            self._light_sensor(False)
+            write_backlight(BRIGHTNESS_MIN)
+            log('standby: brightness at minimum')
 
     def load_saved(self):
         try:
@@ -1083,7 +1120,7 @@ def main():
                 pad.hid.close()
                 subprocess.call(['sh', GADGET_SH, 'adb-only'])
                 pad.mode, pad.message = 'error', 'USB HID setup failed: %s' % e
-        pad.publish_state()
+        pad.on_usb_status(pad.hid.status)     # publishes state; dims if no computer is there yet
         threading.Thread(target=input_loop, args=(pad, keys_path, rotary_path), name='input', daemon=True).start()
         while True:
             time.sleep(2)
