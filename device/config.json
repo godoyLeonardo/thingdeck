@@ -79,6 +79,12 @@
       "widgets": ["github"]
     },
     {
+      "_note": "Streams, load, bandwidth and libraries of the Plex server in plex.txt on the computer (needs the computer agent).",
+      "name": "Plex",
+      "header": "clock",
+      "widgets": ["plex"]
+    },
+    {
       "name": "Desktop",
       "presets": [
         { "label": "◀ Desktop", "key": "ctrl+win+left", "mac": { "key": "ctrl+left" }, "linux": { "key": "win+pageup" } },
