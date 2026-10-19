@@ -161,7 +161,7 @@ updates every 2 s stay small. The UI gets `nowplaying` events over SSE, loads th
 cover from `/api/nowplaying/art?k=…`, and moves the progress bar between updates.
 With no update for 15 s the data is dropped (computer off, agent stopped).
 
-A page with `"header": "clock"` (Media, Calendar, Status, Code and Plex, by default)
+A page with `"header": "clock"` (Media, Lights, Calendar, Status, Code and Plex, by default)
 shows a big clock and the date in place of the preset labels and dial chip, as long
 as the agent has set the time; the presets and dial still work. A page with
 `"nowplaying": true` (Media) is the media card: cover, details and progress on top
@@ -170,8 +170,9 @@ as the agent has set the time; the presets and dial still work. A page with
 ### Touch UI
 
 The bottom bar holds one tab per shown page plus ⚙ Settings. Up to seven tabs share
-it evenly (seven with smaller text). With more, each tab is a quarter of the bar, so four show at a time; the
-bar scrolls sideways, snaps to whole tabs, and keeps the current page's tab in view.
+it evenly (seven with smaller text). With more, each tab is a quarter of the bar, so
+four show at a time; the bar scrolls sideways, snaps to whole tabs, and keeps the
+current page's tab in view.
 The arrow button at its end then points to the other tabs (› scrolls on, ‹ goes back
 to the start), and a drag that starts on the bar never switches pages. Details and
 the audio picker open as a card over the page; tapping outside it closes it.
@@ -303,9 +304,10 @@ which the agent sends as the `X-Plex-Token` header. The agent asks for JSON
 because Plex items can have keys that differ only in case (`guid` and `Guid`).
 `ConvertFrom-Json` in Windows PowerShell refuses those keys.
 
-Every 3 s the agent reads `/`, `/status/sessions`, `/activities`, and the server's own
-history of load and bandwidth (`/statistics/resources` and `/statistics/bandwidth`,
-Plex Pass only). Then it posts the result to `POST /api/plex`. Every 5 minutes it
+Every 3 s while the Plex page is on screen (every 30 s otherwise, see [What updates
+when](#what-updates-when)) the agent reads `/`, `/status/sessions`, `/activities`,
+and the server's own history of load and bandwidth (`/statistics/resources` and
+`/statistics/bandwidth`, Plex Pass only). Then it posts the result to `POST /api/plex`. Every 5 minutes it
 counts the items of each library and reads `/updater/status`. A count is one request
 with `X-Plex-Container-Size=0`, which gives `totalSize` and no items. When the server
 does not answer, the agent tries again after 30 s, so the other pages do not wait.

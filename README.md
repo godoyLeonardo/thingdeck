@@ -8,9 +8,10 @@ as soon as you plug it in.
 - **Touchscreen:** pages of large tiles (Desktop, Shell, and a calls page: Discord
   or Meetings), each sending a shortcut, a media key, typed text or a sequence of
   steps, plus live pages filled by the computer agent: Media, Lights (Philips Hue),
-  Calendar, Status, Code (GitHub) and Plex. Up to seven tabs share the bottom bar; with more,
-  it shows four at a time and scrolls. Settings → Tabs sets their order and hides any
-  you don't use. On live pages, the top bar also shows the song playing (tap it for Media).
+  Calendar, Status, Code (GitHub) and Plex. Up to seven tabs share the bottom bar;
+  with more, it shows four at a time and scrolls. Settings → Tabs sets their order
+  and hides any you don't use. On live pages, the top bar also shows the song
+  playing (tap it for Media).
 - **4 top buttons:** presets that change with the page. Tile pages show their
   labels under the buttons; live pages show a big clock and the date there instead,
   and the buttons still work.
@@ -23,18 +24,17 @@ as soon as you plug it in.
   (Latin American and US are included).
 - **Settings** (the ⚙ tab): brightness (light sensor or manual), host OS, layout,
   dial direction, clock format, calls page (Discord or Meetings), themes and icons,
-  tab order, device info, and Reconnect / Restart / Reboot. Settings are saved on
-  the Car Thing and survive power cycles.
+  tab order and hidden tabs, device info, and Reconnect / Restart / Reboot.
+  Settings are saved on the Car Thing and survive power cycles.
 - **Themes:** Dark, Black, Light, and the editor color schemes Nord, Dracula,
   Catppuccin, Gruvbox, Tokyo Night and Solarized, each with its own accent, one of
   six accent colors, or any hue from a slider. Icons come in three styles (solid,
   outline, emoji) and three colors (neutral, accent, or a color per tile category).
 - **Computer agent (optional):** a small background agent on the computer adds what's
-  playing with its cover, Philips Hue lights, your calendar with Join buttons, CPU/memory/GPU/network
-  graphs, a kill switch for the app in focus, GitHub Actions runs and pull requests,
-  the streams and load of your Plex server,
-  a volume bar, an audio device picker, a clock and a lock screen (see
-  [Computer agent](#computer-agent)).
+  playing with its cover, Philips Hue lights, your calendar with Join buttons,
+  CPU/memory/GPU/network graphs, a kill switch for the app in focus, GitHub Actions
+  runs and pull requests, the streams and load of your Plex server, a volume bar,
+  an audio device picker, a clock and a lock screen (see [Computer agent](#computer-agent)).
 - **Standby screen** while the computer sleeps; the pad reconnects by itself
   when it wakes up.
 
@@ -48,7 +48,7 @@ The Car Thing's screen is 800×480. These use made-up demo data.
 | | |
 |---|---|
 | ![Media page: the song playing, its cover and progress, media controls, and the audio output in the header](docs/screenshots/media.png) | ![Calendar page: today, tomorrow and later this week, with Join buttons on meetings](docs/screenshots/calendar.png) |
-| **Media:** what's playing, with controls and the audio output | **Calendar:** the coming week, the next event highlighted |
+| **Media:** what's playing, with controls and the audio output | **Calendar:** the coming week; a meeting in progress pulses |
 | ![Status page: CPU, memory, GPU and network graphs, and the covered kill switch for the focused app](docs/screenshots/status.png) | ![Code page: the latest GitHub Actions runs and your open pull requests](docs/screenshots/code.png) |
 | **Status:** live stats and the kill switch | **Code:** GitHub Actions runs and your pull requests |
 | ![Event details card with time, length, notes and a Join meeting button](docs/screenshots/event.png) | ![Audio device picker with output and input lists](docs/screenshots/audio.png) |
@@ -56,11 +56,11 @@ The Car Thing's screen is 800×480. These use made-up demo data.
 | ![Volume bar shown over the Media page](docs/screenshots/volume.png) | ![Lock screen with the clock, what's playing and media buttons](docs/screenshots/lock.png) |
 | **Volume bar:** shows when the volume changes | **Lock screen:** while the computer is locked |
 | ![Lights page: Philips Hue rooms and zones tinted with their light color, with switches and brightness bars](docs/screenshots/lights.png) | ![A room card: brightness, warm-to-cool white, scenes and its lights](docs/screenshots/room.png) |
-| **Lights:** Philips Hue rooms and zones | **A room:** brightness, white, scenes, each light |
+| **Lights:** Philips Hue rooms and zones, with the song playing in the top bar | **A room:** brightness, white, scenes, each light |
 | ![Desktop page: a grid of shortcut tiles with line icons](docs/screenshots/desktop.png) | ![Settings, Appearance: themes, accent colors, the hue slider and icon options](docs/screenshots/settings.png) |
 | **Desktop:** a tile page | **Settings → Appearance** |
 | ![Settings, Tabs: the pages in order with up and down arrows](docs/screenshots/tabs.png) | ![Plex page: three streams with posters and transcode tags, the server's CPU and bandwidth graphs, and the libraries](docs/screenshots/plex.png) |
-| **Settings → Tabs:** the tab order | **Plex:** streams, server load and libraries |
+| **Settings → Tabs:** the order, and which tabs show | **Plex:** streams and how each is sent, server load, libraries |
 
 ## Requirements
 
@@ -202,7 +202,8 @@ them to the Car Thing **over the USB cable** (`adb forward`; no network):
   direct play, direct stream, or transcode (HW for a hardware transcode). Next to the
   streams are graphs of the server's CPU and bandwidth, and the size of each library,
   with any library scan in progress. The graphs need Plex Pass. The page refreshes
-  every 3 seconds (see [Connecting Plex](#connecting-plex)).
+  every 3 seconds while it's on screen, every 30 seconds otherwise (see
+  [Connecting Plex](#connecting-plex)).
 - **Volume and audio devices:** when the volume or mute changes (the dial, the Mute
   tile, your keyboard), a volume bar shows at the top for a moment. The Media page
   header shows the current output; tap it to pick the output and input devices.
@@ -315,7 +316,7 @@ on the local network. It uses the server's own API, not the Plex cloud.
 By default, a Plex server asks for a token, also on the local network. A server
 that lists your network under Settings → Network → "List of IP addresses and
 networks that are allowed without auth" does not ask for one. The agent reads
-`plex.txt` on each refresh, so a change shows within 3 seconds and needs no restart.
+`plex.txt` on each refresh, so a change shows within seconds and needs no restart.
 
 The token gives access to your Plex account, so keep `plex.txt` to yourself. The
 graphs of CPU and bandwidth need Plex Pass. Without it, the page shows the streams and
