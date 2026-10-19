@@ -1,7 +1,8 @@
 <#
-streamthing now-playing agent for Windows.
+streamthing agent for Windows.
 
-Reads the system media session (the same one Windows shows in its media flyout:
+Sends the Car Thing the computer's time (for its clock) and lock state, and reads the
+system media session (the same one Windows shows in its media flyout:
 Spotify, browsers, Media Player, ...) and pushes it to the Car Thing over USB
 through `adb forward`. Needs Windows PowerShell 5.1 (powershell.exe), which can
 call the WinRT media API directly, and adb.
@@ -127,9 +128,9 @@ function Get-Hash([string]$text) {
     -join ($md5.ComputeHash([Text.Encoding]::UTF8.GetBytes($text)) | ForEach-Object { $_.ToString('x2') })
 }
 
-function Send-Update($body) {
+function Send-Json([string]$path, $body) {
     $json = $body | ConvertTo-Json -Compress -Depth 3
-    Invoke-RestMethod -Uri "http://127.0.0.1:$Port/api/nowplaying" -Method Post -TimeoutSec 5 `
+    Invoke-RestMethod -Uri "http://127.0.0.1:$Port/api/$path" -Method Post -TimeoutSec 5 `
         -ContentType 'application/json; charset=utf-8' -Body ([Text.Encoding]::UTF8.GetBytes($json))
 }
 
@@ -146,6 +147,8 @@ $lastSent = [DateTime]::MinValue
 $coverSentFor = ''      # art key whose cover the device has
 $coverTries = 0
 $tunnelUp = $false
+$lastHost = $null
+$lastHostSent = [DateTime]::MinValue
 
 while ($true) {
     try {
@@ -154,7 +157,20 @@ while ($true) {
             & $adbExe forward "tcp:$Port" tcp:8765 2>$null | Out-Null
             if ($LASTEXITCODE -ne 0) { Start-Sleep -Seconds 3; continue }
             $tunnelUp = $true
-            $lastSignature = $null; $coverSentFor = ''
+            $lastSignature = $null; $coverSentFor = ''; $lastHost = $null
+        }
+        # Heartbeat: the time and UTC offset set the Car Thing's clock; LogonUI runs only
+        # while the lock (or sign-in) screen is up.
+        $locked = [bool](Get-Process LogonUI -ErrorAction SilentlyContinue)
+        $offset = [int][TimeZoneInfo]::Local.GetUtcOffset([DateTime]::Now).TotalMinutes
+        if ("$locked|$offset" -ne $lastHost -or ((Get-Date) - $lastHostSent).TotalSeconds -ge 10) {
+            [void](Send-Json 'host' @{
+                time_ms = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+                utc_offset_min = $offset
+                locked = $locked
+            })
+            $lastHost = "$locked|$offset"
+            $lastHostSent = Get-Date
         }
         $np = Get-NowPlaying
         if ($np) {
@@ -183,7 +199,7 @@ while ($true) {
             } else {
                 $body = @{ title = $null }
             }
-            $reply = Send-Update $body
+            $reply = Send-Json 'nowplaying' $body
             if ($body.Contains('art')) { $coverSentFor = $artKey }
             if ($reply.need_art) { $coverSentFor = '' }
             $lastSignature = $signature

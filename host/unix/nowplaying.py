@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""streamthing now-playing agent for Linux and macOS.
+"""streamthing agent for Linux and macOS.
 
-Reads what the computer is playing and pushes it to the Car Thing over USB
-through `adb forward`:
+Sends the Car Thing the computer's time (for its clock) and lock state, and what
+it is playing, over USB through `adb forward`:
   Linux  playerctl (any MPRIS player: Spotify, browsers, VLC, ...)
   macOS  nowplaying-cli; if that returns nothing (macOS 15.4+ restricts the API it
          uses), AppleScript for Spotify and Music
@@ -14,6 +14,7 @@ install.sh sets it up to start at login. Environment: ADB (path to adb),
 STREAMTHING_PORT (host side of the forward, default 28765).
 """
 import base64
+import datetime
 import hashlib
 import json
 import os
@@ -157,8 +158,29 @@ def forward():
     return run([ADB, 'forward', 'tcp:%d' % PORT, 'tcp:8765'], timeout=10) is not None
 
 
-def send(body):
-    req = urllib.request.Request('http://127.0.0.1:%d/api/nowplaying' % PORT,
+def linux_locked():
+    """The desktop's screensaver/lock over D-Bus (KDE and others, then GNOME)."""
+    for dest in ('org.freedesktop.ScreenSaver', 'org.gnome.ScreenSaver'):
+        out = run(['gdbus', 'call', '--session', '--dest', dest, '--object-path', '/' + dest.replace('.', '/'),
+                   '--method', dest + '.GetActive'], timeout=3)
+        if out is not None:
+            return 'true' in out
+    return False
+
+
+def mac_locked():
+    return '"CGSSessionScreenIsLocked" = Yes' in (run(['ioreg', '-n', 'Root', '-d1']) or '')
+
+
+def heartbeat(locked):
+    """Time and UTC offset (they set the Car Thing's clock) plus the lock state."""
+    offset = datetime.datetime.now().astimezone().utcoffset()
+    return {'time_ms': int(time.time() * 1000), 'utc_offset_min': int(offset.total_seconds() // 60),
+            'locked': locked}
+
+
+def send(path, body):
+    req = urllib.request.Request('http://127.0.0.1:%d/api/%s' % (PORT, path),
                                  data=json.dumps(body).encode('utf-8'),
                                  headers={'Content-Type': 'application/json'})
     with urllib.request.urlopen(req, timeout=5) as r:
@@ -171,6 +193,7 @@ def log(*args):
 
 def main():
     snapshot = mac_snapshot if sys.platform == 'darwin' else linux_snapshot
+    is_locked = mac_locked if sys.platform == 'darwin' else linux_locked
     if '--once' in sys.argv:
         np = snapshot()
         if np:
@@ -181,6 +204,7 @@ def main():
     tunnel = False
     last_signature, last_sent = None, 0.0
     cover_sent_for, cover_tries = '', 0
+    last_host, last_host_sent = None, 0.0
     while True:
         try:
             if not tunnel:
@@ -189,7 +213,12 @@ def main():
                     time.sleep(3)
                     continue
                 tunnel = True
-                last_signature, cover_sent_for = None, ''
+                last_signature, cover_sent_for, last_host = None, '', None
+            locked = is_locked()
+            offset_now = heartbeat(locked)['utc_offset_min']
+            if (locked, offset_now) != last_host or time.monotonic() - last_host_sent >= 10:
+                send('host', heartbeat(locked))
+                last_host, last_host_sent = (locked, offset_now), time.monotonic()
             np = snapshot()
             if np:
                 key = hashlib.md5('|'.join(str(np.get(k) or '') for k in
@@ -213,7 +242,7 @@ def main():
                                 body['art_type'] = 'image/png' if cover[:4] == b'\x89PNG' else 'image/jpeg'
                 else:
                     body = {'title': None}
-                reply = send(body)
+                reply = send('nowplaying', body)
                 if 'art' in body:
                     cover_sent_for = key
                 if reply.get('need_art'):
