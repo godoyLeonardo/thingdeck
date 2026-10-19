@@ -2,9 +2,10 @@
 """streamthing agent for Linux and macOS.
 
 Sends the Car Thing the computer's time (for its clock) and lock state, system stats
-(CPU, memory, GPU, network), the calendars listed in calendars.txt, and what it is
-playing, over USB through `adb forward`. It also opens meeting links the Car Thing
-asks for. What is playing comes from:
+(CPU, memory, GPU, network), the focused app, the volume and audio devices, the
+calendars listed in calendars.txt, and what it is playing, over USB through
+`adb forward`. It also opens meeting links, kills the focused app and switches audio
+devices when the Car Thing asks. What is playing comes from:
   Linux  playerctl (any MPRIS player: Spotify, browsers, VLC, ...)
   macOS  nowplaying-cli; if that returns nothing (macOS 15.4+ restricts the API it
          uses), AppleScript for Spotify and Music
@@ -381,6 +382,78 @@ def kill_focused(target):
     return result
 
 
+# ------------------------------------------------------------------ audio
+
+def linux_audio(lists):
+    """PipeWire or PulseAudio through pactl: the default sink's volume and mute, the
+    default sink and source, and (with lists) every sink and source."""
+    state = {'output': (run(['pactl', 'get-default-sink']) or '').strip() or None,
+             'input': (run(['pactl', 'get-default-source']) or '').strip() or None}
+    volume = re.search(r'(\d+)%', run(['pactl', 'get-sink-volume', '@DEFAULT_SINK@']) or '')
+    state['volume'] = int(volume.group(1)) if volume else None
+    state['muted'] = 'yes' in (run(['pactl', 'get-sink-mute', '@DEFAULT_SINK@']) or '')
+    if lists:
+        for kind, what in (('outputs', 'sinks'), ('inputs', 'sources')):
+            try:
+                devices = json.loads(run(['pactl', '-f', 'json', 'list', what]) or '[]')
+            except ValueError:
+                devices = []
+            state[kind] = [{'id': d['name'], 'name': d.get('description') or d['name']} for d in devices
+                           if d.get('name') and not d['name'].endswith('.monitor')]     # skip "monitor of" sources
+    return state
+
+
+def mac_audio(lists):
+    """The volume through AppleScript; devices through SwitchAudioSource, if installed."""
+    settings = run(['osascript', '-e', 'get volume settings']) or ''
+    volume = re.search(r'output volume:(\d+)', settings)
+    state = {'volume': int(volume.group(1)) if volume else None, 'muted': 'output muted:true' in settings}
+    if shutil.which('SwitchAudioSource'):
+        for kind, what in (('output', 'output'), ('input', 'input')):
+            state[kind] = (run(['SwitchAudioSource', '-c', '-t', what]) or '').strip() or None
+            if lists:
+                state[kind + 's'] = [{'id': n, 'name': n} for n in (run(['SwitchAudioSource', '-a', '-t', what]) or '').splitlines() if n]
+    return state
+
+
+def set_audio_device(device_id, kind):
+    if sys.platform == 'darwin':
+        run(['SwitchAudioSource', '-t', kind, '-s', device_id])
+    else:
+        run(['pactl', 'set-default-sink' if kind == 'output' else 'set-default-source', device_id])
+
+
+class AudioLink:
+    """Sends the audio state when it changes and at least every 2 s; the reply may carry a
+    device the Car Thing picked. The device lists are read every 3 s and sent when they change."""
+
+    def __init__(self):
+        self.listed, self.lists = 0.0, {}
+        self.sent, self.lists_sent, self.sent_at = None, None, 0.0
+
+    def update(self):
+        fresh = time.monotonic() - self.listed >= 3
+        if fresh:
+            self.listed = time.monotonic()
+        state = (mac_audio if sys.platform == 'darwin' else linux_audio)(fresh)
+        if fresh:
+            self.lists = {k: state.pop(k) for k in ('outputs', 'inputs') if k in state}
+        if state.get('volume') is None and not any(self.lists.values()):
+            return          # no pactl / nothing to show
+        key, lists_key = json.dumps(state, sort_keys=True), json.dumps(self.lists, sort_keys=True)
+        if key == self.sent and lists_key == self.lists_sent and time.monotonic() - self.sent_at < 2:
+            return
+        body = dict(state, **(self.lists if lists_key != self.lists_sent else {}))
+        reply = send('audio', body)
+        self.sent, self.lists_sent, self.sent_at = key, lists_key, time.monotonic()
+        if reply.get('need_lists'):
+            self.lists_sent = None
+        target = reply.get('set')
+        if isinstance(target, dict) and target.get('id'):
+            set_audio_device(str(target['id']), 'input' if target.get('kind') == 'input' else 'output')
+            self.listed = 0.0
+
+
 # ------------------------------------------------------------------ calendars
 
 # Each line is an iCal address, such as Google Calendar's "Secret address in iCal format".
@@ -479,6 +552,7 @@ def main():
         time.sleep(1)
         print(json.dumps(stats.read(), indent=2))
         print(json.dumps(focus(), indent=2, ensure_ascii=False))
+        print(json.dumps((mac_audio if sys.platform == 'darwin' else linux_audio)(True), indent=2, ensure_ascii=False))
         return
     log('started (adb: %s, port %d)' % (ADB, PORT))
     tunnel = False
@@ -486,6 +560,7 @@ def main():
     cover_sent_for, cover_tries = '', 0
     last_host, last_host_sent = None, 0.0
     last_stats, kill_result = 0.0, None
+    audio = AudioLink()
     calendars, calendars_fetched, fetched_hash, calendar_hash = None, None, None, None
     while True:
         try:
@@ -556,6 +631,7 @@ def main():
                 if reply.get('need_art'):
                     cover_sent_for = ''
                 last_signature, last_sent = signature, time.monotonic()
+            audio.update()
         except (OSError, ValueError) as e:
             log('update failed:', e)
             tunnel = False
