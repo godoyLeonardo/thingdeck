@@ -241,6 +241,37 @@
   .sh-actions { display: flex; justify-content: flex-end; margin-top: 12px; }
   .sh-actions .btn { flex: none; min-width: 120px; padding: 0 18px; margin-left: 8px; }
   .sh-actions .btn.primary { background: var(--acc); color: var(--on-acc); }
+  /* audio: the volume bar (over everything) and, in a page's clock header, the output pill */
+  #volhud { position: fixed; left: 50%; top: 12px; width: 400px; margin-left: -200px; height: 60px; z-index: 6;
+    display: flex; align-items: center; padding: 0 20px; border-radius: 30px; background: var(--toast);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, .45); opacity: 0; transform: translateY(-12px);
+    transition: opacity .15s, transform .15s; pointer-events: none; }
+  #volhud.show { opacity: 1; transform: none; }
+  .vh-icon { line-height: 0; color: var(--text); }
+  .vh-icon svg { width: 26px; height: 26px; }
+  .vh-bar { flex: 1; height: 10px; margin: 0 14px; border-radius: 5px; background: var(--line); overflow: hidden; }
+  .vh-bar i { display: block; height: 100%; width: 0; background: var(--acc); transition: width .12s; }
+  #volhud.muted .vh-bar i { background: var(--muted); }
+  #volhud.muted .vh-num { color: var(--muted); }
+  .vh-num { width: 42px; text-align: right; font-size: calc(21px * var(--ts)); font-weight: 700; font-variant-numeric: tabular-nums; }
+  #audiopill { flex: none; align-self: center; margin-left: auto; display: flex; align-items: center; max-width: 290px;
+    height: 42px; padding: 0 16px 0 12px; border-radius: 21px; background: var(--tile); font-size: calc(15px * var(--ts)); font-weight: 600; }
+  #audiopill svg { flex: none; width: 22px; height: 22px; margin-right: 8px; color: var(--muted); }
+  #audiopill .emoji { font-size: 18px; margin-right: 8px; }
+  #audiopill span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #audiopill.down { background: var(--tile-hi); }
+  .au-cols { flex: 1; min-height: 0; display: flex; }
+  .au-col { flex: 1; min-width: 0; overflow-y: auto; }
+  .au-col + .au-col { margin-left: 20px; }
+  .au-col::-webkit-scrollbar { display: none; }
+  .au-dev { display: flex; align-items: center; min-height: 56px; margin: 4px -10px 0; padding: 6px 10px; border-radius: 12px;
+    font-size: calc(15px * var(--ts)); font-weight: 500; }
+  .au-dev svg { flex: none; width: 22px; height: 22px; color: var(--muted); }
+  .au-dev span { flex: 1; min-width: 0; margin: 0 10px; line-height: 1.25; display: -webkit-box; -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical; overflow: hidden; }
+  .au-dev.on { background: var(--acc-soft); color: var(--acc); font-weight: 600; }
+  .au-dev.on svg { color: var(--acc); }
+  .au-dev.down { background: var(--tile-hi); }
   /* page option "kill": the focused app and a guarded kill switch, like an aircraft's
      covered switch: tap the cover to lift it, then press the button under it */
   .killbar { flex: none; display: flex; align-items: center; height: 86px; margin-top: 8px; padding: 0 10px 0 16px;
@@ -406,7 +437,7 @@
 </head>
 <body>
   <div id="top">
-    <div id="topclock"><span class="tc-time"></span><span class="tc-suffix"></span><span class="tc-date"></span></div>
+    <div id="topclock"><span class="tc-time"></span><span class="tc-suffix"></span><span class="tc-date"></span><div id="audiopill" data-audio="1"></div></div>
     <div id="presets"></div>
     <div id="dial">
       <svg viewBox="0 0 26 26" fill="none"><circle cx="13" cy="13" r="10.5" style="stroke:var(--muted)" stroke-width="2"/><line x1="13" y1="4.5" x2="13" y2="9.5" style="stroke:var(--acc)" stroke-width="2.4" stroke-linecap="round"/></svg>
@@ -462,6 +493,7 @@
     <div id="clock" class="hidden"></div>
     <div id="status"><i></i><span id="statustext">…</span></div>
   </div>
+  <div id="volhud"><div class="vh-icon"></div><div class="vh-bar"><i></i></div><div class="vh-num"></div></div>
   <div id="toast"></div>
   <div id="sheet" data-sheet-close="1"><div class="sheet-card" id="sheetcard" data-sheet-card="1"></div></div>
   <div id="lockscreen">
@@ -499,6 +531,7 @@ function load() {
     setNowPlaying(j.nowplaying);
     stats = j.stats || null;
     agenda = j.agenda || agenda;
+    audio = j.audio || null;
     render();
   });
 }
@@ -587,6 +620,7 @@ function kind(a) {
 function render() {
   var pages = (cfg.pages || []).map(resolvePage);
   var page = pages[st.page] || { tiles: [] };
+  currentPage = page;
   var grid = page.grid || cfg.grid || [4, 2];
   var g = $('grid');
   if (page.widgets) {
@@ -631,6 +665,7 @@ function render() {
   document.body.classList.toggle('topclock', !showSettings && page.header === 'clock' && !!st.clock);
   if (showSettings) renderSettings();
   renderStatus();
+  updateAudioPill();
   updateStandby();
   updateLock();
   tick();
@@ -1071,7 +1106,7 @@ function eventHTML(e, isNext, cols) {
     (e.link ? '<div class="ev-join" data-join="' + esc(e.id) + '">' + icon('camera') + '</div>' : '') + '</div>';
 }
 // Event details: the list has the basics; the notes and calendar name come on request.
-var sheetOpen = false;
+var sheetOpen = false, sheetMode = null;      // "event" or "audio"
 function longDay(ms) {
   var d = localParts(ms);
   return DAYS[d.getUTCDay()] + ', ' + d.getUTCDate() + ' ' + MONTHS[d.getUTCMonth()];
@@ -1099,12 +1134,79 @@ function openEvent(id) {
   render({});
   $('sheet').className = 'show';
   sheetOpen = true;
+  sheetMode = 'event';
   fetch('/api/calendar/event?id=' + encodeURIComponent(id)).then(function (r) { return r.json(); })
-    .then(function (d) { if (sheetOpen) render(d); }).catch(function () {});
+    .then(function (d) { if (sheetMode === 'event') render(d); }).catch(function () {});
 }
 function closeSheet() {
   sheetOpen = false;
+  sheetMode = null;
   $('sheet').className = '';
+}
+
+// ---- audio (from the computer agent): a volume bar when the volume or mute changes, and
+// on a page with "audio": true, a pill with the output that opens the device picker.
+var audio = null, volTimer = null, currentPage = {};
+function showVolume() {
+  if (!audio || audio.volume == null) return;
+  var hud = $('volhud');
+  hud.querySelector('.vh-icon').innerHTML = icon(audio.muted || !audio.volume ? 'mute' : 'speaker');
+  hud.querySelector('.vh-bar i').style.width = audio.volume + '%';
+  hud.querySelector('.vh-num').textContent = audio.volume;
+  hud.classList.toggle('muted', !!audio.muted);
+  hud.classList.add('show');
+  clearTimeout(volTimer);
+  volTimer = setTimeout(function () { hud.classList.remove('show'); }, 1500);
+}
+function setAudio(d) {
+  var before = audio;
+  audio = d;
+  if (before && d && (before.volume !== d.volume || before.muted !== d.muted)) showVolume();
+  updateAudioPill();
+  if (sheetMode === 'audio') renderAudioSheet();
+}
+function shortDevice(name) {           // "Speakers (2- Focusrite USB Audio)" -> "Focusrite USB Audio"
+  var m = /^(.*?) \((.+)\)$/.exec(name || '');
+  return (m ? m[2] : name || '').replace(/^\d+- /, '');
+}
+function deviceIcon(name, input) {
+  return icon(input ? 'mic' : /headphone|headset|auricular|casque|kopfh/i.test(name) ? 'headphones' : 'speaker');
+}
+function currentDevice(kind) {
+  return audio && (audio[kind + 's'] || []).filter(function (d) { return d.id === audio[kind]; })[0];
+}
+function updateAudioPill() {
+  var pill = $('audiopill'), out = currentDevice('output');
+  var show = !!(currentPage.audio && audio && (audio.outputs || []).length);
+  pill.style.display = show ? '' : 'none';
+  if (show) pill.innerHTML = deviceIcon(out ? out.name : '', false) + '<span>' + esc(out ? shortDevice(out.name) : 'Audio') + '</span>';
+}
+function renderAudioSheet() {
+  if (!audio) return closeSheet();
+  var col = function (title, list, current, input) {
+    return '<div class="au-col"><div class="m-label">' + title + '</div>' + (list.length ? list.map(function (d) {
+      return '<div class="au-dev' + (d.id === current ? ' on' : '') + '" data-audio-dev="' + esc(d.id) + '">' +
+        deviceIcon(d.name, input) + '<span>' + esc(d.name) + '</span>' + (d.id === current ? icon('check') : '') + '</div>';
+    }).join('') : '<div class="ag-empty">None found</div>') + '</div>';
+  };
+  $('sheetcard').innerHTML = '<div class="au-cols">' + col('Output', audio.outputs || [], audio.output, false) +
+    col('Input', audio.inputs || [], audio.input, true) + '</div>' +
+    '<div class="sh-actions"><div class="btn" data-sheet-close="1">Close</div></div>';
+}
+function openAudio() {
+  if (!audio) return;
+  sheetMode = 'audio';
+  sheetOpen = true;
+  renderAudioSheet();
+  $('sheet').className = 'show';
+}
+function chooseAudio(id) {
+  post('/api/audio/set', { id: id });
+  ['output', 'input'].forEach(function (kind) {      // show the pick now; the agent confirms within a second
+    if ((audio[kind + 's'] || []).some(function (d) { return d.id === id; })) audio[kind] = id;
+  });
+  renderAudioSheet();
+  updateAudioPill();
 }
 function updateAgenda() {
   var box = $('agenda');
@@ -1300,7 +1402,7 @@ function updateLock() {
 var startX = 0, startY = 0, downEl = null;
 document.addEventListener('pointerdown', function (e) {
   startX = e.clientX; startY = e.clientY;
-  downEl = e.target.closest('.tile[data-i], .preset[data-i], #dial, .tab, #status, [data-set], [data-sys], [data-sec], [data-choice-slot], [data-media], [data-join], [data-guard], [data-kill], [data-ev], [data-sheet-close], [data-sheet-card]');
+  downEl = e.target.closest('.tile[data-i], .preset[data-i], #dial, .tab, #status, [data-set], [data-sys], [data-sec], [data-choice-slot], [data-media], [data-join], [data-guard], [data-kill], [data-ev], [data-sheet-close], [data-sheet-card], [data-audio], [data-audio-dev]');
   if (downEl) downEl.classList.add('down');
 });
 document.addEventListener('pointercancel', function () { if (downEl) downEl.classList.remove('down'); downEl = null; });
@@ -1322,6 +1424,8 @@ document.addEventListener('pointerup', function (e) {
   if (el.hasAttribute('data-sheet-card')) return;                  // a tap inside the details card
   if (el.hasAttribute('data-sheet-close')) closeSheet();
   else if (el.hasAttribute('data-ev')) openEvent(el.getAttribute('data-ev'));
+  else if (el.hasAttribute('data-audio')) openAudio();
+  else if (el.hasAttribute('data-audio-dev')) chooseAudio(el.getAttribute('data-audio-dev'));
   else if (el.hasAttribute('data-guard')) openGuard();
   else if (el.hasAttribute('data-kill')) pressKill();
   else if (el.hasAttribute('data-join')) { fire(el); post('/api/calendar/open', { id: el.getAttribute('data-join') }); closeSheet(); }
@@ -1371,6 +1475,8 @@ function connect() {
       if (d.where === 'preset') fire($('presets').querySelector('.preset[data-i="' + d.index + '"]'));
     } else if (m.type === 'turn') {
       spin(d.dir);
+      var mode = (cfg.dial_modes || [])[st.dial];      // the volume dial: show the bar right away
+      if (mode && mode.cw && mode.cw.media === 'vol_up') showVolume();
     } else if (m.type === 'hw') {
       if (d.button === 'knob' || d.button === 'back') fire($('dial'));
     } else if (m.type === 'nowplaying') {
@@ -1382,6 +1488,8 @@ function connect() {
       stats = d;
       updateMonitor();
       updateFocus();
+    } else if (m.type === 'audio') {
+      setAudio(d);
     } else if (m.type === 'agenda') {
       agenda = d;
       updateAgenda();
