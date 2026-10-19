@@ -249,7 +249,8 @@ Manual mode stops it and writes `260 - level`.
 The widget `"github"` (the Code page) shows what the agent reads with the `gh` CLI,
 for the repository in `github.txt` on the computer: the newest run of each workflow
 (5 at most) and the user's open pull requests (one GraphQL query, any repository,
-with the check rollup and review decision). The agent posts it to `POST /api/github`
+with the check rollup and review decision). Both lists scroll, and a redraw keeps
+their scroll position. The agent posts it to `POST /api/github`
 every minute, or every 15 s while a run is queued or running; `{"none": true}` means
 there is no `github.txt`. `GitHubStatus` keeps each row's link and gives the UI only
 row ids; a tap posts `POST /api/github/open {id}`, and the link goes to the agent
