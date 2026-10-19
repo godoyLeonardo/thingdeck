@@ -78,7 +78,9 @@ The result picks per-OS action overrides, and it can pick a per-OS layout
 ### Standby, resume and reconnect
 
 When the HID function is not `connected` (host suspended or gone), the UI shows
-the standby screen after 3 s, and hardware input is ignored.
+the standby screen after 3 s, and hardware input is ignored. After the same 3 s
+the backlight drops to its minimum (`BRIGHTNESS_MIN`, with the light-sensor service
+stopped); the brightness setting is applied again when the host is back.
 
 **After resume.** The host resets the bus. `adbd` then closes and reopens its
 FunctionFS files, and with configfs that unbinds the whole gadget. Nothing in the
@@ -187,6 +189,15 @@ objects. When the host matches, the override replaces the action, keeping
 { "label": "Task view", "key": "win+tab",
   "mac": { "label": "Mission Control", "key": "ctrl+up" },
   "linux": { "label": "Overview", "key": "win" } }
+```
+
+Pages can be replaced per OS the same way: the override's keys (`name`, `presets`,
+`tiles`, `grid`) replace the page's. The default config uses this for the
+Windows-only Discord page:
+
+```json
+{ "name": "Meetings", "presets": [...], "tiles": [...],
+  "windows": { "name": "Discord", "presets": [...], "tiles": [...] } }
 ```
 
 ## HTTP API

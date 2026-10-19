@@ -5,8 +5,8 @@ Stream Deck. It needs **no app on the computer**. The computer sees a standard
 USB keyboard, media keys and mouse wheel, so it works on Windows, macOS and Linux
 as soon as you plug it in.
 
-- **Touchscreen:** pages of large tiles (Media, Desktop, Code, Shell, Meetings),
-  each sending a shortcut, a media key, typed text or a sequence of steps.
+- **Touchscreen:** pages of large tiles (Media, Desktop, Code, Shell, and Discord
+  on Windows or Meetings on macOS/Linux), each sending a shortcut, a media key, typed text or a sequence of steps.
 - **4 top buttons:** presets that change with the page. Labels are shown on the
   screen right under the buttons.
 - **Dial:** volume, scroll, zoom, scrub (arrow keys), browser tabs, undo/redo.
@@ -82,7 +82,11 @@ All of these can be changed in `device/config.json`.
 
 ## Host OS
 
-Shortcuts differ per OS, so tiles can carry `"mac"` and `"linux"` overrides. The
+Shortcuts differ per OS, so tiles, and whole pages, can carry `"windows"`,
+`"mac"` and `"linux"` overrides. On Windows the Meetings page is replaced by a
+**Discord** page (mute, deafen, answer/decline, quick switcher, …), using
+Discord's default shortcuts. Mute and deafen work even when Discord isn't
+focused. The
 defaults use standard shortcuts: Mission Control and Spotlight on macOS,
 GNOME's on Linux.
 
@@ -112,7 +116,8 @@ Shortcuts made of letters, digits and named keys work with any layout.
 ## When the computer sleeps
 
 When the computer sleeps or shuts down and the Car Thing still has power, the
-screen shows **Computer is asleep** and the buttons do nothing. When the computer
+screen shows **Computer is asleep**, dims to its minimum brightness, and the
+buttons do nothing. Your brightness setting comes back with the computer. When the computer
 wakes up, the Car Thing reconnects by itself within a few seconds.
 
 **The Car Thing cannot wake or turn on the computer.** Waking over USB was tried,
