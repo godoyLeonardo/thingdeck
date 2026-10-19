@@ -131,7 +131,27 @@
         { "label": "Zoom camera", "icon": "📷", "key": "alt+v", "mac": { "key": "cmd+shift+v" } },
         { "label": "Meet mic", "icon": "🎙️", "key": "ctrl+d", "mac": { "key": "cmd+d" } },
         { "label": "Meet camera", "icon": "📷", "key": "ctrl+e", "mac": { "key": "cmd+e" } }
-      ]
+      ],
+      "windows": {
+        "_note": "Discord's default shortcuts. Mute and deafen are global keybinds; the others need Discord in focus.",
+        "name": "Discord",
+        "presets": [
+          { "label": "Mute", "key": "ctrl+shift+m" },
+          { "label": "Deafen", "key": "ctrl+shift+d" },
+          { "label": "Answer call", "key": "ctrl+enter" },
+          { "label": "Decline call", "key": "esc" }
+        ],
+        "tiles": [
+          { "label": "Mute", "icon": "🎙️", "key": "ctrl+shift+m", "color": "#5865f2" },
+          { "label": "Deafen", "icon": "🎧", "key": "ctrl+shift+d", "color": "#5865f2" },
+          { "label": "Answer call", "icon": "📞", "key": "ctrl+enter", "color": "#3ba55c" },
+          { "label": "Decline call", "icon": "⛔", "key": "esc", "color": "#ed4245" },
+          { "label": "Quick switcher", "icon": "🔎", "key": "ctrl+k" },
+          { "label": "Back to voice", "icon": "🔊", "key": "ctrl+alt+a" },
+          { "label": "Inbox", "icon": "📥", "key": "ctrl+i" },
+          { "label": "Mark server read", "icon": "✅", "key": "shift+esc" }
+        ]
+      }
     }
   ]
 }
