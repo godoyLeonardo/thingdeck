@@ -128,6 +128,27 @@
 
   /* tile grid */
   #grid { flex: 1; display: grid; grid-gap: 8px; padding: 8px 0; min-height: 0; transition: opacity .12s, transform .12s; }
+  /* now playing (Media page) */
+  .np-top { display: flex; min-height: 0; background: var(--tile); border-radius: 16px; padding: 14px; }
+  .np-art { flex: none; width: 214px; height: 214px; border-radius: 12px; overflow: hidden; background: var(--tile-hi);
+    display: flex; align-items: center; justify-content: center; font-size: 72px; color: var(--muted); }
+  .np-art img { width: 100%; height: 100%; object-fit: cover; }
+  .np-info { flex: 1; min-width: 0; margin-left: 20px; display: flex; flex-direction: column; }
+  .np-app { font: 500 12px GeistMono, monospace; color: var(--acc); text-transform: uppercase; letter-spacing: .06em;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .np-title { font-size: 28px; font-weight: 700; line-height: 1.15; letter-spacing: -.01em; margin-top: 10px;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .np-artist { font-size: 19px; font-weight: 500; margin-top: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .np-album { font-size: 14px; color: var(--muted); margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .np-progress { margin-top: auto; }
+  .np-bar { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+  .np-bar i { display: block; height: 100%; width: 0; background: var(--acc); transition: width .5s linear; }
+  .np-times { display: flex; justify-content: space-between; font: 500 12px GeistMono, monospace; color: var(--muted); margin-top: 6px; }
+  .np-controls { display: grid; grid-template-columns: repeat(8, 1fr); grid-gap: 8px; }
+  .tile.mini { height: 72px; padding: 8px 4px; align-items: center; justify-content: center; }
+  .tile.mini .icon { font-size: 22px; }
+  .tile.mini .label { font-size: 11px; font-weight: 600; margin-top: 5px; max-width: 100%; text-align: center;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   #grid.swipe-l { transform: translateX(-24px); opacity: 0; }
   #grid.swipe-r { transform: translateX(24px); opacity: 0; }
   .tile { position: relative; background: var(--tile); border-radius: 16px; padding: 12px 14px; display: flex;
@@ -299,6 +320,7 @@ function post(path, body) {
 function load() {
   return fetch('/api/state').then(function (r) { return r.json(); }).then(function (j) {
     cfg = j.config || cfg; st = j.state || st; presets = j.presets || [];
+    setNowPlaying(j.nowplaying);
     render();
   });
 }
@@ -389,6 +411,10 @@ function render() {
   var page = pages[st.page] || { tiles: [] };
   var grid = page.grid || cfg.grid || [4, 2];
   var g = $('grid');
+  if (page.nowplaying && np) {
+    renderNowPlaying(page, g);
+  } else {
+  g.removeAttribute('data-np');
   g.style.gridTemplateColumns = 'repeat(' + grid[0] + ', 1fr)';
   g.style.gridTemplateRows = 'repeat(' + grid[1] + ', 1fr)';
   var html = '';
@@ -401,6 +427,7 @@ function render() {
       '<div><div class="label">' + esc(t.label || '') + '</div><div class="hint">' + esc(hint(t)) + '</div></div></div>';
   }
   g.innerHTML = html;
+  }
 
   var ph = '';
   for (var p = 0; p < 4; p++) {
@@ -566,6 +593,70 @@ function esc(s) {
 }
 
 // ---- feedback
+// ---- now playing: pushed by the host agent (host/ in the repo); Media page shows it
+var np = null;       // metadata from the service, plus recv = when it arrived here
+function setNowPlaying(d) {
+  np = d && d.title ? d : null;
+  if (np) np.recv = Date.now();
+}
+function fmtTime(ms) {
+  if (ms == null || ms < 0) return '';
+  var s = Math.floor(ms / 1000), h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60);
+  s = s % 60;
+  return (h ? h + ':' + (m < 10 ? '0' : '') : '') + m + ':' + (s < 10 ? '0' : '') + s;
+}
+function npPosition() {
+  var pos = (np.position_ms || 0) + (np.playing ? Date.now() - np.recv : 0);
+  return np.duration_ms ? Math.min(pos, np.duration_ms) : pos;
+}
+// Built once per track (and page), so the cover isn't refetched on every position update.
+function renderNowPlaying(page, g) {
+  var key = [np.art, np.title, np.artist, np.album, np.app, st.page, st.os].join('|');
+  if (g.getAttribute('data-np') !== key) {
+    g.setAttribute('data-np', key);
+    g.style.gridTemplateColumns = '1fr';
+    g.style.gridTemplateRows = '1fr auto';
+    var tiles = page.tiles || [];
+    g.innerHTML =
+      '<div class="np-top">' +
+        '<div class="np-art">' + (np.art ? '<img src="/api/nowplaying/art?k=' + encodeURIComponent(np.art) + '">' : '♪') + '</div>' +
+        '<div class="np-info">' +
+          '<div class="np-app"><span id="np-state"></span>' + (np.app ? ' · ' + esc(np.app) : '') + '</div>' +
+          '<div class="np-title">' + esc(np.title) + '</div>' +
+          (np.artist ? '<div class="np-artist">' + esc(np.artist) + '</div>' : '') +
+          (np.album ? '<div class="np-album">' + esc(np.album) + (np.track_number ? ' · #' + np.track_number : '') + '</div>' : '') +
+          '<div class="np-progress" id="np-progress"><div class="np-bar"><i id="np-fill"></i></div>' +
+            '<div class="np-times"><span id="np-pos"></span><span id="np-dur"></span></div></div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="np-controls">' + tiles.map(function (t0, i) {
+        var t = variant(t0);
+        if (!t) return '<div></div>';
+        return '<div class="tile mini" data-i="' + i + '" style="--accent:' + kind(t) + '"' +
+          (t.media === 'play_pause' ? ' data-playpause="1"' : '') + '>' +
+          '<div class="icon">' + esc(t.icon || '•') + '</div><div class="label">' + esc(t.label || '') + '</div></div>';
+      }).join('') + '</div>';
+  }
+  updateNowPlaying();
+}
+function updateNowPlaying() {
+  if (!np || !$('np-fill')) return;
+  $('np-state').textContent = np.playing ? '▶ Playing' : '❚❚ Paused';
+  var pp = $('grid').querySelector('[data-playpause]');
+  if (pp) {
+    pp.querySelector('.icon').textContent = np.playing ? '⏸️' : '▶️';
+    pp.querySelector('.label').textContent = np.playing ? 'Pause' : 'Play';
+  }
+  var pos = npPosition(), dur = np.duration_ms;
+  $('np-progress').style.visibility = dur ? 'visible' : 'hidden';
+  if (dur) {
+    $('np-fill').style.width = Math.min(100, pos / dur * 100) + '%';
+    $('np-pos').textContent = fmtTime(pos);
+    $('np-dur').textContent = fmtTime(dur);
+  }
+}
+setInterval(updateNowPlaying, 500);
+
 function fire(el) {
   if (!el) return;
   el.classList.add('fire');
@@ -675,6 +766,11 @@ function connect() {
       spin(d.dir);
     } else if (m.type === 'hw') {
       if (d.button === 'knob' || d.button === 'back') fire($('dial'));
+    } else if (m.type === 'nowplaying') {
+      var had = !!np, track = np && [np.art, np.title, np.artist, np.album, np.app, np.playing].join('|');
+      setNowPlaying(d);
+      if (!!np !== had || (np && [np.art, np.title, np.artist, np.album, np.app, np.playing].join('|') !== track)) render();
+      else updateNowPlaying();
     } else if (m.type === 'toast') {
       toast(d.text, d.level);
     }

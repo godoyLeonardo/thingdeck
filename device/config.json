@@ -39,6 +39,7 @@
   "pages": [
     {
       "name": "Media",
+      "nowplaying": true,
       "tiles": [
         { "label": "Previous", "icon": "⏮️", "media": "prev" },
         { "label": "Play / Pause", "icon": "⏯️", "media": "play_pause" },
