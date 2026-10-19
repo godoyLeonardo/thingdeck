@@ -6,6 +6,8 @@ user space on FunctionFS, because this kernel has no f_hid). The dial, the
 hardware buttons and a touch UI in the kiosk browser send the reports.
 """
 import base64
+import collections
+import datetime
 import fcntl
 import json
 import os
@@ -17,7 +19,10 @@ import subprocess
 import sys
 import threading
 import time
+import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+import ics       # ics.py next to this file: the calendar reader for the agenda
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.path.join(BASE, 'config.json')
@@ -464,6 +469,129 @@ class NowPlaying:
             self.clear()
 
 
+STATS_TTL = 10          # seconds without stats before the host agent counts as gone
+STATS_HISTORY = 60      # samples kept for the graphs (2 minutes at one every 2 s)
+STATS_FIELDS = ('cpu', 'cpu_temp', 'mem_used_mb', 'mem_total_mb', 'gpu', 'gpu_temp', 'gpu_mem_used_mb',
+                'gpu_mem_total_mb', 'net_rx', 'net_tx')
+
+
+class HostStats:
+    """CPU, memory, GPU and network of the computer, sent by the host agent every 2 s,
+    with a short history for the graphs."""
+
+    def __init__(self, ui):
+        self.ui = ui
+        self.latest = None
+        self.history = {k: collections.deque(maxlen=STATS_HISTORY) for k in ('cpu', 'mem', 'gpu', 'net_rx', 'net_tx')}
+        self.updated = None       # monotonic time of the last update
+
+    def update(self, body):
+        latest = {k: body[k] for k in STATS_FIELDS
+                  if isinstance(body.get(k), (int, float)) and not isinstance(body.get(k), bool)}
+        mem = latest['mem_used_mb'] * 100.0 / latest['mem_total_mb'] if latest.get('mem_total_mb') else None
+        for key, value in (('cpu', latest.get('cpu')), ('mem', mem), ('gpu', latest.get('gpu')),
+                           ('net_rx', latest.get('net_rx')), ('net_tx', latest.get('net_tx'))):
+            self.history[key].append(None if value is None else round(value, 1))
+        self.latest, self.updated = latest, time.monotonic()
+        self.ui.publish('stats', self.snapshot())
+
+    def snapshot(self):
+        if self.latest is None:
+            return None
+        return dict(self.latest, history={k: list(v) for k, v in self.history.items()})
+
+    def alive(self):
+        return self.updated is not None and time.monotonic() - self.updated <= STATS_TTL
+
+    def expire(self):
+        if self.latest is not None and not self.alive():
+            self.latest = None
+            for h in self.history.values():
+                h.clear()
+            self.ui.publish('stats', None)
+
+
+AGENDA_DAYS = 7         # today and the next days
+AGENDA_MAX = 80         # events sent to the UI
+EPOCH = datetime.datetime(1970, 1, 1)
+
+
+class Agenda:
+    """Upcoming events from the calendars the host agent downloads (calendars.txt on the
+    computer). The agent passes the iCal files on as they are; ics.py reads them here,
+    so repeats and time zones are handled once for every OS. Meeting links open on the
+    computer: the agent picks them up in the reply to its next stats update."""
+
+    def __init__(self, ui, host):
+        self.ui, self.host = ui, host
+        self.calendar = None      # ics.Calendar
+        self.state = 'unknown'    # unknown (no word from the agent) | none (no calendars.txt) | ok
+        self.error = None
+        self.links = {}           # event id -> meeting link
+        self.pending = None       # (link, monotonic time) to open on the computer
+        self.built = None
+        self.published = {'state': 'unknown', 'error': None, 'events': []}
+
+    def update(self, text, none, error):
+        calendar = None
+        if not none:
+            started = time.monotonic()
+            try:
+                since = datetime.datetime.utcfromtimestamp(time.time()) if time.time() > VALID_TIME else None
+                calendar = ics.Calendar(text, since)
+                log('calendar: %d events read in %.1f s' % (len(calendar.events), time.monotonic() - started))
+            except Exception as e:     # a malformed file must not take the service down
+                log('calendar: could not read it:', e)
+                error = error or 'Could not read the calendar: %s' % e
+        self.calendar, self.state, self.error = calendar, 'none' if none else 'ok', error or None
+        self.refresh(force=True)
+
+    def needs_calendar(self):
+        return self.state == 'unknown'
+
+    def refresh(self, force=False):
+        """Recompute the upcoming events: on new data, every 5 minutes, and when the UTC offset changes."""
+        now = time.time()
+        key = (int(now // 300), self.host.utc_offset)
+        if key == self.built and not force:
+            return
+        self.built = key
+        events, links = [], {}
+        if self.calendar is not None and now > VALID_TIME:
+            offset = datetime.timedelta(seconds=self.host.utc_offset or 0)
+            local_midnight = (datetime.datetime.utcfromtimestamp(now) + offset).replace(
+                hour=0, minute=0, second=0, microsecond=0)
+            start = local_midnight - offset
+            try:
+                found = self.calendar.between(start, start + datetime.timedelta(days=AGENDA_DAYS), offset)
+            except Exception as e:
+                log('calendar: could not list events:', e)
+                found = []
+            for ev in found[:AGENDA_MAX]:
+                start_ms = int((ev['start'] - EPOCH).total_seconds() * 1000)
+                eid = '%s|%d' % (ev['uid'], start_ms)
+                if ev['link']:
+                    links[eid] = ev['link']
+                events.append({'id': eid, 'start': start_ms, 'end': int((ev['end'] - EPOCH).total_seconds() * 1000),
+                               'all_day': ev['all_day'], 'title': ev['title'], 'where': ev['where'],
+                               'link': bool(ev['link']), 'cal': ev['cal']})
+        self.links = links
+        data = {'state': self.state, 'error': self.error, 'events': events}
+        if data != self.published:
+            self.published = data
+            self.ui.publish('agenda', data)
+
+    def open(self, eid):
+        link = self.links.get(eid)
+        if link:
+            self.pending = (link, time.monotonic())
+        return bool(link)
+
+    def take_open(self):
+        pending, self.pending = self.pending, None
+        return pending[0] if pending and time.monotonic() - pending[1] < 15 else None
+
+
 class Broadcaster:
     def __init__(self):
         self.lock = threading.Lock()
@@ -507,6 +635,8 @@ class Pad:
         self.ui = Broadcaster()
         self.np = NowPlaying(self.ui)
         self.host = HostLink(lambda: self.publish_state())
+        self.stats = HostStats(self.ui)
+        self.agenda = Agenda(self.ui, self.host)
         self.hid = Hid(lambda status: self.on_usb_status(status))
         self.config = {}
         self.config_mtime = 0
@@ -1022,7 +1152,7 @@ class Handler(BaseHTTPRequestHandler):
             self._send(200, pad.info())
         elif path == '/api/state':
             self._send(200, {'config': pad.config, 'state': pad.state(), 'presets': pad.presets(),
-                             'nowplaying': pad.np.meta})
+                             'nowplaying': pad.np.meta, 'stats': pad.stats.snapshot(), 'agenda': pad.agenda.published})
         elif path == '/api/nowplaying':
             self._send(200, {'nowplaying': pad.np.meta})
         elif path == '/api/nowplaying/art':
@@ -1062,13 +1192,21 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         pad = self.pad
         length = int(self.headers.get('Content-Length') or 0)
+        path, _, query = self.path.partition('?')
+        if path == '/api/calendar':
+            # The iCal files as they are (not JSON): ?none=1 means no calendars.txt, ?error= a download error.
+            if length > 32 * 1024 * 1024:
+                return self._send(413, {'error': 'calendar too large'})
+            params = urllib.parse.parse_qs(query)
+            pad.agenda.update(self.rfile.read(length).decode('utf-8', 'replace'), 'none' in params,
+                              (params.get('error') or [None])[0])
+            return self._send(200, {'ok': True})
         try:
             body = json.loads(self.rfile.read(length) or b'{}')
         except ValueError:
             body = None
         if not isinstance(body, dict):
             return self._send(400, {'error': 'expected a JSON object'})
-        path = self.path.split('?')[0]
         if path == '/api/tap':
             threading.Thread(target=pad.tap_tile, args=(int(body.get('page', -1)), int(body.get('index', -1))),
                              daemon=True).start()
@@ -1092,6 +1230,15 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, {'ok': True, 'need_art': pad.np.update(body)})
         elif path == '/api/host':
             pad.host.update(body)
+        elif path == '/api/stats':
+            pad.stats.update(body)
+            return self._send(200, {'ok': True, 'open': pad.agenda.take_open(),
+                                    'need_calendar': pad.agenda.needs_calendar()})
+        elif path == '/api/calendar/open':
+            if not pad.stats.alive():
+                pad.toast('The computer agent is not running', 'warn')
+            elif pad.agenda.open(str(body.get('id'))):
+                pad.toast('Opening the meeting on the computer…')
         elif path == '/api/run':
             pad.run(body)
         else:
@@ -1290,6 +1437,8 @@ def main():
                 pad.ui.publish('config', {})
             pad.np.expire()
             pad.host.expire()
+            pad.stats.expire()
+            pad.agenda.refresh()
     finally:
         pad.hid.close()
 

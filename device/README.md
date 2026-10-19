@@ -167,6 +167,36 @@ time; the presets and dial still work. A page with `"nowplaying": true` (Media, 
 layout while something plays: cover, details and progress on top, and its tiles
 as a compact row of controls below.
 
+### Calendar and system stats
+
+A page with `"widgets"` shows live panels instead of tiles: `["agenda"]` (Calendar)
+lays the coming days out as Today / Tomorrow / Later this week columns,
+`["monitor"]` (Status) shows CPU, memory, GPU and network cards, and
+`["agenda", "monitor"]` puts a list and a 2×2 grid side by side.
+
+**Stats:** the agent posts `POST /api/stats` every 2 s. `HostStats` keeps the last
+60 samples for the graphs and sends `stats` events; with no update for 10 s it
+clears them. The reply carries a meeting link to open (`open`) and whether the
+service needs the calendars again (`need_calendar`, e.g. after a restart), so the
+agent needs no second request.
+
+**Calendars:** the agent downloads the addresses in `calendars.txt` every 5 minutes
+and posts the iCal text as it is to `POST /api/calendar` when it changes
+(`?none=1`: no `calendars.txt`; `?error=`: a download failed). `ics.py` reads it
+here, so the logic exists once for every OS: VTIMEZONE observances (DST included),
+RRULE (DAILY/WEEKLY/MONTHLY/YEARLY with COUNT, UNTIL, INTERVAL, BYDAY, BYMONTHDAY,
+BYMONTH, BYSETPOS), EXDATE, RDATE, RECURRENCE-ID (moved or cancelled occurrences),
+and events the calendar's owner declined (a Google feed's name is the owner's address).
+One-off events that ended before today are skipped while reading: a 4 MB feed takes
+about 2 s on the Car Thing. `Agenda` lists the events from local midnight
+to 7 days later, recomputes every 5 minutes and when the UTC offset changes, and
+sends `agenda` events. All-day and floating times use the computer's UTC offset.
+
+**Join:** the UI posts `POST /api/calendar/open` with an event id; only events with
+a Meet, Zoom or Teams link have one. The link goes out once, in the reply to the
+agent's next stats update (within 2 s), and the agent opens it only if it is an
+`https://` link of one of those services.
+
 ### Themes
 
 `web/index.html` defines each theme as CSS variables under
@@ -255,8 +285,8 @@ page, or `adb shell`).
 | Method | Path | Body | Purpose |
 |---|---|---|---|
 | GET | `/api/ping` | | Health check (used by `shim.html`) |
-| GET | `/api/state` | | Config, state, presets |
-| GET | `/api/events` | | SSE stream: `state`, `config`, `fired`, `turn`, `hw`, `toast` |
+| GET | `/api/state` | | Config, state, presets, now playing, stats, agenda |
+| GET | `/api/events` | | SSE stream: `state`, `config`, `fired`, `turn`, `hw`, `toast`, `nowplaying`, `stats`, `agenda` |
 | GET | `/api/info` | | Uptime, temperature, memory, load, brightness |
 | POST | `/api/tap` | `{"page", "index"}` | Run a tile |
 | POST | `/api/preset` | `{"index"}` | Run a preset |
@@ -265,6 +295,9 @@ page, or `adb shell`).
 | POST | `/api/host` | `{"time_ms", "utc_offset_min", "locked"}` | Heartbeat from the host agent: sets the clock, lock state |
 | POST | `/api/nowplaying` | `{"title", "artist", "album", "album_artist", "track_number", "app", "playing", "position_ms", "duration_ms", "shuffle", "repeat", "art_key", "art"?, "art_type"?}` | From the host agent; `{"title": null}` clears. Replies `{"need_art": bool}` |
 | GET | `/api/nowplaying`, `/api/nowplaying/art` | | Current track metadata; its cover image |
+| POST | `/api/stats` | `{"cpu", "cpu_temp"?, "mem_used_mb", "mem_total_mb", "gpu"?, "gpu_temp"?, "gpu_mem_used_mb"?, "gpu_mem_total_mb"?, "net_rx", "net_tx"}` | From the host agent every 2 s. Replies `{"open": link or null, "need_calendar": bool}` |
+| POST | `/api/calendar` | iCal text (`?none=1`, `?error=…`) | From the host agent when its calendars change |
+| POST | `/api/calendar/open` | `{"id"}` | Open an event's meeting link on the computer |
 | POST | `/api/run` | any action | Run an action |
 | POST | `/api/system` | `{"do": "reconnect" \| "restart" \| "reboot"}` | Reconnect USB (software replug) / restart service / reboot |
 
