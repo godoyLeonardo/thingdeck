@@ -90,24 +90,10 @@
       ]
     },
     {
+      "_note": "Latest workflow runs of the repo in github.txt on the computer, and your open pull requests (needs the computer agent and gh).",
       "name": "Code",
-      "presets": [
-        { "label": "Run / Continue", "key": "f5" },
-        { "label": "Step over", "key": "f10" },
-        { "label": "Step into", "key": "f11" },
-        { "label": "Stop", "key": "shift+f5" }
-      ],
-      "tiles": [
-        { "label": "Command palette", "symbol": "command", "key": "ctrl+shift+p", "mac": { "key": "cmd+shift+p" } },
-        { "label": "Quick open", "symbol": "search", "key": "ctrl+p", "mac": { "key": "cmd+p" } },
-        { "label": "Terminal", "symbol": "terminal", "seq": [{ "key": "ctrl+shift+p", "mac": { "key": "cmd+shift+p" } }, { "type": "View: Toggle Terminal\n" }],
-          "delay": 0.3, "hint": "palette → Toggle Terminal" },
-        { "label": "Find in files", "symbol": "files", "key": "ctrl+shift+f", "mac": { "key": "cmd+shift+f" } },
-        { "label": "Go to definition", "symbol": "target", "key": "f12" },
-        { "label": "Rename symbol", "symbol": "pencil", "key": "f2" },
-        { "label": "Format", "symbol": "format", "key": "shift+alt+f", "mac": { "key": "shift+option+f" }, "linux": { "key": "ctrl+shift+i" } },
-        { "label": "Toggle sidebar", "symbol": "sidebar", "key": "ctrl+b", "mac": { "key": "cmd+b" } }
-      ]
+      "header": "clock",
+      "widgets": ["github"]
     },
     {
       "name": "Shell",
