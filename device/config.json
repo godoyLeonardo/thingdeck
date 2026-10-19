@@ -43,6 +43,7 @@
       "name": "Media",
       "nowplaying": true,
       "header": "clock",
+      "audio": true,
       "tiles": [
         { "label": "Stop", "symbol": "stop", "media": "stop" },
         { "label": "Previous", "symbol": "prev", "media": "prev" },
