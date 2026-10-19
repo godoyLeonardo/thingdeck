@@ -3,7 +3,7 @@
 
 Sends the Car Thing the computer's time (for its clock) and lock state, system stats
 (CPU, memory, GPU, network), the focused app, the volume and audio devices, the
-calendars listed in calendars.txt, and what it is playing, over USB through
+calendars listed in calendars.txt, the Plex server in plex.txt, and what it is playing, over USB through
 `adb forward`. It also opens meeting links, kills the focused app and switches audio
 devices when the Car Thing asks. What is playing comes from:
   Linux  playerctl (any MPRIS player: Spotify, browsers, VLC, ...)
@@ -721,6 +721,198 @@ class GitHub:
         return result
 
 
+# ------------------------------------------------------------------ Plex
+
+# A Plex Media Server on the local network: its streams, load, bandwidth and libraries. The
+# first line of plex.txt next to calendars.txt is the server's address (192.168.1.20, or
+# http://192.168.1.20:32400); a second line holds a Plex token, for a server that asks for
+# one on the local network.
+PLEX_FILE = os.path.join(os.path.dirname(CALENDAR_FILE), 'plex.txt')
+PLEX_STEP = 6           # seconds per sample in the server's own load and bandwidth history
+PLEX_HISTORY = 60       # samples sent for the graphs
+RESOLUTIONS = {'4k': '4K', 'sd': 'SD'}
+
+
+def plex_session(s):
+    """One stream from /status/sessions, as the Car Thing shows it, plus its poster's path."""
+    kind, player, session = s.get('type'), s.get('Player') or {}, s.get('Session') or {}
+    media, transcode = (s.get('Media') or [{}])[0], s.get('TranscodeSession')
+    if kind == 'episode':
+        number = ('S%s · E%s' % (s['parentIndex'], s['index'])
+                  if s.get('parentIndex') is not None and s.get('index') is not None else '')
+        title, sub = s.get('grandparentTitle'), ' · '.join(x for x in (number, s.get('title')) if x)
+        thumb = s.get('grandparentThumb') or s.get('thumb')
+    elif kind == 'track':
+        title, sub = s.get('title'), ' — '.join(x for x in (s.get('grandparentTitle'), s.get('parentTitle')) if x)
+        thumb = s.get('parentThumb') or s.get('thumb')
+    else:
+        title, sub, thumb = s.get('title'), str(s.get('year') or ''), s.get('thumb')
+    if not transcode:
+        decision = 'direct play'
+    elif transcode.get('videoDecision') == 'transcode' or (kind == 'track' and transcode.get('audioDecision') == 'transcode'):
+        decision = 'transcode'
+    else:
+        decision = 'direct stream'      # the video is copied; only the audio or the container changes
+    resolution = str(media.get('videoResolution') or '')
+    quality = (RESOLUTIONS.get(resolution.lower(), resolution + 'p' if resolution.isdigit() else resolution)
+               if resolution else str(media.get('audioCodec') or '').upper())
+    location = session.get('location')
+    return {'id': str(session.get('id') or s.get('sessionKey') or ''), 'kind': kind, 'title': title, 'sub': sub,
+            'user': (s.get('User') or {}).get('title'), 'player': player.get('title') or player.get('product'),
+            'state': player.get('state'), 'position_ms': as_int(s.get('viewOffset')),
+            'duration_ms': as_int(s.get('duration')), 'decision': decision,
+            'hw': bool(transcode and (transcode.get('transcodeHwEncoding') or transcode.get('transcodeHwFullPipeline'))),
+            'quality': quality, 'kbps': as_int(session.get('bandwidth')),
+            'local': location != 'wan' if location else player.get('local') is not False, 'thumb': thumb}
+
+
+class PlexLink:
+    """Reads the server every 3 s and sends it to the Car Thing; the library counts and the
+    update check every 5 minutes. When the server doesn't answer, it tries again in 30 s.
+    Posters go only when the Car Thing asks for them (need_art in its reply)."""
+
+    def __init__(self):
+        self.server = self.token = None
+        self.next = 0.0                                  # monotonic time of the next read
+        self.counted, self.libraries, self.update_version = None, [], None
+        self.thumbs, self.need = {}, []                  # poster key -> (path, square); keys asked for
+        self.sent, self.sent_at, self.error = None, 0.0, None
+
+    def load(self):
+        try:
+            with open(PLEX_FILE) as f:
+                lines = [l.strip() for l in f if l.strip() and not l.strip().startswith('#')]
+        except OSError:
+            lines = []
+        server = lines[0].rstrip('/') if lines else None
+        if server and '://' not in server:
+            server = 'http://' + server
+        if server and urllib.parse.urlsplit(server).port is None:
+            server += ':32400'
+        if server != self.server:
+            self.counted, self.libraries = None, []
+        self.server, self.token = server, (lines[1] if len(lines) > 1 else None)
+
+    def get(self, path, raw=False):
+        headers = dict({'Accept': 'application/json'}, **({'X-Plex-Token': self.token} if self.token else {}))
+        with urllib.request.urlopen(urllib.request.Request(self.server + path, headers=headers), timeout=4) as r:
+            data = r.read(MAX_COVER + 1) if raw else r.read()
+        return data if raw else json.loads(data.decode('utf-8') or '{}').get('MediaContainer') or {}
+
+    def optional(self, path):
+        """A Plex Pass part (load, bandwidth, updates): None when the server doesn't give it."""
+        try:
+            return self.get(path)
+        except urllib.error.HTTPError:
+            return None
+
+    def count_libraries(self):
+        libraries = []
+        for d in self.get('/library/sections').get('Directory') or []:
+            def total(kind=None):
+                query = ('type=%d&' % kind if kind else '') + 'X-Plex-Container-Start=0&X-Plex-Container-Size=0'
+                return as_int(self.get('/library/sections/%s/all?%s' % (d['key'], query)).get('totalSize'))
+            library = {'title': d.get('title'), 'kind': d.get('type'), 'count': total()}
+            if d.get('type') == 'show':
+                library['episodes'] = total(4)
+            elif d.get('type') == 'artist':
+                library['albums'], library['tracks'] = total(9), total(10)
+            libraries.append(library)
+        releases = (self.optional('/updater/status') or {}).get('Release') or []
+        self.update_version = next((r['version'] for r in releases if r.get('version')), None)
+        self.libraries, self.counted = libraries, time.monotonic()
+
+    def history(self):
+        """The server's own load and bandwidth history, for the graphs (needs Plex Pass)."""
+        rows = sorted((self.optional('/statistics/resources?timespan=%d' % PLEX_STEP) or {}).get('StatisticsResources') or [],
+                      key=lambda r: r.get('at') or 0)[-PLEX_HISTORY:]
+        load = {'cpu': [round(r.get('hostCpuUtilization') or 0, 1) for r in rows],
+                'mem': [round(r.get('hostMemoryUtilization') or 0, 1) for r in rows],
+                'plex_cpu': rows[-1].get('processCpuUtilization'),
+                'plex_mem': rows[-1].get('processMemoryUtilization')} if rows else None
+        bandwidth = self.optional('/statistics/bandwidth?timespan=%d' % PLEX_STEP)
+        if bandwidth is None:
+            return load, None
+        # One row per device and sample, at uneven times: add them up per 6 s, LAN and WAN apart.
+        buckets = {}
+        for r in bandwidth.get('StatisticsBandwidth') or []:
+            bucket = buckets.setdefault((as_int(r.get('at')) or 0) // PLEX_STEP, [0, 0])
+            bucket[0 if r.get('lan') else 1] += as_int(r.get('bytes')) or 0
+        end = max([int(time.time()) // PLEX_STEP] + list(buckets))
+        start = max(min(buckets or [end]), end - PLEX_HISTORY + 1)
+        steps = [buckets.get(k, [0, 0]) for k in range(start, end + 1)]
+        return load, {'lan': [b[0] // PLEX_STEP for b in steps], 'wan': [b[1] // PLEX_STEP for b in steps]}
+
+    def read(self):
+        self.load()
+        if not self.server:
+            return {'state': 'none'}
+        if self.counted is None or time.monotonic() - self.counted >= 300:
+            self.count_libraries()
+        root = self.get('/')
+        sessions, thumbs = [], {}
+        for s in self.get('/status/sessions').get('Metadata') or []:
+            session = plex_session(s)
+            thumb = session.pop('thumb')
+            if thumb:
+                session['art'] = hashlib.md5(thumb.encode('utf-8')).hexdigest()[:16]
+                thumbs[session['art']] = (thumb, session['kind'] == 'track')
+            sessions.append(session)
+        self.thumbs = thumbs
+        load, net = self.history()
+        activities = [{'title': a.get('title'), 'sub': a.get('subtitle'), 'progress': as_int(a.get('progress'))}
+                      for a in self.get('/activities').get('Activity') or [] if a.get('title')]
+        version = root.get('version') or ''
+        return {'state': 'ok', 'sessions': sessions, 'load': load, 'net': net, 'libraries': self.libraries,
+                'activities': activities,
+                'server': {'name': root.get('friendlyName'), 'version': version,
+                           'update': self.update_version if self.update_version not in (None, version) else None,
+                           'transcodes': as_int(root.get('transcoderActiveVideoSessions')) or 0}}
+
+    def posters(self):
+        """The posters the Car Thing asked for, small (it shows them 44 px wide)."""
+        posters = {}
+        for key in self.need:
+            if key not in self.thumbs:
+                continue
+            thumb, square = self.thumbs[key]
+            query = urllib.parse.urlencode({'width': 144 if square else 96, 'height': 144, 'minSize': 1, 'upscale': 1, 'url': thumb})
+            try:
+                data = self.get('/photo/:/transcode?' + query, raw=True)
+            except OSError as e:
+                log('plex poster:', e)
+                continue
+            if data and len(data) <= MAX_COVER:
+                posters[key] = base64.b64encode(data).decode('ascii')
+        return posters
+
+    def update(self):
+        if time.monotonic() < self.next:
+            return
+        self.next = time.monotonic() + 3
+        try:
+            state = self.read()
+            if self.need:
+                state['posters'] = self.posters()
+        except (OSError, ValueError, KeyError, TypeError) as e:
+            self.next = time.monotonic() + 30           # server unreachable: retry in 30 s, don't stall the loop
+            if isinstance(e, urllib.error.HTTPError) and e.code in (401, 403):
+                error = 'The server asks for a Plex token: put it on the second line of plex.txt'
+            else:
+                error = '%s: %s' % (self.server, getattr(e, 'reason', None) or e)
+            state = {'state': 'error', 'error': error}
+        if state.get('error') != self.error:
+            self.error = state.get('error')
+            if self.error:
+                log('plex:', self.error)
+        key = json.dumps(state, sort_keys=True)
+        if key == self.sent and time.monotonic() - self.sent_at < 10:
+            return
+        reply = send('plex', state)
+        self.sent, self.sent_at = key, time.monotonic()
+        self.need = [str(k) for k in reply.get('need_art') or []]
+
+
 def fetch_calendars():
     """(ics text, error text), or None when there is no calendars.txt."""
     try:
@@ -809,6 +1001,10 @@ def main():
         print(json.dumps(stats.read(), indent=2))
         print(json.dumps(focus(), indent=2, ensure_ascii=False))
         print(json.dumps((mac_audio if sys.platform == 'darwin' else linux_audio)(True), indent=2, ensure_ascii=False))
+        try:
+            print(json.dumps(PlexLink().read(), indent=2, ensure_ascii=False))
+        except (OSError, ValueError, KeyError, TypeError) as e:
+            print('plex:', e)
         return
     log('started (adb: %s, port %d)' % (ADB, PORT))
     tunnel = False
@@ -818,6 +1014,7 @@ def main():
     last_stats, kill_result = 0.0, None
     audio = AudioLink()
     hue = HueLink()
+    plex = PlexLink()
     calendars, calendars_fetched, fetched_hash, calendar_hash = None, None, None, None
     github, github_fetched, github_busy = GitHub(), None, False
     while True:
@@ -897,6 +1094,7 @@ def main():
                 last_signature, last_sent = signature, time.monotonic()
             audio.update()
             hue.update()
+            plex.update()
         except (OSError, ValueError) as e:
             log('update failed:', e)
             tunnel = False
