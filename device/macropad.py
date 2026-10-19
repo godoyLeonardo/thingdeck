@@ -387,6 +387,7 @@ class HostLink:
         self.utc_offset = None     # seconds east of UTC, from the host (follows DST)
         self.locked = False
         self.seen = None           # monotonic time of the last heartbeat
+        self.agent = None          # {os, version}: the agent's own script fingerprint
 
     def update(self, body):
         changed = False
@@ -403,6 +404,10 @@ class HostLink:
         offset = body.get('utc_offset_min')
         if isinstance(offset, int) and offset * 60 != self.utc_offset:
             self.utc_offset = offset * 60
+            changed = True
+        agent = body.get('agent')
+        if isinstance(agent, dict) and agent != self.agent:
+            self.agent = {'os': str(agent.get('os')), 'version': str(agent.get('version'))}
             changed = True
         locked = bool(body.get('locked'))
         if locked != self.locked:
@@ -1176,7 +1181,20 @@ class Pad:
                 'mode': self.mode, 'message': self.message,
                 'os': self.host_os(), 'os_mode': self.settings['os_mode'], 'os_detected': self.os_detected,
                 'settings': self.settings, 'layout': self.layout_name(), 'dial_invert': self.dial_invert(),
-                'locked': self.host.locked, 'clock': self.host.clock()}
+                'locked': self.host.locked, 'clock': self.host.clock(), 'agent': self.agent_status()}
+
+    def agent_status(self):
+        """The agent's version against the repo's (agents.json, written by deploy.sh):
+        {os, version, expected, outdated}, or None before the agent's first heartbeat."""
+        agent = self.host.agent
+        if not agent:
+            return None
+        try:
+            with open(os.path.join(BASE, 'agents.json')) as f:
+                expected = json.load(f).get(agent['os'])
+        except (OSError, ValueError):
+            expected = None
+        return dict(agent, expected=expected, outdated=bool(expected) and expected != agent['version'])
 
     def publish_state(self):
         self.ui.publish('state', self.state())

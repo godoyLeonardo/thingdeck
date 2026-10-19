@@ -529,6 +529,7 @@
   .kv { display: grid; grid-template-columns: auto 1fr; grid-gap: 5px 12px; font: 500 calc(13px * var(--ts)) GeistMono, monospace; color: var(--muted);
     padding: 6px 0; }
   .kv b { color: var(--text); font-weight: 500; text-align: right; }
+  .kv b.warn { color: var(--warn); }
   .btn { flex: 1; height: 40px; line-height: 40px; text-align: center; border-radius: 10px; background: var(--tile-hi);
     font-size: calc(14px * var(--ts)); font-weight: 600; }
   .btn.danger { color: var(--bad); }
@@ -1011,8 +1012,17 @@ function renderSettings() {
       '<span>SoC temp</span><b>' + info.temp_c.toFixed(1) + ' °C</b>' +
       '<span>Memory in use</span><b>' + (info.mem_total_mb - info.mem_avail_mb) + ' of ' + info.mem_total_mb + ' MB</b>' +
       '<span>Load</span><b>' + info.load.join(' ') + '</b>' +
-      '<span>USB</span><b>' + st.usb + '</b>';
+      '<span>USB</span><b>' + st.usb + '</b>' +
+      '<span>Agent</span><b' + (st.agent && st.agent.outdated ? ' class="warn"' : '') + '>' + agentText() + '</b>';
   }
+}
+// The computer agent against the repo's version (deploy.sh records that one).
+var agentWarned = false;
+function agentText() {
+  var a = st.agent;
+  if (!a) return 'not connected';
+  if (a.outdated) return 'out of date: run ./deploy.sh all';
+  return a.expected ? 'up to date' : 'version ' + a.version;
 }
 function pollInfo() {
   fetch('/api/info').then(function (r) { return r.json(); }).then(function (j) {
@@ -2084,7 +2094,11 @@ function connect() {
       var choicesChanged = JSON.stringify((d.settings || {}).page_choices) !== JSON.stringify((st.settings || {}).page_choices);
       st = d;
       if (pageChanged && showSettings) openSettings(false);
-      if (pageChanged || osChanged || choicesChanged) load(); else render();   // presets come per page, OS and choice
+      if (d.message) toast(d.message, d.mode === 'error' ? 'fail' : 'warn');
+      if (d.agent && d.agent.outdated && !agentWarned) {     // once per page load
+        agentWarned = true;
+        toast('The computer agent is out of date: run ./deploy.sh all', 'warn');
+      }
       if (d.message) toast(d.message, d.mode === 'error' ? 'fail' : 'warn');
     } else if (m.type === 'config') {
       load().then(function () { toast('Config reloaded', 'ok'); });
