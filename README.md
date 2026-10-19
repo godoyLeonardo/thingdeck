@@ -21,9 +21,10 @@ as soon as you plug it in.
 - **Themes:** Dark, Black, Light, and the editor color schemes Nord, Dracula,
   Catppuccin, Gruvbox, Tokyo Night and Solarized, each with its own accent or
   one of six accent colors.
-- **Now playing (optional):** with a small agent on the computer, the Media page
-  shows the cover, title, artist, album, app and a live progress bar of whatever
-  is playing (see [Now playing](#now-playing)).
+- **Computer agent (optional):** a small background agent on the computer adds a
+  **now playing** view to the Media page (cover, title, artist, album, app, live
+  progress), a **clock**, and a **lock screen** with media controls (see
+  [Now playing, clock and lock screen](#now-playing-clock-and-lock-screen)).
 - **Standby screen** while the computer sleeps; the pad reconnects by itself
   when it wakes up.
 
@@ -120,14 +121,22 @@ layout:
 
 Shortcuts made of letters, digits and named keys work with any layout.
 
-## Now playing
+## Now playing, clock and lock screen
 
-The pad itself is just a USB keyboard, and computers never send track info to a
-keyboard. An optional agent on the computer reads the system's media session and
-sends it to the Car Thing **over the USB cable** (`adb forward`; no network). The
-Media page then shows the cover, title, artist, album, the app it plays in,
+The pad itself is just a USB keyboard, and computers never send track info, the
+time or their lock state to a keyboard. An optional agent on the computer sends
+them to the Car Thing **over the USB cable** (`adb forward`; no network):
+
+- **Now playing:** the Media page shows the cover, title, artist, album, the app it plays in,
 playing/paused and a live progress bar, with the media controls in a row below.
-When nothing is playing, or the agent isn't running, it's the normal tile page.
+  When nothing is playing, or the agent isn't running, it's the normal tile page.
+- **Clock:** the agent sets the Car Thing's clock and time zone (DST included).
+  The time shows in the bottom bar and, large with the date, on the standby
+  screen; 24h/12h is under Settings → General → Clock.
+- **Lock screen:** while the computer is locked, the Car Thing shows the clock,
+  "🔒 Computer locked", what's playing, and media and volume buttons. Tiles,
+  presets and dial modes that press keys are blocked while locked, so nothing gets
+  typed into the password box; media keys, volume and the wheel still work.
 
 Install it once per computer (and once per OS on a dual-boot PC). It starts at
 login, survives unplugging and sleep, and needs `adb` (see [Requirements](#requirements)):
@@ -198,8 +207,6 @@ switching, per-OS overrides) is in [device/README.md](device/README.md#configjso
   desktop shortcuts need adjusting.
 - **macOS F11:** the "Step into" preset sends F11, which macOS uses for Show
   Desktop unless you turn that shortcut off.
-- **No clock:** the pad only talks to the computer as a USB keyboard, and
-  computers never send the time to a keyboard.
-- **Now playing needs the agent** on each computer; without it, the Media page
-  is the plain tile grid. The macOS and Linux agents are untested on real
+- **Now playing, the clock and the lock screen need the agent** on each computer;
+  without it, there's no clock and the Media page is the plain tile grid. The macOS and Linux agents are untested on real
   machines so far.

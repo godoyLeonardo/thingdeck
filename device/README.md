@@ -133,6 +133,22 @@ exactly that, and the boot hook on the old slot was gone with it. So
 (120 s at most; the log can't be trusted because it rotates at 1 MB), and
 `hook.sh` installs the hook on both slots.
 
+### Clock and lock screen
+
+The host agent posts a heartbeat to `POST /api/host` on every change and every
+10 s: `time_ms`, `utc_offset_min` and `locked`. `HostLink` sets the system clock
+with `clock_settime` when it is more than 2 s off (the device has no RTC; the
+clock then keeps running while the computer sleeps) and keeps the UTC offset,
+which the UI uses for local time (this Chromium has no `Intl`). A computer counts
+as locked only while heartbeats say so; with none for 30 s, the lock is dropped.
+
+While locked, `Pad.run()` refuses any action that would press keys (`key`, `type`,
+wheel with `mods`, sequences or dial presses containing those): on a lock screen
+they would land in the password box. Media keys, volume, plain wheel, clicks and
+mic mute still work. Lock detection: `LogonUI` running (Windows), the
+freedesktop or GNOME screensaver `GetActive` over D-Bus (Linux),
+`CGSSessionScreenIsLocked` (macOS).
+
 ### Now playing
 
 A host agent (`../host/`) posts the current track to `POST /api/nowplaying` through
@@ -232,6 +248,7 @@ page, or `adb shell`).
 | POST | `/api/preset` | `{"index"}` | Run a preset |
 | POST | `/api/page`, `/api/dial`, `/api/os` | `{"page"}` / `{"dial"}` / `{"os"}` | Switch page / dial mode / host OS |
 | POST | `/api/settings` | `{"theme": "nord", …}` | Change settings (saved in `state.json`) |
+| POST | `/api/host` | `{"time_ms", "utc_offset_min", "locked"}` | Heartbeat from the host agent: sets the clock, lock state |
 | POST | `/api/nowplaying` | `{"title", "artist", "album", "album_artist", "track_number", "app", "playing", "position_ms", "duration_ms", "shuffle", "repeat", "art_key", "art"?, "art_type"?}` | From the host agent; `{"title": null}` clears. Replies `{"need_art": bool}` |
 | GET | `/api/nowplaying`, `/api/nowplaying/art` | | Current track metadata; its cover image |
 | POST | `/api/run` | any action | Run an action |
