@@ -130,8 +130,8 @@ function Get-Hash([string]$text) {
     -join ($md5.ComputeHash([Text.Encoding]::UTF8.GetBytes($text)) | ForEach-Object { $_.ToString('x2') })
 }
 
-function Send-Json([string]$path, $body) {
-    $json = $body | ConvertTo-Json -Compress -Depth 3
+function Send-Json([string]$path, $body, [int]$depth = 3) {     # rooms with lights and scenes need more depth
+    $json = $body | ConvertTo-Json -Compress -Depth $depth
     Invoke-RestMethod -Uri "http://127.0.0.1:$Port/api/$path" -Method Post -TimeoutSec 5 `
         -ContentType 'application/json; charset=utf-8' -Body ([Text.Encoding]::UTF8.GetBytes($json))
 }
@@ -550,6 +550,188 @@ function Get-GitHub {
 $gitHubFetched = [DateTime]::MinValue
 $gitHubBusy = $false        # a run is queued or running: check more often
 
+# --- Philips Hue. The Car Thing has no network, so the agent talks to the Hue Bridge (its
+# local API v2) and passes rooms, zones, lights and scenes on. The bridge's address and key
+# are in hue.json next to the log, written when you pair from the Car Thing's Lights page.
+$HueFile = Join-Path (Split-Path $LogFile) 'hue.json'
+Add-Type @'
+using System.Net;
+using System.Net.Security;
+using System.Security.Cryptography.X509Certificates;
+public static class ThingdeckHueTls {
+    public static string Bridge = "";
+    // The bridge's certificate comes from Philips' own authority, not a public one:
+    // accept it for the bridge's address only; everything else is checked as usual.
+    static bool Check(object sender, X509Certificate certificate, X509Chain chain, SslPolicyErrors errors) {
+        if (errors == SslPolicyErrors.None) return true;
+        var request = sender as HttpWebRequest;
+        return request != null && Bridge != "" && request.RequestUri.Host == Bridge;
+    }
+    public static void Install() { ServicePointManager.ServerCertificateValidationCallback = Check; }
+}
+'@
+[ThingdeckHueTls]::Install()
+$hue = $null                 # @{ bridge; key } from hue.json
+$huePairing = $null          # @{ until; next } while waiting for the bridge's button
+$hueFetched = [DateTime]::MinValue; $hueListed = [DateTime]::MinValue; $hueLists = $null
+$hueSent = $null; $hueSentAt = [DateTime]::MinValue
+
+function Read-HueConfig {
+    if (-not (Test-Path $HueFile)) { return $null }
+    $config = Get-Content $HueFile -Raw | ConvertFrom-Json
+    if (-not $config.bridge -or -not $config.key) { return $null }
+    [ThingdeckHueTls]::Bridge = $config.bridge
+    @{ bridge = [string]$config.bridge; key = [string]$config.key }
+}
+
+# One request to the bridge, read as UTF-8 (room names can have accents).
+function Invoke-Hue([string]$method, [string]$path, $body, [string]$bridge = $script:hue.bridge, [string]$key = $script:hue.key) {
+    $request = [System.Net.HttpWebRequest]::Create("https://$bridge$path")
+    $request.Method = $method
+    $request.Timeout = 5000
+    if ($key) { $request.Headers.Add('hue-application-key', $key) }
+    if ($null -ne $body) {
+        $bytes = [Text.Encoding]::UTF8.GetBytes(($body | ConvertTo-Json -Compress -Depth 6))
+        $request.ContentType = 'application/json'
+        $request.ContentLength = $bytes.Length
+        $stream = $request.GetRequestStream(); $stream.Write($bytes, 0, $bytes.Length); $stream.Close()
+    }
+    try { $response = $request.GetResponse() }
+    catch [System.Net.WebException] { if ($_.Exception.Response) { $response = $_.Exception.Response } else { throw } }
+    $reader = New-Object System.IO.StreamReader($response.GetResponseStream(), [Text.Encoding]::UTF8)
+    try { $text = $reader.ReadToEnd() } finally { $reader.Close(); $response.Close() }
+    $result = $text | ConvertFrom-Json
+    if ($result.errors -and @($result.errors).Count) { throw ('Hue: ' + (@($result.errors)[0].description)) }
+    $result
+}
+
+# Pairing: find the bridge, then ask for a key every 2 s for 30 s while you press its button.
+function Step-HuePairing {
+    $p = $script:huePairing
+    if ((Get-Date) -lt $p.next) { return }
+    if ((Get-Date) -gt $p.until) {
+        $script:huePairing = $null
+        Send-HueState @{ state = 'error'; error = 'The bridge''s button wasn''t pressed. Tap Pair, then press it within 30 seconds.' }
+        return
+    }
+    $p.next = (Get-Date).AddSeconds(2)
+    if (-not $p.bridge) {
+        $found = @(Invoke-RestMethod -Uri 'https://discovery.meethue.com/' -TimeoutSec 10) | Where-Object { $_.internalipaddress } | Select-Object -First 1
+        if (-not $found) { throw 'No Hue Bridge found on the network' }
+        $p.bridge = $found.internalipaddress
+        [ThingdeckHueTls]::Bridge = $p.bridge
+    }
+    $answer = @(Invoke-Hue 'POST' '/api' @{ devicetype = "thingdeck#$env:COMPUTERNAME"; generateclientkey = $true } $p.bridge '')[0]
+    if ($answer.success.username) {
+        New-Item -ItemType Directory -Force (Split-Path $HueFile) | Out-Null
+        @{ bridge = $p.bridge; key = $answer.success.username } | ConvertTo-Json | Set-Content $HueFile -Encoding UTF8
+        Write-Log "hue: paired with the bridge at $($p.bridge)"
+        $script:huePairing = $null
+        $script:hue = Read-HueConfig
+        $script:hueFetched = [DateTime]::MinValue; $script:hueListed = [DateTime]::MinValue
+    }
+}
+
+function Send-HueState($state) {
+    [void](Send-Json 'hue' $state 8)
+    $script:hueSent = $state | ConvertTo-Json -Compress -Depth 8
+    $script:hueSentAt = Get-Date
+}
+
+# Rooms and zones with their lights and scenes. The structure (rooms, devices, scenes) is
+# read every 30 s; the light levels every 2 s, and right after a command.
+function Read-Hue {
+    if (-not $script:hueLists -or ((Get-Date) - $script:hueListed).TotalSeconds -ge 30) {
+        $script:hueLists = @{
+            rooms = @((Invoke-Hue 'GET' '/clip/v2/resource/room').data) + @((Invoke-Hue 'GET' '/clip/v2/resource/zone').data)
+            devices = @((Invoke-Hue 'GET' '/clip/v2/resource/device').data)
+            scenes = @((Invoke-Hue 'GET' '/clip/v2/resource/scene').data)
+        }
+        $script:hueListed = Get-Date
+    }
+    $lights = @{}; foreach ($l in (Invoke-Hue 'GET' '/clip/v2/resource/light').data) { $lights[$l.id] = $l }
+    $groups = @{}; foreach ($g in (Invoke-Hue 'GET' '/clip/v2/resource/grouped_light').data) { $groups[$g.id] = $g }
+    $deviceLights = @{}
+    foreach ($d in $script:hueLists.devices) { $deviceLights[$d.id] = @($d.services | Where-Object { $_.rtype -eq 'light' } | ForEach-Object { $_.rid }) }
+    $rooms = foreach ($r in $script:hueLists.rooms) {
+        $groupId = @($r.services | Where-Object { $_.rtype -eq 'grouped_light' } | ForEach-Object { $_.rid })[0]
+        $ids = foreach ($c in $r.children) { if ($c.rtype -eq 'light') { $c.rid } elseif ($c.rtype -eq 'device') { $deviceLights[$c.rid] } }
+        $group = if ($groupId) { $groups[$groupId] }
+        [ordered]@{
+            id = $r.id; kind = $r.type; name = $r.metadata.name; archetype = $r.metadata.archetype; group = $groupId
+            on = [bool]$group.on.on
+            brightness = $(if ($group.dimming) { [Math]::Round($group.dimming.brightness, 1) } else { $null })
+            lights = @(foreach ($id in $ids) {
+                $l = $lights[$id]
+                if (-not $l) { continue }
+                [ordered]@{
+                    id = $l.id; name = $l.metadata.name; on = [bool]$l.on.on
+                    brightness = $(if ($l.dimming) { [Math]::Round($l.dimming.brightness, 1) } else { $null })
+                    xy = $(if ($l.color) { @($l.color.xy.x, $l.color.xy.y) } else { $null })
+                    mirek = $(if ($l.color_temperature.mirek_valid) { $l.color_temperature.mirek } else { $null })
+                    ct = [bool]$l.color_temperature
+                }
+            })
+            scenes = @(foreach ($s in $script:hueLists.scenes) {
+                if ($s.group.rid -eq $r.id) { [ordered]@{ id = $s.id; name = $s.metadata.name; active = ($s.status.active -and $s.status.active -ne 'inactive') } }
+            })
+        }
+    }
+    @{ state = 'ok'; rooms = @($rooms | Sort-Object { $_.kind -ne 'room' }, { $_.name }) }
+}
+
+function Invoke-HueCommand($cmd) {
+    switch ($cmd.op) {
+        'pair' { $script:huePairing = @{ until = (Get-Date).AddSeconds(30); next = [DateTime]::MinValue; bridge = $null }
+                 Send-HueState @{ state = 'pairing' }; return }
+        'scene' { [void](Invoke-Hue 'PUT' "/clip/v2/resource/scene/$($cmd.id)" @{ recall = @{ action = 'active' } }) }
+        'all_off' { foreach ($r in $script:hueLists.rooms) {
+                        $g = @($r.services | Where-Object { $_.rtype -eq 'grouped_light' })[0]
+                        if ($g -and $r.type -eq 'room') { [void](Invoke-Hue 'PUT' "/clip/v2/resource/grouped_light/$($g.rid)" @{ on = @{ on = $false } }) } } }
+        { $_ -in 'group', 'light' } {
+            $body = @{}
+            if ($null -ne $cmd.on) { $body.on = @{ on = [bool]$cmd.on } }
+            if ($null -ne $cmd.brightness) { $body.dimming = @{ brightness = [Math]::Max(1, [double]$cmd.brightness) } }
+            $kind = if ($cmd.op -eq 'group') { 'grouped_light' } else { 'light' }
+            if ($body.Count) { [void](Invoke-Hue 'PUT' "/clip/v2/resource/$kind/$($cmd.id)" $body) }
+            if ($null -ne $cmd.mirek) {           # white temperature: per light, on the lights that have it
+                $room = $script:hueLists.rooms | Where-Object { @($_.services | Where-Object { $_.rid -eq $cmd.id }).Count } | Select-Object -First 1
+                $last = (Read-Hue).rooms | Where-Object { $_.id -eq $room.id } | Select-Object -First 1
+                foreach ($l in $last.lights) { if ($l.ct) { [void](Invoke-Hue 'PUT' "/clip/v2/resource/light/$($l.id)" @{ color_temperature = @{ mirek = [int]$cmd.mirek } }) } }
+            }
+        }
+    }
+    $script:hueFetched = [DateTime]::MinValue        # show the result right away
+}
+
+# Several times a second: commands from the Car Thing, pairing, and the lights' state.
+function Update-Hue {
+    $commands = (Invoke-RestMethod -Uri "http://127.0.0.1:$Port/api/commands" -TimeoutSec 5).hue
+    if (-not $script:hue -and -not $script:huePairing) { $script:hue = Read-HueConfig }
+    foreach ($cmd in @($commands)) {
+        if (-not $cmd) { continue }
+        try {
+            if ($cmd.op -ne 'pair' -and -not $script:hue) { throw 'Pair the Hue Bridge first' }
+            Invoke-HueCommand $cmd
+        } catch { Write-Log "hue: $($_.Exception.Message)"; Send-HueState @{ state = 'error'; error = $_.Exception.Message } }
+    }
+    if ($script:huePairing) {
+        try { Step-HuePairing } catch { Write-Log "hue pairing: $($_.Exception.Message)"; $script:huePairing = $null
+            Send-HueState @{ state = 'error'; error = $_.Exception.Message } }
+        return
+    }
+    if (((Get-Date) - $script:hueFetched).TotalSeconds -lt 2) { return }
+    $script:hueFetched = Get-Date
+    $state = if (-not $script:hue) { @{ state = 'none' } } else {
+        try { Read-Hue } catch {
+            $script:hueFetched = (Get-Date).AddSeconds(28)      # bridge unreachable: retry in 30 s, don't stall the loop
+            @{ state = 'error'; error = $_.Exception.Message }
+        }
+    }
+    $key = $state | ConvertTo-Json -Compress -Depth 8
+    if ($key -ne $script:hueSent -or ((Get-Date) - $script:hueSentAt).TotalSeconds -ge 10) { Send-HueState $state }
+}
+
 # Links the Car Thing asks to open: https links of known meeting services, and GitHub.
 $OpenableUrl = '^https://(meet\.google\.com|([a-z0-9-]+\.)?zoom\.us|teams\.microsoft\.com|teams\.live\.com|github\.com)/'
 
@@ -674,7 +856,7 @@ while ($true) {
     # The volume four times a second between rounds, so the Car Thing's volume bar follows the dial.
     for ($tick = 0; $tick -lt 4; $tick++) {
         if ($tunnelUp) {
-            try { Update-Audio } catch { Write-Log "audio update failed: $($_.Exception.Message)"; $tunnelUp = $false }
+            try { Update-Audio; Update-Hue } catch { Write-Log "update failed: $($_.Exception.Message)"; $tunnelUp = $false }
         }
         Start-Sleep -Milliseconds 250
     }
