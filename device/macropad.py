@@ -528,6 +528,7 @@ class Agenda:
         self.state = 'unknown'    # unknown (no word from the agent) | none (no calendars.txt) | ok
         self.error = None
         self.links = {}           # event id -> meeting link
+        self.details = {}         # event id -> {notes, calendar}, fetched when an event is opened
         self.pending = None       # (link, monotonic time) to open on the computer
         self.built = None
         self.published = {'state': 'unknown', 'error': None, 'events': []}
@@ -557,7 +558,7 @@ class Agenda:
         if key == self.built and not force:
             return
         self.built = key
-        events, links = [], {}
+        events, links, details = [], {}, {}
         if self.calendar is not None and now > VALID_TIME:
             offset = datetime.timedelta(seconds=self.host.utc_offset or 0)
             local_midnight = (datetime.datetime.utcfromtimestamp(now) + offset).replace(
@@ -571,12 +572,14 @@ class Agenda:
             for ev in found[:AGENDA_MAX]:
                 start_ms = int((ev['start'] - EPOCH).total_seconds() * 1000)
                 eid = '%s|%d' % (ev['uid'], start_ms)
+                names = self.calendar.names
+                details[eid] = {'notes': ev['notes'], 'calendar': names[ev['cal']] if ev['cal'] < len(names) else ''}
                 if ev['link']:
                     links[eid] = ev['link']
                 events.append({'id': eid, 'start': start_ms, 'end': int((ev['end'] - EPOCH).total_seconds() * 1000),
                                'all_day': ev['all_day'], 'title': ev['title'], 'where': ev['where'],
                                'link': bool(ev['link']), 'cal': ev['cal']})
-        self.links = links
+        self.links, self.details = links, details
         data = {'state': self.state, 'error': self.error, 'events': events}
         if data != self.published:
             self.published = data
@@ -1162,6 +1165,9 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(200, art[2], art[1])
             else:
                 self._send(404, {'error': 'no cover'})
+        elif path == '/api/calendar/event':
+            eid = (urllib.parse.parse_qs(self.path.partition('?')[2]).get('id') or [''])[0]
+            self._send(200, pad.agenda.details.get(eid) or {'notes': '', 'calendar': ''})
         elif path == '/api/events':
             self._events()
         else:

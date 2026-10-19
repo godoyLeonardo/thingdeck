@@ -9,6 +9,7 @@ cancelled occurrences (RECURRENCE-ID) and the time zones the file defines (VTIME
 """
 import calendar as _calendar
 import datetime as dt
+import html
 import re
 
 WEEKDAYS = ('MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU')
@@ -71,6 +72,15 @@ def components(text):
 
 def unescape(value):
     return re.sub(r'\\([\\;,nN])', lambda m: '\n' if m.group(1) in 'nN' else m.group(1), value)
+
+
+def plain_text(value, limit=2000):
+    """A description as plain text: Google Calendar writes some of them in HTML."""
+    if '<' in value:
+        value = re.sub(r'<br\s*/?>|</p>|</li>|</div>', '\n', value, flags=re.I)
+        value = html.unescape(re.sub(r'<[^>]+>', '', value))
+    value = re.sub(r'\n{3,}', '\n\n', value.replace('\r', '')).strip()
+    return value[:limit] + ('…' if len(value) > limit else '')
 
 
 def parse_time(value, params):
@@ -263,6 +273,7 @@ class Calendar:
         self.zones = {}
         self.events = []
         self.moved = set()     # (uid, original start in UTC) of occurrences that have their own VEVENT
+        self.names = []        # each VCALENDAR's name (X-WR-CALNAME), by index
         root = components(text)
         cals = [c for c in root['children'] if c['name'] == 'VCALENDAR'] or [root]
         for cal in cals:
@@ -274,6 +285,7 @@ class Calendar:
         for index, cal in enumerate(cals):
             # A Google Calendar feed is named after its owner's address, which marks their RSVP.
             owner = next((v.strip().lower() for n, p, v in cal['props'] if n == 'X-WR-CALNAME'), '')
+            self.names.append(next((unescape(v).strip() for n, p, v in cal['props'] if n == 'X-WR-CALNAME'), ''))
             for child in cal['children']:
                 if child['name'] == 'VEVENT':
                     event = self.read_event(child, owner, index)
@@ -313,6 +325,7 @@ class Calendar:
             'title': unescape(props.get('SUMMARY', ({}, ''))[1]).strip() or '(No title)',
             'where': unescape(props.get('LOCATION', ({}, ''))[1]).strip().split('\n')[0],
             'link': link.group(0) if link else None, 'cal': index,
+            'notes': plain_text(unescape(props['DESCRIPTION'][1])) if 'DESCRIPTION' in props else '',
             'rule': parse_rule(props['RRULE'][1]) if 'RRULE' in props else None,
             'exdates': [t for params, value in multi.get('EXDATE', []) for t in parse_times(value, params)],
             'rdates': [t for params, value in multi.get('RDATE', []) for t in parse_times(value, params)
@@ -330,7 +343,7 @@ class Calendar:
 
     def between(self, lo, hi, local_offset=dt.timedelta(0)):
         """Occurrences overlapping [lo, hi] (naive UTC), sorted by start:
-        dicts with start/end (naive UTC), all_day, title, where, link, cal, uid."""
+        dicts with start/end (naive UTC), all_day, title, where, link, cal, uid, notes."""
         out = []
         for ev in self.events:
             to_utc = lambda t, zone=ev['zone']: self.utc(t, zone, local_offset)
@@ -349,6 +362,7 @@ class Calendar:
                 e = to_utc(start + ev['length'])
                 if e > lo and s < hi or (s == e and lo <= s < hi):
                     out.append({'start': s, 'end': e, 'all_day': ev['zone'] == 'date', 'title': ev['title'],
-                                'where': ev['where'], 'link': ev['link'], 'cal': ev['cal'], 'uid': ev['uid']})
+                                'where': ev['where'], 'link': ev['link'], 'cal': ev['cal'], 'uid': ev['uid'],
+                                'notes': ev['notes']})
         out.sort(key=lambda o: (o['start'], not o['all_day'], o['title']))
         return out
