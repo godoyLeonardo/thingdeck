@@ -5,6 +5,7 @@ Shows up on the host as a USB HID keyboard + media keys + mouse wheel (built in
 user space on FunctionFS, because this kernel has no f_hid). The dial, the
 hardware buttons and a touch UI in the kiosk browser send the reports.
 """
+import base64
 import fcntl
 import json
 import os
@@ -361,6 +362,55 @@ class Hid:
 
 # ------------------------------------------------------------- UI events
 
+NOWPLAYING_TTL = 15     # seconds without an update before the host agent counts as gone
+NOWPLAYING_FIELDS = ('title', 'artist', 'album', 'album_artist', 'track_number', 'app', 'playing',
+                     'position_ms', 'duration_ms', 'shuffle', 'repeat')
+
+
+class NowPlaying:
+    """What the computer is playing, pushed by an agent on the host (host/ in the repo)
+    through `adb forward`. The cover is stored once per track (art_key) and served
+    separately, so the frequent position updates stay small."""
+
+    def __init__(self, ui):
+        self.ui = ui
+        self.lock = threading.Lock()
+        self.meta = None          # dict for the UI, or None when nothing is playing
+        self.art = None           # (key, content type, bytes)
+        self.updated = 0.0        # monotonic time of the last update
+
+    def update(self, body):
+        """Store an update from the agent. Returns True if it should send the cover."""
+        meta = {k: body[k] for k in NOWPLAYING_FIELDS if body.get(k) is not None}
+        if not meta.get('title'):
+            self.clear()
+            return False
+        key = str(body.get('art_key') or '')
+        with self.lock:
+            if key and body.get('art'):
+                try:
+                    self.art = (key, str(body.get('art_type') or 'image/jpeg'), base64.b64decode(body['art']))
+                except (ValueError, TypeError) as e:
+                    log('now playing: bad cover data:', e)
+            meta['art'] = key if self.art and self.art[0] == key else None
+            self.meta = meta
+            self.updated = time.monotonic()
+        self.ui.publish('nowplaying', meta)
+        return bool(key) and meta['art'] is None
+
+    def clear(self):
+        with self.lock:
+            if self.meta is None:
+                return
+            self.meta = None
+        self.ui.publish('nowplaying', None)
+
+    def expire(self):
+        if self.meta is not None and time.monotonic() - self.updated > NOWPLAYING_TTL:
+            log('now playing: no update for %d s, clearing' % NOWPLAYING_TTL)
+            self.clear()
+
+
 class Broadcaster:
     def __init__(self):
         self.lock = threading.Lock()
@@ -402,6 +452,7 @@ def write_backlight(level):
 class Pad:
     def __init__(self):
         self.ui = Broadcaster()
+        self.np = NowPlaying(self.ui)
         self.hid = Hid(lambda status: self.on_usb_status(status))
         self.config = {}
         self.config_mtime = 0
@@ -895,7 +946,16 @@ class Handler(BaseHTTPRequestHandler):
         elif path == '/api/info':
             self._send(200, pad.info())
         elif path == '/api/state':
-            self._send(200, {'config': pad.config, 'state': pad.state(), 'presets': pad.presets()})
+            self._send(200, {'config': pad.config, 'state': pad.state(), 'presets': pad.presets(),
+                             'nowplaying': pad.np.meta})
+        elif path == '/api/nowplaying':
+            self._send(200, {'nowplaying': pad.np.meta})
+        elif path == '/api/nowplaying/art':
+            art = pad.np.art
+            if art:
+                self._send(200, art[2], art[1])
+            else:
+                self._send(404, {'error': 'no cover'})
         elif path == '/api/events':
             self._events()
         else:
@@ -953,6 +1013,8 @@ class Handler(BaseHTTPRequestHandler):
             threading.Thread(target=system_action, args=(body.get('do'), pad), daemon=True).start()
         elif path == '/api/os':
             pad.set_os(body.get('os', 'next'))
+        elif path == '/api/nowplaying':
+            return self._send(200, {'ok': True, 'need_art': pad.np.update(body)})
         elif path == '/api/run':
             pad.run(body)
         else:
@@ -1149,6 +1211,7 @@ def main():
             time.sleep(2)
             if pad.load_config():
                 pad.ui.publish('config', {})
+            pad.np.expire()
     finally:
         pad.hid.close()
 
