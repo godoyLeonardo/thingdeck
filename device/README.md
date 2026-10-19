@@ -197,6 +197,25 @@ a Meet, Zoom or Teams link have one. The link goes out once, in the reply to the
 agent's next stats update (within 2 s), and the agent opens it only if it is an
 `https://` link of one of those services.
 
+**Event details:** the agenda carries what the list shows; tapping an event fetches
+its notes (descriptions, HTML turned into plain text, up to 2000 characters) and
+calendar name from `GET /api/calendar/event?id=…`.
+
+### Kill switch
+
+A page with `"kill": true` (Status) adds a strip under its widgets with the focused
+app, which the agent sends in each stats update as `focus`: `{pid, name, app, title,
+protected}`, or `{error}` when it can't tell (e.g. GNOME Wayland without the Window
+Calls extension). The switch is a cover over a button: the first tap lifts the cover
+and locks in that app's pid; the button answers only 900 ms later, so a double tap
+can't do both; the cover drops after 6 s or when focus moves. Pressing it posts
+`POST /api/kill {pid}`. The service refuses unless the pid is still the focused app
+and not protected, then hands `{pid, name, app}` to the agent in its next stats reply.
+The agent checks the process still has that pid and name and isn't protected (the
+OS, the desktop shell, the agent itself), kills it (`Stop-Process -Force` on
+Windows, SIGKILL elsewhere), and reports `kill_result` in the next update, which
+shows as a toast.
+
 ### Themes
 
 `web/index.html` defines each theme as CSS variables under
@@ -228,7 +247,7 @@ Top level:
 | `hardware` | `knob`, `back`, `menu`: `{"tap": action, "hold": action}`; `dial_invert` |
 | `dial_modes` | `[{"name", "cw", "ccw", "press"}]` |
 | `presets` | Default 4 top-button actions |
-| `pages` | `[{"name", "presets"?, "grid"?, "nowplaying"?, "header"?, "widgets"?, "tiles": [...]}]`, or a choice slot (below) |
+| `pages` | `[{"name", "presets"?, "grid"?, "nowplaying"?, "header"?, "widgets"?, "kill"?, "tiles": [...]}]`, or a choice slot (below) |
 
 Tiles and presets are actions plus `label`, optional `icon` (an emoji) or `symbol`
 (a built-in icon drawn in the current icon style, or as an emoji in the emoji style),
@@ -295,9 +314,11 @@ page, or `adb shell`).
 | POST | `/api/host` | `{"time_ms", "utc_offset_min", "locked"}` | Heartbeat from the host agent: sets the clock, lock state |
 | POST | `/api/nowplaying` | `{"title", "artist", "album", "album_artist", "track_number", "app", "playing", "position_ms", "duration_ms", "shuffle", "repeat", "art_key", "art"?, "art_type"?}` | From the host agent; `{"title": null}` clears. Replies `{"need_art": bool}` |
 | GET | `/api/nowplaying`, `/api/nowplaying/art` | | Current track metadata; its cover image |
-| POST | `/api/stats` | `{"cpu", "cpu_temp"?, "mem_used_mb", "mem_total_mb", "gpu"?, "gpu_temp"?, "gpu_mem_used_mb"?, "gpu_mem_total_mb"?, "net_rx", "net_tx"}` | From the host agent every 2 s. Replies `{"open": link or null, "need_calendar": bool}` |
+| POST | `/api/stats` | `{"cpu", "cpu_temp"?, "mem_used_mb", "mem_total_mb", "gpu"?, "gpu_temp"?, "gpu_mem_used_mb"?, "gpu_mem_total_mb"?, "net_rx", "net_tx"}` | From the host agent every 2 s. Also `focus` and `kill_result`. Replies `{"open": link or null, "kill": target or null, "need_calendar": bool}` |
 | POST | `/api/calendar` | iCal text (`?none=1`, `?error=…`) | From the host agent when its calendars change |
 | POST | `/api/calendar/open` | `{"id"}` | Open an event's meeting link on the computer |
+| GET | `/api/calendar/event?id=…` | | An event's notes and calendar name |
+| POST | `/api/kill` | `{"pid"}` | Kill the focused app (it must still have focus); goes to the agent with its next stats reply |
 | POST | `/api/run` | any action | Run an action |
 | POST | `/api/system` | `{"do": "reconnect" \| "restart" \| "reboot"}` | Reconnect USB (software replug) / restart service / reboot |
 

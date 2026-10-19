@@ -138,9 +138,22 @@ playing/paused and a live progress bar, with the media controls in a row below.
   events, moved or cancelled occurrences and time zones included, meetings you
   declined left out. The next event is highlighted with a countdown. Events with a
   Google Meet, Zoom or Teams link get a Join button that opens the link on the computer.
+  Tap an event for its details: date, time and length, place, calendar and notes.
 - **Status:** the Status page shows CPU, memory, GPU and network speed, each with
   a graph of the last two minutes. The GPU needs an NVIDIA card (`nvidia-smi`), or
   an AMD one on Linux; CPU temperature shows on Linux.
+- **Kill switch:** below the stats, the Status page shows the app that has focus on
+  the computer, next to a covered switch like an aircraft's. Tap the cover to lift
+  it; once "KILL" lights up (about a second later), press it to force-quit that app.
+  The cover closes again after 6 seconds. Only the app shown is killed, and only if
+  it still has focus. The system and desktop shell (Explorer, the window manager,
+  Finder, the Dock, …) and the agent itself are protected. Finding the focused app:
+  - Windows: the foreground window; apps running as administrator can't be killed
+    unless the agent runs as administrator too.
+  - macOS: the frontmost app (`lsappinfo`, no permission prompts).
+  - Linux: X11 (`xprop`), Hyprland, Sway, KDE Wayland with `kdotool`, and GNOME
+    Wayland with the [Window Calls](https://extensions.gnome.org/extension/4724/window-calls/)
+    extension, since GNOME doesn't share the focused window otherwise.
 - **Clock:** the agent sets the Car Thing's clock and time zone (DST included).
   The time shows in the bottom bar, large with the date at the top of the Media
   page and on the standby screen; 24h/12h is under Settings → General → Clock.
