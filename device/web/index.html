@@ -522,6 +522,7 @@
      arrow button, which points to where the other tabs are). */
   #tabs { flex: 1; display: flex; align-items: center; overflow-x: auto; min-width: 0; height: 100%; scroll-snap-type: x mandatory; }
   #tabs::-webkit-scrollbar { display: none; }
+  #tabs.dense .tab { padding: 0 4px; font-size: calc(17px * var(--ts)); }
   .tab[data-settings] { font-size: calc(24px * var(--ts)); }
   .tab { flex: 0 0 var(--tabw, 25%); box-sizing: border-box; padding: 0 8px; height: 48px; line-height: 48px; border-radius: 24px; text-align: center;
     font-size: calc(19px * var(--ts)); font-weight: 500; color: var(--muted); scroll-snap-align: start;
@@ -857,9 +858,10 @@ function render() {
   }).join('') + '<div class="tab' + (showSettings ? ' on' : '') + '" data-settings="1" title="Settings">⚙</div>';
   var on = $('tabs').querySelector('.on');
   if (on) on.scrollIntoView({ inline: 'nearest', block: 'nearest' });
-  // Up to 6 tabs share the bar evenly (no scrolling); more show 4 at a time and scroll.
+  // Up to 7 tabs share the bar evenly (no scrolling; 7 with smaller text); more show 4 at a time and scroll.
   var count = $('tabs').children.length;
-  $('tabs').style.setProperty('--tabw', count <= 6 ? (100 / count) + '%' : '25%');
+  $('tabs').style.setProperty('--tabw', count <= 7 ? (100 / count) + '%' : '25%');
+  $('tabs').classList.toggle('dense', count === 7);
 
   applyTheme();
   document.body.classList.toggle('settings', showSettings);
