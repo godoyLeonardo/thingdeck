@@ -66,6 +66,12 @@
       "kill": true
     },
     {
+      "_note": "Latest workflow runs of the repo in github.txt on the computer, and your open pull requests (needs the computer agent and gh).",
+      "name": "Code",
+      "header": "clock",
+      "widgets": ["github"]
+    },
+    {
       "name": "Desktop",
       "presets": [
         { "label": "◀ Desktop", "key": "ctrl+win+left", "mac": { "key": "ctrl+left" }, "linux": { "key": "win+pageup" } },
@@ -88,12 +94,6 @@
           "linux": { "label": "System Monitor", "seq": [{ "key": "win" }, { "type": "system monitor\n" }], "delay": 0.5, "hint": "Super → system monitor" } },
         { "label": "Lock", "symbol": "lock", "key": "win+l", "mac": { "key": "ctrl+cmd+q" } }
       ]
-    },
-    {
-      "_note": "Latest workflow runs of the repo in github.txt on the computer, and your open pull requests (needs the computer agent and gh).",
-      "name": "Code",
-      "header": "clock",
-      "widgets": ["github"]
     },
     {
       "name": "Shell",
