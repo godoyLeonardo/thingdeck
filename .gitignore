@@ -4,6 +4,13 @@ __pycache__/
 
 # Written by the device at runtime (Settings tab choices); not part of the source
 state.json
+
+# The agent's private config: it lives next to the agent's log, never in the repo.
+# These names are here in case a copy is saved in the repo by mistake.
+calendars.txt
+github.txt
+hue.json
+plex.txt
 *.tmp
 *.log
 
