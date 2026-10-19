@@ -479,15 +479,47 @@ class HostStats:
     """CPU, memory, GPU and network of the computer, sent by the host agent every 2 s,
     with a short history for the graphs."""
 
-    def __init__(self, ui):
+    def __init__(self, ui, on_toast):
         self.ui = ui
+        self.on_toast = on_toast
         self.latest = None
         self.history = {k: collections.deque(maxlen=STATS_HISTORY) for k in ('cpu', 'mem', 'gpu', 'net_rx', 'net_tx')}
         self.updated = None       # monotonic time of the last update
+        self.pending_kill = None  # ({pid, name, app}, monotonic time) for the agent's next update
+
+    def kill(self, pid):
+        """The kill switch: queue the focused app for the agent, if it is still the one shown."""
+        focus = (self.latest or {}).get('focus') or {}
+        if not self.alive():
+            return 'The computer agent is not running'
+        if focus.get('pid') != pid:
+            return 'The focused app changed; check it and try again'
+        if focus.get('protected'):
+            return '%s is protected' % focus['app']
+        self.pending_kill = ({'pid': pid, 'name': focus['name'], 'app': focus['app']}, time.monotonic())
+        return None
+
+    def take_kill(self):
+        pending, self.pending_kill = self.pending_kill, None
+        return pending[0] if pending and time.monotonic() - pending[1] < 10 else None
 
     def update(self, body):
         latest = {k: body[k] for k in STATS_FIELDS
                   if isinstance(body.get(k), (int, float)) and not isinstance(body.get(k), bool)}
+        # The focused app, for the kill switch: {pid, name, app, title, protected}, or {error}.
+        focus = body.get('focus')
+        if isinstance(focus, dict) and isinstance(focus.get('pid'), int) and isinstance(focus.get('name'), str):
+            latest['focus'] = {'pid': focus['pid'], 'name': focus['name'], 'app': str(focus.get('app') or focus['name']),
+                               'title': str(focus.get('title') or ''), 'protected': bool(focus.get('protected'))}
+        elif isinstance(focus, dict) and focus.get('error'):
+            latest['focus'] = {'error': str(focus['error'])}
+        result = body.get('kill_result')
+        if isinstance(result, dict):
+            name = str(result.get('name') or 'the app')
+            if result.get('ok'):
+                self.on_toast('Killed %s' % name, 'ok')
+            else:
+                self.on_toast('Could not kill %s: %s' % (name, result.get('error') or 'unknown error'), 'fail')
         mem = latest['mem_used_mb'] * 100.0 / latest['mem_total_mb'] if latest.get('mem_total_mb') else None
         for key, value in (('cpu', latest.get('cpu')), ('mem', mem), ('gpu', latest.get('gpu')),
                            ('net_rx', latest.get('net_rx')), ('net_tx', latest.get('net_tx'))):
@@ -639,7 +671,7 @@ class Pad:
         self.ui = Broadcaster()
         self.np = NowPlaying(self.ui)
         self.host = HostLink(lambda: self.publish_state())
-        self.stats = HostStats(self.ui)
+        self.stats = HostStats(self.ui, self.toast)
         self.agenda = Agenda(self.ui, self.host)
         self.hid = Hid(lambda status: self.on_usb_status(status))
         self.config = {}
@@ -1239,8 +1271,14 @@ class Handler(BaseHTTPRequestHandler):
             pad.host.update(body)
         elif path == '/api/stats':
             pad.stats.update(body)
-            return self._send(200, {'ok': True, 'open': pad.agenda.take_open(),
+            return self._send(200, {'ok': True, 'open': pad.agenda.take_open(), 'kill': pad.stats.take_kill(),
                                     'need_calendar': pad.agenda.needs_calendar()})
+        elif path == '/api/kill':
+            problem = pad.stats.kill(body.get('pid'))
+            if problem:
+                pad.toast(problem, 'warn')
+            else:
+                pad.toast('Killing %s…' % pad.stats.pending_kill[0]['app'])
         elif path == '/api/calendar/open':
             if not pad.stats.alive():
                 pad.toast('The computer agent is not running', 'warn')
