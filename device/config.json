@@ -11,8 +11,8 @@
   "hardware": {
     "dial_invert": false,
     "knob": { "tap": { "dial_press": true }, "hold": { "media": "play_pause" } },
-    "back": { "tap": { "dial": "next" }, "hold": { "dial": "Volume" } },
-    "menu": { "tap": { "page": "next" }, "hold": { "page": 0 } }
+    "back": { "tap": { "page": "next" }, "hold": { "page": 0 } },
+    "menu": { "tap": { "dial": "next" }, "hold": { "dial": "Volume" } }
   },
 
   "dial_modes": [
