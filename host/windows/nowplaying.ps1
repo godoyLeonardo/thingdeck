@@ -747,6 +747,19 @@ if ($Once) {
 }
 
 $adbExe = Find-Adb
+
+# Run adb as a plain process and go by its exit code. Not "& adb ... 2>$null": after a
+# reboot adb first prints "daemon not running; starting now" on stderr, which Windows
+# PowerShell turns into an error, so the link never came up. Its output isn't captured
+# either: the adb server it may start inherits those handles and keeps them open.
+function Invoke-Adb([string]$arguments) {
+    $psi = New-Object System.Diagnostics.ProcessStartInfo $script:adbExe, $arguments
+    $psi.UseShellExecute = $false
+    $psi.CreateNoWindow = $true
+    $process = [System.Diagnostics.Process]::Start($psi)
+    if (-not $process.WaitForExit(20000)) { try { $process.Kill() } catch { }; return $false }
+    $process.ExitCode -eq 0
+}
 Write-Log "started (adb: $adbExe, port $Port)"
 $lastSignature = $null
 $lastSent = [DateTime]::MinValue
@@ -765,8 +778,7 @@ while ($true) {
     try {
         if (-not $tunnelUp) {
             # Only now call adb: on start and after a failed send (unplugged, rebooted).
-            & $adbExe forward "tcp:$Port" tcp:8765 2>$null | Out-Null
-            if ($LASTEXITCODE -ne 0) { Start-Sleep -Seconds 3; continue }
+            if (-not (Invoke-Adb 'start-server') -or -not (Invoke-Adb "forward tcp:$Port tcp:8765")) { Start-Sleep -Seconds 3; continue }
             $tunnelUp = $true
             $lastSignature = $null; $coverSentFor = ''; $lastHost = $null; $calendarHash = $null
         }
