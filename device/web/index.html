@@ -239,8 +239,23 @@
   #standby { position: fixed; left: 0; top: 0; right: 0; bottom: 0; background: var(--standby); display: none; z-index: 5;
     flex-direction: column; align-items: center; justify-content: center; }
   #standby.show { display: flex; }
+  #clock { flex: none; font-size: 19px; font-weight: 600; font-variant-numeric: tabular-nums; margin: 0 4px 0 10px; letter-spacing: -.01em; }
+  #clock.hidden, .bigclock.hidden, .bigdate.hidden, #sbicon.hidden { display: none; }
+  .bigclock { font-size: 120px; font-weight: 300; line-height: 1; letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
+  .bc-suffix { font-size: 32px; font-weight: 400; letter-spacing: 0; margin-left: 10px; color: var(--muted); }
+  .bigdate { font-size: 20px; color: var(--muted); margin-top: 6px; }
+  #lockscreen { position: fixed; left: 0; top: 0; right: 0; bottom: 0; background: var(--standby); display: none; z-index: 4;
+    flex-direction: column; align-items: center; justify-content: center; }
+  #lockscreen.show { display: flex; }
+  #lktitle { margin-top: 16px; font-size: 17px; color: var(--muted); }
+  #lknp { margin-top: 14px; font-size: 18px; font-weight: 600; max-width: 660px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #lknp:empty { display: none; }
+  #lkcontrols { display: flex; margin-top: 22px; }
+  .lkbtn { width: 84px; height: 62px; border-radius: 14px; background: var(--tile); margin: 0 5px; display: flex; align-items: center;
+    justify-content: center; font-size: 26px; font-family: 'Noto Color Emoji', sans-serif; transition: background .1s, transform .08s; }
+  .lkbtn.down { background: var(--tile-hi); transform: scale(.95); }
   #sbicon { font-size: 64px; line-height: 1; font-family: 'Noto Color Emoji', sans-serif; }
-  #sbtitle { font-size: 32px; font-weight: 600; margin-top: 18px; letter-spacing: -.01em; }
+  #sbtitle { font-size: 26px; font-weight: 600; margin-top: 18px; letter-spacing: -.01em; }
   #sbhint { margin-top: 10px; font-size: 15px; color: var(--muted); max-width: 640px; text-align: center; }
   #sbstuck { position: absolute; bottom: 22px; font-size: 13px; color: var(--faint); display: flex; align-items: center; }
   #sbstuck .btn { flex: none; height: 34px; line-height: 34px; padding: 0 14px; margin-left: 10px; font-size: 13px; color: var(--muted); }
@@ -289,6 +304,9 @@
       <h3>Dial</h3>
       <div class="row"><label>Direction</label>
         <div class="seg"><div data-set="dial_invert" data-val="false">Normal</div><div data-set="dial_invert" data-val="true">Reversed</div></div></div>
+      <h3 style="margin-top:10px">Clock</h3>
+      <div class="row"><label>Format<small>time comes from the computer</small></label>
+        <div class="seg"><div data-set="clock_24h" data-val="true">24h</div><div data-set="clock_24h" data-val="false">12h</div></div></div>
       <h3 style="margin-top:10px">Pages</h3>
       <div id="pagechoices"></div>
     </div>
@@ -296,11 +314,24 @@
   </div>
   <div id="bar">
     <div id="tabs"></div>
+    <div id="clock" class="hidden"></div>
     <div id="status"><i></i><span id="statustext">…</span></div>
   </div>
   <div id="toast"></div>
+  <div id="lockscreen">
+    <div class="bigclock"><span class="bc-time"></span><span class="bc-suffix"></span></div>
+    <div class="bigdate"></div>
+    <div id="lktitle">🔒 Computer locked</div>
+    <div id="lknp"></div>
+    <div id="lkcontrols">
+      <div class="lkbtn" data-media="prev">⏮️</div><div class="lkbtn" data-media="play_pause" id="lkplay">⏯️</div><div class="lkbtn" data-media="next">⏭️</div>
+      <div class="lkbtn" data-media="vol_down">🔉</div><div class="lkbtn" data-media="mute">🔇</div><div class="lkbtn" data-media="vol_up">🔊</div>
+    </div>
+  </div>
   <div id="standby">
     <div id="sbicon">💤</div>
+    <div class="bigclock"><span class="bc-time"></span><span class="bc-suffix"></span></div>
+    <div class="bigdate"></div>
     <div id="sbtitle"></div>
     <div id="sbhint">The pad comes back when the computer wakes up</div>
     <div id="sbstuck">Stuck here while your PC is on? <span class="btn" data-sys="reconnect">Reconnect</span></div>
@@ -451,6 +482,8 @@ function render() {
   if (showSettings) renderSettings();
   renderStatus();
   updateStandby();
+  updateLock();
+  tick();
 }
 
 function renderStatus() {
@@ -526,7 +559,7 @@ function renderSettings() {
     $('sec-' + secs[j]).classList.toggle('on', secs[j] === settingsSec);
     $('snav').children[j].classList.toggle('on', secs[j] === settingsSec);
   }
-  var current = { brightness_auto: s.brightness_auto, os_mode: st.os_mode, layout: st.layout,
+  var current = { clock_24h: s.clock_24h, brightness_auto: s.brightness_auto, os_mode: st.os_mode, layout: st.layout,
     dial_invert: st.dial_invert, theme: THEMES[s.theme] ? s.theme : 'dark', accent: ACCENTS[s.accent] ? s.accent : 'theme' };
   var opts = $('settings').querySelectorAll('[data-set]');
   for (var i = 0; i < opts.length; i++) {
@@ -640,6 +673,7 @@ function renderNowPlaying(page, g) {
   updateNowPlaying();
 }
 function updateNowPlaying() {
+  if (lockShown) updateLock();
   if (!np || !$('np-fill')) return;
   $('np-state').textContent = np.playing ? '▶ Playing' : '❚❚ Paused';
   var pp = $('grid').querySelector('[data-playpause]');
@@ -697,16 +731,61 @@ function updateStandby() {
   }
 }
 
+// ---- clock: the host agent sets the device clock and sends the UTC offset (follows DST).
+// This Chromium has no Intl, so local time is computed from the offset.
+var DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+var MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September',
+  'October', 'November', 'December'];
+function localTime() {
+  if (!st.clock) return null;
+  var d = new Date(Date.now() + st.clock.utc_offset * 1000);
+  var h = d.getUTCHours(), m = d.getUTCMinutes(), mm = (m < 10 ? '0' : '') + m;
+  var h12 = st.settings && st.settings.clock_24h === false;
+  return {
+    time: h12 ? ((h + 11) % 12 + 1) + ':' + mm : (h < 10 ? '0' : '') + h + ':' + mm,
+    suffix: h12 ? (h < 12 ? 'AM' : 'PM') : '',
+    date: DAYS[d.getUTCDay()] + ', ' + d.getUTCDate() + ' ' + MONTHS[d.getUTCMonth()]
+  };
+}
+function each(selector, fn) {
+  var els = document.querySelectorAll(selector);
+  for (var i = 0; i < els.length; i++) fn(els[i]);
+}
+function tick() {
+  var t = localTime();
+  $('clock').textContent = t ? t.time + (t.suffix ? ' ' + t.suffix : '') : '';
+  $('clock').classList.toggle('hidden', !t);
+  each('.bigclock', function (el) {
+    el.classList.toggle('hidden', !t);
+    if (t) { el.querySelector('.bc-time').textContent = t.time; el.querySelector('.bc-suffix').textContent = t.suffix; }
+  });
+  each('.bigdate', function (el) { el.classList.toggle('hidden', !t); el.textContent = t ? t.date : ''; });
+  $('sbicon').classList.toggle('hidden', !!t);    // standby: the clock replaces the 💤
+}
+setInterval(tick, 1000);
+
+// ---- lock screen: the computer is locked (from the agent). Only media keys go through;
+// the service refuses keystrokes so nothing gets typed into the password box.
+var lockShown = false;
+function updateLock() {
+  lockShown = st.mode === 'ok' && st.usb === 'connected' && !!st.locked;
+  $('lockscreen').className = lockShown ? 'show' : '';
+  if (!lockShown) return;
+  $('lknp').textContent = np ? '♪ ' + np.title + (np.artist ? ' — ' + np.artist : '') : '';
+  $('lkplay').textContent = np && np.playing ? '⏸️' : '▶️';
+}
+
 // ---- touch: tap on release, swipe the grid to change page
 var startX = 0, startY = 0, downEl = null;
 document.addEventListener('pointerdown', function (e) {
   startX = e.clientX; startY = e.clientY;
-  downEl = e.target.closest('.tile[data-i], .preset[data-i], #dial, .tab, #status, [data-set], [data-sys], [data-sec], [data-choice-slot]');
+  downEl = e.target.closest('.tile[data-i], .preset[data-i], #dial, .tab, #status, [data-set], [data-sys], [data-sec], [data-choice-slot], [data-media]');
   if (downEl) downEl.classList.add('down');
 });
 document.addEventListener('pointercancel', function () { if (downEl) downEl.classList.remove('down'); downEl = null; });
 document.addEventListener('pointerup', function (e) {
   if (standbyShown && !(downEl && downEl.hasAttribute('data-sys'))) { downEl = null; return; }  // standby: only Reconnect
+  if (lockShown && !standbyShown && !(downEl && downEl.hasAttribute('data-media'))) { if (downEl) downEl.classList.remove('down'); downEl = null; return; }  // lock screen: only its media buttons
   var dx = e.clientX - startX, dy = e.clientY - startY, el = downEl;
   downEl = null;
   if (el) el.classList.remove('down');
@@ -719,7 +798,8 @@ document.addEventListener('pointerup', function (e) {
   }
   if (!el || Math.abs(dx) > 25 || Math.abs(dy) > 25) return;
   var i = parseInt(el.getAttribute('data-i'), 10);
-  if (el.hasAttribute('data-choice-slot')) {
+  if (el.hasAttribute('data-media')) post('/api/run', { media: el.getAttribute('data-media') });
+  else   if (el.hasAttribute('data-choice-slot')) {
     var choices = JSON.parse(JSON.stringify((st.settings || {}).page_choices || {}));
     choices[el.getAttribute('data-choice-slot')] = JSON.parse(el.getAttribute('data-val'));   // null = default
     post('/api/settings', { page_choices: choices });
