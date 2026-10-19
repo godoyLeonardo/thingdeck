@@ -290,8 +290,10 @@
   .px-streams h3 { display: flex; }
   .px-streams h3 span { margin-left: auto; padding-right: 8px; }
   .px-side { flex: 1; }
-  .px-side .mcard { grid-column: 1; }
-  .px-side .px-libs { grid-column: 2; grid-row: 1 / -1; padding-bottom: 6px; }
+  /* The libraries (text up to the right edge of the card) stay out of the right column: the
+     dial covers the right edge of the screen. The graphs, with their text on the left, go there. */
+  .px-side .mcard { grid-column: 2; }
+  .px-side .px-libs { grid-column: 1; grid-row: 1 / -1; padding-bottom: 6px; }
   .px-row { display: flex; align-items: center; padding: 6px 0; }
   .px-art { flex: none; width: 44px; height: 66px; margin-right: 12px; border-radius: 6px; color: var(--muted);
     background: var(--tile-hi) center / cover no-repeat; display: flex; align-items: center; justify-content: center; }
