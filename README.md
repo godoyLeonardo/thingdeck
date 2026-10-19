@@ -5,11 +5,14 @@ Stream Deck. It needs **no app on the computer**. The computer sees a standard
 USB keyboard, media keys and mouse wheel, so it works on Windows, macOS and Linux
 as soon as you plug it in.
 
-- **Touchscreen:** pages of large tiles (Media, Desktop, Shell, and a calls
-  page: Discord or Meetings), each sending a shortcut, a media key, typed text or a sequence of steps,
-  and live pages from the computer agent (Calendar, Status, Code).
-- **4 top buttons:** presets that change with the page. Labels are shown on the
-  screen right under the buttons.
+- **Touchscreen:** pages of large tiles (Desktop, Shell, and a calls page: Discord
+  or Meetings), each sending a shortcut, a media key, typed text or a sequence of
+  steps, plus live pages filled by the computer agent: Media, Calendar, Status and
+  Code (GitHub). The bottom bar shows four big tabs at a time; drag it, or tap the
+  arrow at its end, for the rest.
+- **4 top buttons:** presets that change with the page. Tile pages show their
+  labels under the buttons; live pages show a big clock and the date there instead,
+  and the buttons still work.
 - **Dial:** volume, scroll, zoom, scrub (arrow keys), browser tabs, undo/redo.
   The back button switches dial mode.
 - **Windows, macOS and Linux:** each tile can have per-OS shortcuts. The pad
@@ -17,17 +20,17 @@ as soon as you plug it in.
   [Host OS](#host-os)).
 - **Keyboard layouts:** typed text is translated for the host layout
   (Latin American and US are included).
-- **Settings:** brightness (light sensor or manual), host OS, layout, dial
-  direction, calls page (Discord or Meetings), themes, device info, and Reconnect / Restart / Reboot.
+- **Settings** (the ⚙ tab): brightness (light sensor or manual), host OS, layout,
+  dial direction, clock format, calls page (Discord or Meetings), themes and icons,
+  device info, and Reconnect / Restart / Reboot.
 - **Themes:** Dark, Black, Light, and the editor color schemes Nord, Dracula,
-  Catppuccin, Gruvbox, Tokyo Night and Solarized, each with its own accent or
-  one of six accent colors or any hue from a slider. Icons come in three styles (solid, outline, emoji) and three colors (neutral,
-  accent, or a color per tile category).
-- **Computer agent (optional):** a small background agent on the computer adds a
-  **now playing** view to the Media page (cover, title, artist, album, app, live
-  progress), a **Calendar** page with your Google Calendar for the coming days and
-  Join buttons for meetings, a **Status** page with CPU, memory, GPU and network,
-  a **clock**, and a **lock screen** with media controls (see
+  Catppuccin, Gruvbox, Tokyo Night and Solarized, each with its own accent, one of
+  six accent colors, or any hue from a slider. Icons come in three styles (solid,
+  outline, emoji) and three colors (neutral, accent, or a color per tile category).
+- **Computer agent (optional):** a small background agent on the computer adds what's
+  playing with its cover, your calendar with Join buttons, CPU/memory/GPU/network
+  graphs, a kill switch for the app in focus, GitHub Actions runs and pull requests,
+  a volume bar, an audio device picker, a clock and a lock screen (see
   [Computer agent](#computer-agent)).
 - **Standby screen** while the computer sleeps; the pad reconnects by itself
   when it wakes up.
@@ -60,7 +63,8 @@ computer without it.
 ./deploy.sh install
 ```
 
-This copies `device/` to `/var/macropad` on the Car Thing, adds one file,
+This checks the Python files and `config.json` on the Car Thing first (a broken
+file is refused and nothing changes), then copies `device/` to `/var/macropad`, adds one file,
 `/etc/supervisor.d/macropad.conf`, so the pad starts on boot, and reboots. No
 stock file is changed. The file goes on **both** system partitions: the
 bootloader keeps two copies of the system (slots A and B) and can switch between
@@ -83,7 +87,8 @@ them.
 | Dial hold | Play/Pause |
 | Back button | Next dial mode · hold: back to Volume |
 | Menu button (M) | Next page · hold: first page |
-| Swipe left/right on the tiles | Change page |
+| Swipe left/right on the page | Change page |
+| Bottom bar | Tap a tab; drag the bar or tap › / ‹ for the other tabs |
 | Tap the status pill (bottom right) | Cycle host OS: Auto → Windows → macOS → Linux |
 
 All of these can be changed in `device/config.json`.
@@ -131,9 +136,9 @@ The pad itself is just a USB keyboard, and computers never send track info, the
 time or their lock state to a keyboard. An optional agent on the computer sends
 them to the Car Thing **over the USB cable** (`adb forward`; no network):
 
-- **Now playing:** the Media page shows the cover, title, artist, album, the app it plays in,
-playing/paused and a live progress bar, with the media controls in a row below.
-  When nothing is playing, or the agent isn't running, it's the normal tile page.
+- **Now playing:** the Media page shows the cover, title, artist, album, the app it
+  plays in, playing/paused and a live progress bar, with the media controls in a row
+  below. When nothing is playing it says so; the controls work either way.
 - **Calendar:** the Calendar page shows today, tomorrow and the rest of the week
   from your calendars (see [Adding your calendar](#adding-your-calendar)): repeating
   events, moved or cancelled occurrences and time zones included, meetings you
@@ -168,8 +173,9 @@ playing/paused and a live progress bar, with the media controls in a row below.
   - Linux: `pactl` (PipeWire or PulseAudio).
   - macOS: the volume always; switching devices needs `brew install switchaudio-osx`.
 - **Clock:** the agent sets the Car Thing's clock and time zone (DST included).
-  The time shows in the bottom bar, large with the date at the top of the Media
-  page and on the standby screen; 24h/12h is under Settings → General → Clock.
+  The time shows large with the date at the top of the live pages (Media, Calendar,
+  Status, Code), in the bottom bar on the others, and on the standby and lock
+  screens; 24h/12h is under Settings → General → Clock.
 - **Lock screen:** while the computer is locked, the Car Thing shows the clock,
   "🔒 Computer locked", the cover and what's playing, and media buttons. Tiles,
   presets and dial modes that press keys are blocked while locked, so nothing gets
@@ -178,7 +184,7 @@ playing/paused and a live progress bar, with the media controls in a row below.
 Install it once per computer (and once per OS on a dual-boot PC). It starts at
 login, survives unplugging and sleep, and needs `adb` (see [Requirements](#requirements)):
 
-| OS | Reads from | Install |
+| OS | Now playing from | Install |
 |---|---|---|
 | Windows | The system media session (Spotify, browsers, Media Player, …) | `powershell -ExecutionPolicy Bypass -File host\windows\install.ps1` |
 | Linux | MPRIS through `playerctl` (Spotify, browsers, VLC, …) | `host/unix/install.sh` |
@@ -256,9 +262,12 @@ picked it up after 20 seconds, the Car Thing reboots.
 Edit `device/config.json` and run `./deploy.sh config`. A tile looks like:
 
 ```json
-{ "label": "Snip", "icon": "✂️", "key": "win+shift+s",
+{ "label": "Snip", "symbol": "snip", "key": "win+shift+s",
   "mac": { "key": "cmd+shift+4" }, "linux": { "key": "printscreen" } }
 ```
+
+`symbol` picks a built-in icon that follows the icon style and color settings; an
+emoji in `"icon"` works too.
 
 The full action reference (keys, media, typed text, sequences, wheel, page/dial
 switching, per-OS overrides) is in [device/README.md](device/README.md#configjson).
@@ -277,12 +286,10 @@ switching, per-OS overrides) is in [device/README.md](device/README.md#configjso
 
 - **Linux overrides assume GNOME** (Fedora Workstation, Ubuntu). On KDE a few
   desktop shortcuts need adjusting.
-- **macOS F11:** the "Step into" preset sends F11, which macOS uses for Show
-  Desktop unless you turn that shortcut off.
-- **Now playing, the calendar, stats, the clock and the lock screen need the agent**
-  on each computer; without it, there's no clock, the Media page is the plain tile
-  grid, and Calendar and Status say the agent is missing. The macOS and Linux agents
-  are untested on real machines so far.
+- **The live pages, the clock and the lock screen need the agent** on each
+  computer. Without it, there's no clock, the Media page shows its controls and a hint, and
+  Calendar, Status and Code say the agent is missing. The macOS and Linux agents are
+  untested on real machines so far.
 - **No Windows CPU temperature:** Windows only gives it to programs running as
   administrator with a hardware driver, so the Status page leaves it out there.
 

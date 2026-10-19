@@ -161,11 +161,20 @@ updates every 2 s stay small. The UI gets `nowplaying` events over SSE, loads th
 cover from `/api/nowplaying/art?k=…`, and moves the progress bar between updates.
 With no update for 15 s the data is dropped (computer off, agent stopped).
 
-A page with `"header": "clock"` (Media, by default) shows a big clock and the date
-in place of the preset labels and dial chip, as long as the agent has set the
-time; the presets and dial still work. A page with `"nowplaying": true` (Media, by default) switches to the now-playing
-layout while something plays: cover, details and progress on top, and its tiles
-as a compact row of controls below.
+A page with `"header": "clock"` (Media, Calendar, Status and Code, by default)
+shows a big clock and the date in place of the preset labels and dial chip, as long
+as the agent has set the time; the presets and dial still work. A page with
+`"nowplaying": true` (Media) is the media card: cover, details and progress on top
+(or "Nothing playing"), and its tiles as a compact row of controls below.
+
+### Touch UI
+
+The bottom bar holds one tab per page plus ⚙ Settings. Each tab is a quarter of the
+bar, so four show at a time; the bar scrolls sideways, snaps to whole tabs, and
+keeps the current page's tab in view. The arrow button at its end points to the
+hidden tabs (› scrolls on, ‹ goes back to the start), and a drag that starts on the
+bar never switches pages. Details and the audio picker open as a card over the
+page; tapping outside it closes it.
 
 ### Calendar and system stats
 
@@ -281,8 +290,9 @@ symbol whatever the icon color setting (the default config keeps red for hanging
 
 Symbols: `play pause prev next stop mute note` (media), `windows desktop snip
 clipboard folder smile activity lock search`, `command terminal files target pencil
-format sidebar`, `branch download diff list flask launch repeat interrupt`, and `mic
-camera hand phone hangup headphones speaker inbox check`.
+format sidebar`, `branch download diff list flask launch repeat interrupt`, `mic
+camera hand phone hangup headphones speaker inbox check`, and `x clock slash alert
+pr` (also used for GitHub statuses).
 
 ### Actions
 
