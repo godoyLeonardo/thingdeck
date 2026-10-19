@@ -30,6 +30,8 @@ BRIGHTNESS_MIN = 5          # brightness levels run 5..255 (Settings slider)
 THEMES = ('dark', 'black', 'light', 'nord', 'dracula', 'catppuccin', 'gruvbox', 'tokyonight', 'solarized')
 ACCENTS = ('theme', 'green', 'blue', 'purple', 'orange', 'pink', 'red')   # palettes: web/index.html
 OS_MODES = ('auto', 'windows', 'mac', 'linux')
+ICON_STYLES = ('solid', 'outline', 'emoji')   # icon sets: web/index.html
+ICON_COLORS = ('neutral', 'accent', 'category')
 HTTP_PORT = 8765
 
 
@@ -518,7 +520,8 @@ class Pad:
         self.settings = {'os_mode': 'auto', 'layout': None, 'dial_invert': None,
                          'brightness_auto': True, 'brightness': 180,
                          'theme': 'dark', 'accent': 'theme', 'page_choices': {},
-                         'clock_24h': True}
+                         'clock_24h': True, 'icon_style': None,
+                         'icon_color': None}
         self._als_running = None    # stock light-sensor service state, as last set by us
         self._dimmed = False
         self._dim_timer = None
@@ -568,6 +571,8 @@ class Pad:
             'theme': lambda v: v in THEMES,
             'accent': lambda v: v in ACCENTS,
             'clock_24h': lambda v: isinstance(v, bool),
+            'icon_style': lambda v: v is None or v in ICON_STYLES,
+            'icon_color': lambda v: v is None or v in ICON_COLORS,
             'page_choices': self._valid_page_choices,
             'brightness_auto': lambda v: isinstance(v, bool),
             'brightness': lambda v: isinstance(v, int) and BRIGHTNESS_MIN <= v <= 255,
