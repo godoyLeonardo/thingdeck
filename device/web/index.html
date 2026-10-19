@@ -112,6 +112,14 @@
 
   /* top strip: mirrors the 4 preset buttons on the top edge + the dial */
   #top { display: flex; height: 50px; flex: none; }
+  /* page option "header": "clock": a big clock and the date replace the preset labels */
+  #topclock { display: none; flex: 1; align-items: baseline; padding: 0 6px; min-width: 0; white-space: nowrap; }
+  body.topclock #top { height: 62px; }
+  body.topclock #presets, body.topclock #dial, body.topclock #clock { display: none; }
+  body.topclock #topclock { display: flex; }
+  .tc-time { font-size: 52px; font-weight: 600; line-height: 1; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .tc-suffix { font-size: 22px; font-weight: 500; color: var(--muted); margin-left: 6px; }
+  .tc-date { font-size: 22px; font-weight: 500; color: var(--muted); margin-left: 18px; overflow: hidden; text-overflow: ellipsis; }
   #presets { flex: 1; display: grid; grid-template-columns: repeat(4, 1fr); grid-gap: 8px; margin-right: 8px; }
   .preset { display: flex; align-items: center; background: var(--panel); border-radius: 12px; padding: 0 10px;
     min-width: 0; transition: background .15s; }
@@ -293,6 +301,7 @@
 </head>
 <body>
   <div id="top">
+    <div id="topclock"><span class="tc-time"></span><span class="tc-suffix"></span><span class="tc-date"></span></div>
     <div id="presets"></div>
     <div id="dial">
       <svg viewBox="0 0 26 26" fill="none"><circle cx="13" cy="13" r="10.5" style="stroke:var(--muted)" stroke-width="2"/><line x1="13" y1="4.5" x2="13" y2="9.5" style="stroke:var(--acc)" stroke-width="2.4" stroke-linecap="round"/></svg>
@@ -508,6 +517,7 @@ function render() {
 
   applyTheme();
   document.body.classList.toggle('settings', showSettings);
+  document.body.classList.toggle('topclock', !showSettings && page.header === 'clock' && !!st.clock);
   if (showSettings) renderSettings();
   renderStatus();
   updateStandby();
@@ -840,6 +850,12 @@ function tick() {
   var t = localTime();
   $('clock').textContent = t ? t.time + (t.suffix ? ' ' + t.suffix : '') : '';
   $('clock').classList.toggle('hidden', !t);
+  if (t) {
+    var tc = $('topclock');
+    tc.querySelector('.tc-time').textContent = t.time;
+    tc.querySelector('.tc-suffix').textContent = t.suffix;
+    tc.querySelector('.tc-date').textContent = t.date;
+  }
   each('.bigclock', function (el) {
     el.classList.toggle('hidden', !t);
     if (t) { el.querySelector('.bc-time').textContent = t.time; el.querySelector('.bc-suffix').textContent = t.suffix; }
