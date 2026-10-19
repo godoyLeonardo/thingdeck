@@ -484,8 +484,74 @@ function Send-Calendars($calendars) {
         -ContentType 'text/calendar; charset=utf-8' -Body $body)
 }
 
-# The Car Thing asks to open a meeting link; only https links of known meeting services.
-$MeetingUrl = '^https://(meet\.google\.com|([a-z0-9-]+\.)?zoom\.us|teams\.microsoft\.com|teams\.live\.com)/'
+# --- GitHub: a repo's latest workflow runs and your open pull requests, through the gh CLI,
+# which keeps the login (nothing is stored here). The repo is the first line of github.txt
+# next to the log ("name" for one of yours, or "owner/name").
+$GitHubFile = Join-Path (Split-Path $LogFile) 'github.txt'
+$ghExe = $null
+$ghRepo = @{ name = ''; full = '' }        # the github.txt line and what it resolved to
+$PrQuery = '{"query":"query { viewer { pullRequests(states: OPEN, first: 20, orderBy: {field: UPDATED_AT, direction: DESC}) { nodes { number title url isDraft updatedAt reviewDecision repository { nameWithOwner } commits(last: 1) { nodes { commit { statusCheckRollup { state } } } } } } } }"}'
+
+# Run gh and read its output as UTF-8 (PowerShell 5.1 would decode it with the console code page).
+function Invoke-Gh([string[]]$arguments, [string]$stdin) {
+    $psi = New-Object System.Diagnostics.ProcessStartInfo $script:ghExe
+    $psi.Arguments = ($arguments | ForEach-Object { if ($_ -match '[\s"]') { '"' + ($_ -replace '"', '\"') + '"' } else { $_ } }) -join ' '
+    $psi.UseShellExecute = $false
+    $psi.CreateNoWindow = $true
+    $psi.RedirectStandardInput = [bool]$stdin
+    $psi.RedirectStandardOutput = $true
+    $psi.RedirectStandardError = $true
+    $psi.StandardOutputEncoding = [Text.Encoding]::UTF8
+    $psi.StandardErrorEncoding = [Text.Encoding]::UTF8
+    $process = [System.Diagnostics.Process]::Start($psi)
+    if ($stdin) { $process.StandardInput.Write($stdin); $process.StandardInput.Close() }
+    $out = $process.StandardOutput.ReadToEndAsync()
+    $err = $process.StandardError.ReadToEnd()
+    if (-not $process.WaitForExit(30000)) { $process.Kill(); throw 'gh took too long' }
+    if ($process.ExitCode -ne 0) { throw (($err.Trim() -split "`n")[0]) }
+    $out.Result
+}
+
+function Get-GitHub {
+    $name = if (Test-Path $GitHubFile) {
+        Get-Content $GitHubFile | ForEach-Object { $_.Trim() } | Where-Object { $_ -and -not $_.StartsWith('#') } | Select-Object -First 1
+    }
+    if (-not $name) { return @{ none = $true } }
+    if (-not $script:ghExe) { $script:ghExe = (Get-Command gh.exe -ErrorAction SilentlyContinue).Source }
+    $result = [ordered]@{ repo = $name; runs = @(); prs = @() }
+    if (-not $script:ghExe) { $result.error = 'Install the GitHub CLI (gh) and sign in (see README)'; return $result }
+    try {
+        if ($script:ghRepo.name -ne $name) {       # "name" alone: one of the signed-in account's repos
+            $full = if ($name -match '/') { $name } else { (Invoke-Gh @('repo', 'view', $name, '--json', 'nameWithOwner', '-q', '.nameWithOwner')).Trim() }
+            $script:ghRepo = @{ name = $name; full = $full }
+        }
+        $result.repo = $script:ghRepo.full
+        $runs = Invoke-Gh @('run', 'list', '-R', $script:ghRepo.full, '-L', '40', '--json',
+            'workflowName,displayTitle,status,conclusion,headBranch,event,createdAt,updatedAt,url') | ConvertFrom-Json
+        $seen = @{}         # the newest run of each workflow
+        $latest = foreach ($run in $runs) {
+            if ($seen.ContainsKey($run.workflowName)) { continue }
+            $seen[$run.workflowName] = $true
+            [ordered]@{ workflow = $run.workflowName; status = $run.status; conclusion = $run.conclusion; branch = $run.headBranch
+                title = $run.displayTitle; event = $run.event; created = $run.createdAt; updated = $run.updatedAt; url = $run.url }
+        }
+        $result.runs = @($latest | Select-Object -First 5)
+        $prs = (Invoke-Gh @('api', 'graphql', '--input', '-') $PrQuery | ConvertFrom-Json).data.viewer.pullRequests.nodes
+        $result.prs = @(foreach ($pr in $prs) {
+            [ordered]@{ repo = $pr.repository.nameWithOwner; number = $pr.number; title = $pr.title; draft = $pr.isDraft
+                review = $pr.reviewDecision; updated = $pr.updatedAt; url = $pr.url
+                checks = $(if ($pr.commits.nodes) { $pr.commits.nodes[0].commit.statusCheckRollup.state }) }
+        })
+    } catch {
+        $result.error = $_.Exception.Message
+    }
+    $result
+}
+$gitHubFetched = [DateTime]::MinValue
+$gitHubBusy = $false        # a run is queued or running: check more often
+
+# Links the Car Thing asks to open: https links of known meeting services, and GitHub.
+$OpenableUrl = '^https://(meet\.google\.com|([a-z0-9-]+\.)?zoom\.us|teams\.microsoft\.com|teams\.live\.com|github\.com)/'
 
 if ($Once) {
     $np = Get-NowPlaying
@@ -531,11 +597,18 @@ while ($true) {
             if ($killResult) { $stats.kill_result = $killResult; $killResult = $null }
             $reply = Send-Json 'stats' $stats
             if ($reply.kill) { $killResult = Stop-Focused $reply.kill; $lastStatsSent = [DateTime]::MinValue }   # report it right away
-            if ($reply.open -and $reply.open -match $MeetingUrl) {
+            if ($reply.open -and $reply.open -match $OpenableUrl) {
                 Write-Log "opening $($reply.open -replace '\?.*', '')"
                 Start-Process $reply.open
             }
             if ($reply.need_calendar) { $calendarHash = $null }
+        }
+        # GitHub every minute, or every 15 s while a workflow runs.
+        if (((Get-Date) - $gitHubFetched).TotalSeconds -ge $(if ($gitHubBusy) { 15 } else { 60 })) {
+            $gitHubFetched = Get-Date
+            $gitHub = Get-GitHub
+            $gitHubBusy = [bool]($gitHub.runs | Where-Object { $_.status -ne 'completed' })
+            [void](Send-Json 'github' $gitHub)
         }
         if (((Get-Date) - $calendarFetched).TotalMinutes -ge 5) {
             $calendarFetched = Get-Date
