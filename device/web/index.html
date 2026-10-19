@@ -414,6 +414,8 @@
     display: flex; align-items: center; justify-content: center; }
   .to-btn svg { width: 22px; height: 22px; }
   .to-btn.off { opacity: .25; }
+  .to-btn.eye.shown { color: var(--acc); }
+  .to-row.hidden-tab .to-name { color: var(--muted); text-decoration: line-through; }
   .to-btn.down { filter: brightness(1.3); }
   .sec { flex: 1; display: none; grid-template-columns: 1fr 1fr; grid-gap: 8px; min-height: 0; }
   .sec.on { display: grid; }
@@ -552,8 +554,8 @@
     <div class="sec" id="sec-tabs">
       <div class="card"><h3>Tab order</h3><div class="ag-list" id="taborder"></div></div>
       <div class="card"><h3>Order</h3>
-        <div class="ag-empty">Move a page up or down with the arrows. The order is saved on the Car Thing and kept across restarts; pages added to config.json later appear at the end.</div>
-        <div class="action"><div class="btn" data-tabs-reset="1">Reset</div><small>Back to the order in config.json</small></div></div>
+        <div class="ag-empty">Move a page up or down with the arrows; the eye shows or hides its tab. Hidden pages are skipped by the back button too. This is saved on the Car Thing and kept across restarts; pages added to config.json later appear at the end.</div>
+        <div class="action"><div class="btn" data-tabs-reset="1">Reset</div><small>Back to config.json: every tab, in its order</small></div></div>
     </div>
     <div class="sec" id="sec-device">
       <div class="card"><h3>Device</h3><div class="kv" id="kv"></div></div>
@@ -704,29 +706,41 @@ function renderPageChoices(s) {
 }
 // The page entries in the order picked in Settings → Tabs (same rules as Pad.ordered_pages).
 function pageKey(p) { return p.choices ? p.id : p.name; }
-function orderedEntries() {
-  var order = (st.settings || {}).page_order || [], rank = {};
+function orderedEntries(withHidden) {
+  var s = st.settings || {}, order = s.page_order || [], hidden = s.page_hidden || [], rank = {};
   order.forEach(function (k, i) { rank[k] = i; });
-  return (cfg.pages || []).map(function (p, i) { return [p, i]; }).sort(function (a, b) {
+  var all = (cfg.pages || []).map(function (p, i) { return [p, i]; }).sort(function (a, b) {
     var ra = pageKey(a[0]) in rank ? rank[pageKey(a[0])] : order.length, rb = pageKey(b[0]) in rank ? rank[pageKey(b[0])] : order.length;
     return ra - rb || a[1] - b[1];
   }).map(function (e) { return e[0]; });
+  if (withHidden) return all;
+  var shown = all.filter(function (p) { return hidden.indexOf(pageKey(p)) < 0; });
+  return shown.length ? shown : all.slice(0, 1);       // at least one page always shows
 }
 var ARROW = { up: '<path d="M6 15l6-6 6 6"/>', down: '<path d="M6 9l6 6 6-6"/>' };
+var EYE = '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>';
 function renderTabOrder() {
-  var entries = orderedEntries();
+  var entries = orderedEntries(true), hidden = (st.settings || {}).page_hidden || [], n = 0;
   $('taborder').innerHTML = entries.map(function (p, i) {
-    var name = p.choices ? resolvePage(p).name + ' (' + (p.label || 'choice') + ')' : p.name;
+    var name = p.choices ? resolvePage(p).name + ' (' + (p.label || 'choice') + ')' : p.name, off = hidden.indexOf(pageKey(p)) >= 0;
     var btn = function (dir, disabled) {
       return '<div class="to-btn' + (disabled ? ' off' : '') + '"' + (disabled ? '' : ' data-tab-move="' + esc(pageKey(p)) + '|' + dir + '"') + '>' +
         CHEVRON + ARROW[dir < 0 ? 'up' : 'down'] + '</svg></div>';
     };
-    return '<div class="to-row"><span class="to-n">' + (i + 1) + '</span><span class="to-name">' + esc(name) + '</span>' +
+    return '<div class="to-row' + (off ? ' hidden-tab' : '') + '"><span class="to-n">' + (off ? '–' : ++n) + '</span>' +
+      '<span class="to-name">' + esc(name) + '</span>' +
+      '<div class="to-btn eye' + (off ? '' : ' shown') + '" data-tab-hide="' + esc(pageKey(p)) + '">' + CHEVRON + EYE + (off ? '<path d="M3 3l18 18"/>' : '') + '</svg></div>' +
       btn(-1, i === 0) + btn(1, i === entries.length - 1) + '</div>';
   }).join('');
 }
+function toggleTab(key) {
+  var hidden = ((st.settings || {}).page_hidden || []).slice(), i = hidden.indexOf(key);
+  if (i >= 0) hidden.splice(i, 1); else hidden.push(key);
+  if (orderedEntries(true).every(function (p) { return hidden.indexOf(pageKey(p)) >= 0; })) return toast('At least one tab has to stay', 'warn');
+  post('/api/settings', { page_hidden: hidden });
+}
 function moveTab(key, dir) {
-  var keys = orderedEntries().map(pageKey), i = keys.indexOf(key), j = i + dir;
+  var keys = orderedEntries(true).map(pageKey), i = keys.indexOf(key), j = i + dir;
   if (i < 0 || j < 0 || j >= keys.length) return;
   keys[i] = keys[j]; keys[j] = key;
   post('/api/settings', { page_order: keys });
@@ -1764,7 +1778,7 @@ document.addEventListener('pointerdown', function (e) {
   startX = e.clientX; startY = e.clientY;
   startInBar = !!e.target.closest('#bar');
   startOnSlider = !!e.target.closest('[data-hue-bar], [data-hue-lbar]');   // dragging a light's brightness, not swiping
-  downEl = e.target.closest('.tile[data-i], .preset[data-i], #dial, .tab, #status, [data-set], [data-sys], [data-sec], [data-choice-slot], [data-media], [data-join], [data-guard], [data-kill], [data-ev], [data-sheet-close], [data-sheet-card], [data-audio], [data-audio-dev], [data-gh], #tabmore, [data-hue-room], [data-hue-toggle], [data-hue-ltoggle], [data-hue-scene], [data-hue-alloff], [data-hue-pair], [data-hue-bar], [data-hue-lbar], [data-tab-move], [data-tabs-reset]');
+  downEl = e.target.closest('.tile[data-i], .preset[data-i], #dial, .tab, #status, [data-set], [data-sys], [data-sec], [data-choice-slot], [data-media], [data-join], [data-guard], [data-kill], [data-ev], [data-sheet-close], [data-sheet-card], [data-audio], [data-audio-dev], [data-gh], #tabmore, [data-hue-room], [data-hue-toggle], [data-hue-ltoggle], [data-hue-scene], [data-hue-alloff], [data-hue-pair], [data-hue-bar], [data-hue-lbar], [data-tab-move], [data-tabs-reset], [data-tab-hide]');
   if (downEl) downEl.classList.add('down');
 });
 document.addEventListener('pointercancel', function () { if (downEl) downEl.classList.remove('down'); downEl = null; });
@@ -1790,7 +1804,8 @@ document.addEventListener('pointerup', function (e) {
   else if (el.hasAttribute('data-gh')) post('/api/github/open', { id: el.getAttribute('data-gh') });
   else if (el.id === 'tabmore') scrollTabs();
   else if (el.hasAttribute('data-tab-move')) { var mv = el.getAttribute('data-tab-move').split('|'); moveTab(mv[0], parseInt(mv[1], 10)); }
-  else if (el.hasAttribute('data-tabs-reset')) post('/api/settings', { page_order: [] });
+  else if (el.hasAttribute('data-tabs-reset')) post('/api/settings', { page_order: [], page_hidden: [] });
+  else if (el.hasAttribute('data-tab-hide')) toggleTab(el.getAttribute('data-tab-hide'));
   else if (el.hasAttribute('data-hue-bar') || el.hasAttribute('data-hue-lbar')) { }       // handled by the drag code
   else if (el.hasAttribute('data-hue-toggle')) hueToggle(el.getAttribute('data-hue-toggle'), false);
   else if (el.hasAttribute('data-hue-ltoggle')) hueToggle(el.getAttribute('data-hue-ltoggle'), true);

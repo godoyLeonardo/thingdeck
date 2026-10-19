@@ -897,7 +897,7 @@ class Pad:
                          'brightness_auto': True, 'brightness': 180,
                          'theme': 'dark', 'accent': 'theme', 'page_choices': {},
                          'clock_24h': True, 'icon_style': None,
-                         'icon_color': None, 'page_order': []}
+                         'icon_color': None, 'page_order': [], 'page_hidden': []}
         self._als_running = None    # stock light-sensor service state, as last set by us
         self._dimmed = False
         self._dim_timer = None
@@ -951,12 +951,13 @@ class Pad:
             'icon_color': lambda v: v is None or v in ICON_COLORS,
             'page_choices': self._valid_page_choices,
             'page_order': lambda v: isinstance(v, list) and len(v) <= 64 and all(isinstance(x, str) for x in v),
+            'page_hidden': lambda v: isinstance(v, list) and len(v) <= 64 and all(isinstance(x, str) for x in v),
             'brightness_auto': lambda v: isinstance(v, bool),
             'brightness': lambda v: isinstance(v, int) and BRIGHTNESS_MIN <= v <= 255,
         }
         if key not in valid or not valid[key](value):
             raise ValueError('bad setting %s=%r' % (key, value))
-        if key == 'page_order':          # stay on the same page when the tabs move
+        if key in ('page_order', 'page_hidden'):       # stay on the same page when tabs move or hide
             current = page_key(self.ordered_pages()[self.page]) if self.page < len(self.ordered_pages()) else None
             self.settings[key] = value
             keys = [page_key(p) for p in self.ordered_pages()]
@@ -1086,12 +1087,17 @@ class Pad:
         """The pages as shown: in the Settings order, and a slot with "choices" shows one of them (see page_choice)."""
         return [self.page_choice(p)[1] if 'choices' in p else p for p in self.ordered_pages()]
 
-    def ordered_pages(self):
-        """config.json's page entries in the order picked in Settings → Tabs. Entries the order
-        doesn't name (new in config.json) keep their config order, after the named ones."""
+    def ordered_pages(self, hidden=False):
+        """config.json's page entries in the order picked in Settings → Tabs, without the ones
+        hidden there (unless hidden=True). Entries the order doesn't name (new in config.json)
+        keep their config order, after the named ones. At least one page always shows."""
         entries = self.config.get('pages', [])
         rank = {key: i for i, key in enumerate(self.settings.get('page_order') or [])}
-        return [p for _, p in sorted(enumerate(entries), key=lambda e: (rank.get(page_key(e[1]), len(rank)), e[0]))]
+        ordered = [p for _, p in sorted(enumerate(entries), key=lambda e: (rank.get(page_key(e[1]), len(rank)), e[0]))]
+        if hidden:
+            return ordered
+        shown = [p for p in ordered if page_key(p) not in (self.settings.get('page_hidden') or [])]
+        return shown or ordered[:1]
 
     def page_choice(self, slot):
         """(name, page) a choice slot shows: the one picked in Settings, else its default
