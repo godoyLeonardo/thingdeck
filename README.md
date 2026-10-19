@@ -38,6 +38,23 @@ as soon as you plug it in.
 Everything runs on the Car Thing itself: a Python service plus a page in its
 built-in browser. How it works is in [device/README.md](device/README.md).
 
+## Screenshots
+
+The Car Thing's screen is 800×480. These use made-up demo data.
+
+| | |
+|---|---|
+| ![Media page: the song playing, its cover and progress, media controls, and the audio output in the header](docs/screenshots/media.png) | ![Calendar page: today, tomorrow and later this week, with Join buttons on meetings](docs/screenshots/calendar.png) |
+| **Media:** what's playing, with controls and the audio output | **Calendar:** the coming week, the next event highlighted |
+| ![Status page: CPU, memory, GPU and network graphs, and the covered kill switch for the focused app](docs/screenshots/status.png) | ![Code page: the latest GitHub Actions runs and your open pull requests](docs/screenshots/code.png) |
+| **Status:** live stats and the kill switch | **Code:** GitHub Actions runs and your pull requests |
+| ![Event details card with time, length, notes and a Join meeting button](docs/screenshots/event.png) | ![Audio device picker with output and input lists](docs/screenshots/audio.png) |
+| **Event details:** tap any event | **Audio devices:** tap the output in the Media header |
+| ![Volume bar shown over the Media page](docs/screenshots/volume.png) | ![Lock screen with the clock, what's playing and media buttons](docs/screenshots/lock.png) |
+| **Volume bar:** shows when the volume changes | **Lock screen:** while the computer is locked |
+| ![Desktop page: a grid of shortcut tiles with line icons](docs/screenshots/desktop.png) | ![Settings, Appearance: themes, accent colors, the hue slider and icon options](docs/screenshots/settings.png) |
+| **Desktop:** a tile page | **Settings → Appearance** |
+
 ## Requirements
 
 - A Car Thing running the stock Spotify system with **ADB enabled** (for example
