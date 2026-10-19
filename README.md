@@ -8,13 +8,14 @@ as soon as you plug it in.
 - **Touchscreen:** pages of large tiles (Desktop, Shell, and a calls page: Discord
   or Meetings), each sending a shortcut, a media key, typed text or a sequence of
   steps, plus live pages filled by the computer agent: Media, Lights (Philips Hue),
-  Calendar, Status and Code (GitHub). The bottom bar shows four big tabs at a time;
-  drag it, or tap the arrow at its end, for the rest. Settings → Tabs sets their order.
+  Calendar, Status and Code (GitHub). Up to six tabs share the bottom bar; with more,
+  it shows four at a time and scrolls. Settings → Tabs sets their order and hides any
+  you don't use. On live pages, the top bar also shows the song playing (tap it for Media).
 - **4 top buttons:** presets that change with the page. Tile pages show their
   labels under the buttons; live pages show a big clock and the date there instead,
   and the buttons still work.
 - **Dial:** volume, Hue lights (the room you last tapped), scroll, zoom, scrub (arrow keys),
-  browser tabs, undo/redo. The back button switches dial mode.
+  browser tabs, undo/redo. The menu (M) button switches dial mode.
 - **Windows, macOS and Linux:** each tile can have per-OS shortcuts. The pad
   detects Windows by itself; pick macOS or Linux once in Settings (see
   [Host OS](#host-os)).
@@ -107,10 +108,11 @@ them.
 | Dial turn | Current dial mode (Volume, Lights, Scroll, Zoom, Scrub, Tabs, Undo/Redo) |
 | Dial press | Dial mode action (mute, middle click, reset zoom, …) |
 | Dial hold | Play/Pause |
-| Back button | Next dial mode · hold: back to Volume |
-| Menu button (M) | Next page · hold: first page |
+| Back button | Next page, wrapping from the last back to the first · hold: first page |
+| Menu button (M) | Next dial mode · hold: back to Volume |
 | Swipe left/right on the page | Change page |
-| Bottom bar | Tap a tab; drag the bar or tap › / ‹ for the other tabs |
+| Bottom bar | Tap a tab (with more than six, drag the bar or tap › / ‹ for the rest) |
+| Song pill (top bar) | Go to Media |
 | Tap the status pill (bottom right) | Cycle host OS: Auto → Windows → macOS → Linux |
 
 All of these can be changed in `device/config.json`.
@@ -201,8 +203,8 @@ them to the Car Thing **over the USB cable** (`adb forward`; no network):
   - Linux: `pactl` (PipeWire or PulseAudio).
   - macOS: the volume always; switching devices needs `brew install switchaudio-osx`.
 - **Clock:** the agent sets the Car Thing's clock and time zone (DST included).
-  The time shows large with the date at the top of the live pages (Media, Calendar,
-  Status, Code), in the bottom bar on the others, and on the standby and lock
+  The time shows large with the date at the top of the live pages (Media, Lights,
+  Calendar, Status, Code), and on the standby and lock
   screens; 24h/12h is under Settings → General → Clock.
 - **Lock screen:** while the computer is locked, the Car Thing shows the clock,
   "🔒 Computer locked", the cover and what's playing, and media buttons. Tiles,

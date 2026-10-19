@@ -169,12 +169,16 @@ as the agent has set the time; the presets and dial still work. A page with
 
 ### Touch UI
 
-The bottom bar holds one tab per page plus ⚙ Settings. Each tab is a quarter of the
-bar, so four show at a time; the bar scrolls sideways, snaps to whole tabs, and
-keeps the current page's tab in view. The arrow button at its end points to the
-hidden tabs (› scrolls on, ‹ goes back to the start), and a drag that starts on the
-bar never switches pages. Details and the audio picker open as a card over the
-page; tapping outside it closes it.
+The bottom bar holds one tab per shown page plus ⚙ Settings. Up to six tabs share
+it evenly. With more, each tab is a quarter of the bar, so four show at a time; the
+bar scrolls sideways, snaps to whole tabs, and keeps the current page's tab in view.
+The arrow button at its end then points to the other tabs (› scrolls on, ‹ goes back
+to the start), and a drag that starts on the bar never switches pages. Details and
+the audio picker open as a card over the page; tapping outside it closes it.
+
+In a page's clock header, every page but the media card shows the song playing on
+the right (title, then artist, cut off from the end when space runs out); tapping
+it goes to the first page with `"nowplaying": true`.
 
 ### Calendar and system stats
 
@@ -282,9 +286,12 @@ button; the address and key go to `hue.json` on the computer.
 ### Tab order
 
 `state.json` keeps `page_order`, a list of page keys (a page's `name`, or a choice
-slot's `id`). `Pad.ordered_pages()` (and `orderedEntries()` in the UI) sorts
-`config.json`'s pages by it; pages it doesn't name keep their config order after
-the named ones, so new pages appear at the end. Changing it keeps the current page.
+slot's `id`), and `page_hidden`, the keys of hidden pages. `Pad.ordered_pages()`
+(and `orderedEntries()` in the UI) sorts `config.json`'s pages by the order and
+leaves out hidden ones (at least one always stays); pages the order doesn't name keep
+their config order after the named ones, so new pages appear at the end. Page
+indexes, the tabs, swipes and `{"page": "next"}` (the back button, wrapping around)
+all work on the shown pages. Changing either setting keeps the current page.
 
 ### Volume and audio devices
 
