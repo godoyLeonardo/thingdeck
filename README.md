@@ -144,13 +144,12 @@ login, survives unplugging and sleep, and needs `adb` (see [Requirements](#requi
 
 | OS | Reads from | Install |
 |---|---|---|
-| Windows | The system media session (Spotify, browsers, Media Player, …) | `powershell -ExecutionPolicy Bypass -File hostwindowsinstall.ps1` |
+| Windows | The system media session (Spotify, browsers, Media Player, …) | `powershell -ExecutionPolicy Bypass -File host\windows\install.ps1` |
 | Linux | MPRIS through `playerctl` (Spotify, browsers, VLC, …) | `host/unix/install.sh` |
 | macOS | `nowplaying-cli`, or Spotify and Music through AppleScript | `host/unix/install.sh` |
 
 - **Windows:** a Task Scheduler task at logon starts a tiny windowless launcher
-  in `%USERPROFILE%.streamthing`. Log: `%USERPROFILE%.streamthing
-owplaying.log`.
+  in `%USERPROFILE%\.streamthing`. Log: `%USERPROFILE%\.streamthing\nowplaying.log`.
 - **Linux:** a systemd user service (`streamthing-nowplaying`). Needs `playerctl`
   (`sudo dnf install playerctl`). Log: `journalctl --user -u streamthing-nowplaying`.
 - **macOS:** a LaunchAgent. `brew install nowplaying-cli` is recommended; recent
