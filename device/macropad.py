@@ -362,6 +362,57 @@ class Hid:
 
 # ------------------------------------------------------------- UI events
 
+HOST_TTL = 30           # seconds without a heartbeat before the host agent counts as gone
+VALID_TIME = 1735689600  # 2025-01-01: earlier means the clock was never set (the device has no RTC)
+
+
+class HostLink:
+    """Heartbeat from the host agent (host/ in the repo): the computer's time and UTC
+    offset, which set this device's clock, and whether the computer's screen is locked."""
+
+    def __init__(self, on_change):
+        self.on_change = on_change
+        self.utc_offset = None     # seconds east of UTC, from the host (follows DST)
+        self.locked = False
+        self.seen = None           # monotonic time of the last heartbeat
+
+    def update(self, body):
+        changed = False
+        host_time = body.get('time_ms')
+        if isinstance(host_time, (int, float)) and host_time / 1000 > VALID_TIME:
+            if abs(time.time() - host_time / 1000) > 2:
+                was_valid = time.time() > VALID_TIME
+                try:
+                    time.clock_settime(time.CLOCK_REALTIME, host_time / 1000)
+                    log('clock set from the computer: %s UTC' % time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime()))
+                except OSError as e:
+                    log('could not set the clock:', e)
+                changed = changed or not was_valid
+        offset = body.get('utc_offset_min')
+        if isinstance(offset, int) and offset * 60 != self.utc_offset:
+            self.utc_offset = offset * 60
+            changed = True
+        locked = bool(body.get('locked'))
+        if locked != self.locked:
+            self.locked = locked
+            log('computer %s' % ('locked' if locked else 'unlocked'))
+            changed = True
+        self.seen = time.monotonic()
+        if changed:
+            self.on_change()
+
+    def expire(self):
+        """Agent gone (stopped, computer off): drop the lock state; the clock keeps running."""
+        if self.locked and self.seen is not None and time.monotonic() - self.seen > HOST_TTL:
+            self.locked = False
+            self.on_change()
+
+    def clock(self):
+        if self.utc_offset is None or time.time() < VALID_TIME:
+            return None
+        return {'utc_offset': self.utc_offset}
+
+
 NOWPLAYING_TTL = 15     # seconds without an update before the host agent counts as gone
 NOWPLAYING_FIELDS = ('title', 'artist', 'album', 'album_artist', 'track_number', 'app', 'playing',
                      'position_ms', 'duration_ms', 'shuffle', 'repeat')
@@ -453,6 +504,7 @@ class Pad:
     def __init__(self):
         self.ui = Broadcaster()
         self.np = NowPlaying(self.ui)
+        self.host = HostLink(lambda: self.publish_state())
         self.hid = Hid(lambda status: self.on_usb_status(status))
         self.config = {}
         self.config_mtime = 0
@@ -465,7 +517,8 @@ class Pad:
         # None means "use config.json".
         self.settings = {'os_mode': 'auto', 'layout': None, 'dial_invert': None,
                          'brightness_auto': True, 'brightness': 180,
-                         'theme': 'dark', 'accent': 'theme', 'page_choices': {}}
+                         'theme': 'dark', 'accent': 'theme', 'page_choices': {},
+                         'clock_24h': True}
         self._als_running = None    # stock light-sensor service state, as last set by us
         self._dimmed = False
         self._dim_timer = None
@@ -514,6 +567,7 @@ class Pad:
             'dial_invert': lambda v: v is None or isinstance(v, bool),
             'theme': lambda v: v in THEMES,
             'accent': lambda v: v in ACCENTS,
+            'clock_24h': lambda v: isinstance(v, bool),
             'page_choices': self._valid_page_choices,
             'brightness_auto': lambda v: isinstance(v, bool),
             'brightness': lambda v: isinstance(v, int) and BRIGHTNESS_MIN <= v <= 255,
@@ -666,7 +720,8 @@ class Pad:
         return {'page': self.page, 'dial': self.dial, 'usb': self.hid.status,
                 'mode': self.mode, 'message': self.message,
                 'os': self.host_os(), 'os_mode': self.settings['os_mode'], 'os_detected': self.os_detected,
-                'settings': self.settings, 'layout': self.layout_name(), 'dial_invert': self.dial_invert()}
+                'settings': self.settings, 'layout': self.layout_name(), 'dial_invert': self.dial_invert(),
+                'locked': self.host.locked, 'clock': self.host.clock()}
 
     def publish_state(self):
         self.ui.publish('state', self.state())
@@ -699,11 +754,26 @@ class Pad:
             return
         global layout
         layout = LAYOUTS.get(self.layout_name(), LAYOUTS['us'])
+        if self.host.locked and self._types(action):
+            # On a locked computer, keystrokes land in the password box (and Enter
+            # counts as a failed sign-in). Media keys, volume and wheel still go through.
+            self.toast('Computer locked: only media controls work', 'warn')
+            return
         try:
             self._run(action)
         except Exception as e:  # a bad config entry must never kill the input loop
             log('action failed:', action, e)
             self.toast('Action error: %s' % e, 'fail')
+
+    def _types(self, a):
+        """Would this action press keyboard keys?"""
+        a = self.variant(a)
+        if 'seq' in a:
+            return any(self._types(step) for step in a['seq'])
+        if 'dial_press' in a:
+            mode = self.dials()[self.dial] if self.dials() else {}
+            return self._types(mode.get('press') or {})
+        return 'key' in a or 'type' in a or bool(a.get('mods'))
 
     def _run(self, a):
         hid = self.hid
@@ -1015,6 +1085,8 @@ class Handler(BaseHTTPRequestHandler):
             pad.set_os(body.get('os', 'next'))
         elif path == '/api/nowplaying':
             return self._send(200, {'ok': True, 'need_art': pad.np.update(body)})
+        elif path == '/api/host':
+            pad.host.update(body)
         elif path == '/api/run':
             pad.run(body)
         else:
@@ -1212,6 +1284,7 @@ def main():
             if pad.load_config():
                 pad.ui.publish('config', {})
             pad.np.expire()
+            pad.host.expire()
     finally:
         pad.hid.close()
 
