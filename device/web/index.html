@@ -241,8 +241,13 @@
   .lcard.off .hbar i, .hl-row.off .hbar i { opacity: .2; }
   .hbar span { position: absolute; left: 10px; top: 0; bottom: 0; display: flex; align-items: center; font: 600 calc(13px * var(--ts)) GeistMono, monospace;
     color: var(--text); text-shadow: 0 1px 3px var(--tile); }
-  .hue-msg { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; padding: 0 30px; }
-  .hue-msg .btn { flex: none; margin-top: 16px; padding: 0 28px; background: var(--acc); color: var(--on-acc); height: 48px; line-height: 48px; }
+  /* a live page's "waiting", "set this up" or error card (stateCard): centered, the same on every page */
+  .state-msg { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; padding: 0 30px; }
+  .state-msg .ag-empty { max-width: 560px; }
+  .state-msg .ag-empty b { display: flex; align-items: center; font-size: calc(20px * var(--ts)); margin-bottom: 6px; }
+  .state-msg .spin { flex: none; margin-right: 12px; color: var(--acc); }
+  .state-msg.msg { grid-column: 1 / -1; grid-row: 1 / -1; }
+  .state-msg .btn { flex: none; margin-top: 16px; padding: 0 28px; background: var(--acc); color: var(--on-acc); height: 48px; line-height: 48px; }
   /* the room card (a sheet) */
   .sh-head { display: flex; align-items: center; margin-top: 6px; }
   .sh-head .sh-title { flex: 1; min-width: 0; margin-top: 0; }
@@ -1454,13 +1459,10 @@ function updateAgenda() {
     html += eventHTML(e, e === next, false);
   });
   if (!events.length) {
-    var msg;
-    if (agenda.state === 'none') msg = '<b>No calendar yet</b>Put your Google Calendar’s secret iCal address in calendars.txt on the computer (see README).';
-    else if (agenda.error) msg = '<b>Couldn’t get the calendar</b>' + esc(agenda.error);
-    else if (agenda.state === 'ok') msg = '<b>Nothing coming up</b>No events in the next 7 days.';
-    else msg = st.clock ? 'Waiting for the calendar…' : '<b>No computer agent</b>Install it to see your calendar here (see README).';
-    html = cols ? '<div class="card ag-col"><h3>Calendar</h3><div class="ag-empty">' + msg + '</div></div>'
-                : '<div class="ag-empty">' + msg + '</div>';
+    if (agenda.state === 'none') html = stateCard('Calendar', 'No calendar yet', 'Put your Google Calendar’s secret iCal address in calendars.txt on the computer (see README).');
+    else if (agenda.error) html = stateCard('Calendar', 'Couldn’t get the calendar', agenda.error);
+    else if (agenda.state === 'ok') html = stateCard('Calendar', 'Nothing coming up', 'No events in the next 7 days.');
+    else html = agentCard('Calendar', 'your calendar');
   }
   if (box.innerHTML !== html) {
     var top = box.scrollTop;
@@ -1473,6 +1475,20 @@ setInterval(updateAgenda, 20000);
 // Draw a widget's HTML only when it changed, and keep the scroll position of its lists.
 // Compare with what was drawn last, not innerHTML: the icons' <path/> reads back as
 // <path></path>, so innerHTML never matches and every redraw sent the lists to the top.
+// The card a live page shows instead of its data: what's missing and what to do. Every
+// page uses it, so "waiting", "set this up" and errors look the same everywhere.
+// waiting: show a spinner; button: extra HTML under the text; cls: extra classes.
+function stateCard(label, title, text, opts) {
+  opts = opts || {};
+  return '<div class="card state-msg' + (opts.cls ? ' ' + opts.cls : '') + '"><div class="m-label">' + esc(label) + '</div>' +
+    '<div class="ag-empty"><b>' + (opts.waiting ? '<i class="spin"></i>' : '') + esc(title) + '</b>' + esc(text || '') + '</div>' +
+    (opts.button || '') + '</div>';
+}
+// The usual "no agent yet / waiting for it" pair, for a page whose data comes from the agent.
+function agentCard(label, what, cls) {
+  return st.clock ? stateCard(label, 'Waiting for ' + what + '…', 'It usually takes a few seconds after the computer connects.', { waiting: true, cls: cls })
+    : stateCard(label, 'No computer agent', 'Install it on the computer to see ' + what + ' here (see README).', { cls: cls });
+}
 function redraw(box, html) {
   if (box._html === html) return false;
   var tops = [].map.call(box.querySelectorAll('.ag-list'), function (l) { return l.scrollTop; });
@@ -1512,9 +1528,8 @@ function updateGitHub() {
   if (!box) return;
   var g = github, html;
   if (g.state !== 'ok') {
-    var msg = g.state === 'none' ? '<b>No repository set</b>Put a repository name in github.txt on the computer, next to calendars.txt (see README).'
-      : st.clock ? 'Waiting for GitHub…' : '<b>No computer agent</b>Install it to see GitHub here (see README).';
-    html = '<div class="card gh-col"><h3>GitHub</h3><div class="ag-empty">' + msg + '</div></div>';
+    html = g.state === 'none' ? stateCard('GitHub', 'No repository set', 'Put a repository name in github.txt on the computer, next to calendars.txt (see README).')
+      : agentCard('GitHub', 'GitHub');
   } else {
     var repoName = (g.repo || '').split('/').pop();
     var runs = (g.runs || []).map(function (r) {
@@ -1591,13 +1606,11 @@ function updateLights() {
     }).join('') + '<div class="lcard alloff" data-hue-alloff="1">' + icon('power') + 'All off</div>';
     box.className = 'lights';
   } else {
-    var title, text, pair = false;
-    if (hue.state === 'none') { title = 'Connect your Hue Bridge'; text = 'Tap Pair, then press the round button on top of the bridge within 30 seconds.'; pair = true; }
-    else if (hue.state === 'pairing') { title = 'Press the bridge’s button'; text = 'Press the round button on top of your Hue Bridge now…'; }
-    else if (hue.state === 'error') { title = 'Hue isn’t answering'; text = hue.error || 'Unknown error'; pair = true; }
-    else { title = st.clock ? 'Waiting for the computer…' : 'No computer agent'; text = st.clock ? '' : 'Install it to control your lights (see README).'; }
-    html = '<div class="card hue-msg"><div class="m-label">Philips Hue</div><div class="ag-empty"><b>' + esc(title) + '</b>' + esc(text) + '</div>' +
-      (pair ? '<div class="btn" data-hue-pair="1">' + (hue.state === 'error' ? 'Pair again' : 'Pair') + '</div>' : '') + '</div>';
+    var pair = function (label) { return { button: '<div class="btn" data-hue-pair="1">' + label + '</div>' }; };
+    if (hue.state === 'none') html = stateCard('Philips Hue', 'Connect your Hue Bridge', 'Tap Pair, then press the round button on top of the bridge within 30 seconds.', pair('Pair'));
+    else if (hue.state === 'pairing') html = stateCard('Philips Hue', 'Press the bridge’s button', 'Press the round button on top of your Hue Bridge now.', { waiting: true });
+    else if (hue.state === 'error') html = stateCard('Philips Hue', 'Hue isn’t answering', hue.error || 'Unknown error', pair('Pair again'));
+    else html = agentCard('Philips Hue', 'your lights');
     box.className = 'lights msg';
   }
   if (box.innerHTML !== html) box.innerHTML = html;
@@ -1704,9 +1717,7 @@ function updateMonitor() {
   if (!box) return;
   var s = stats, h = s && s.history || {};
   if (!s) {
-    box.innerHTML = '<div class="mcard msg"><div class="m-label">System</div><div class="ag-empty">' +
-      (st.clock ? 'Waiting for stats from the computer…' : '<b>No computer agent</b>Install it to see CPU, memory, GPU and network here (see README).') +
-      '</div></div>';
+    box.innerHTML = agentCard('System', 'the computer’s stats', 'msg');      // spans the whole stats grid
     return;
   }
   var pct = function (v) { return v == null ? '–' : Math.round(v) + '<small>%</small>'; };
@@ -1761,12 +1772,10 @@ function updatePlex() {
   if (!box) return;
   var p = plex;
   if (p.state !== 'ok') {
-    var title, text;
-    if (p.state === 'none') { title = 'Add your Plex server'; text = 'Put its address in plex.txt on the computer, next to calendars.txt (see README).'; }
-    else if (p.state === 'error') { title = 'Plex isn’t answering'; text = p.error || 'Unknown error'; }
-    else { title = st.clock ? 'Waiting for Plex…' : 'No computer agent'; text = st.clock ? '' : 'Install it to see your Plex server here (see README).'; }
     box.className = 'plex msg';
-    redraw(box, '<div class="card hue-msg"><div class="m-label">Plex</div><div class="ag-empty"><b>' + esc(title) + '</b>' + esc(text) + '</div></div>');
+    redraw(box, p.state === 'none' ? stateCard('Plex', 'Add your Plex server', 'Put its address in plex.txt on the computer, next to calendars.txt (see README).')
+      : p.state === 'error' ? stateCard('Plex', 'Plex isn’t answering', p.error || 'Unknown error')
+      : agentCard('Plex', 'your Plex server'));
     return;
   }
   if (!$('pxs')) {
