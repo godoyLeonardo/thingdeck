@@ -342,6 +342,15 @@ function variant(a) {
   for (var k in o) r[k] = o[k];
   return r;
 }
+// per-OS page replacement: {"name": "Meetings", ..., "windows": {"name": "Discord", "tiles": [...]}}
+function pageVariant(p) {
+  var o = p[st.os];
+  if (!o || typeof o !== 'object') return p;
+  var r = {};
+  for (var k in p) if (k !== 'windows' && k !== 'mac' && k !== 'linux') r[k] = p[k];
+  for (var j in o) r[j] = o[j];
+  return r;
+}
 function kind(a) {
   if (!a) return 'key';
   if (a.color) return a.color;
@@ -354,7 +363,7 @@ function kind(a) {
 
 // ---- rendering
 function render() {
-  var pages = cfg.pages || [];
+  var pages = (cfg.pages || []).map(pageVariant);
   var page = pages[st.page] || { tiles: [] };
   var grid = page.grid || cfg.grid || [4, 2];
   var g = $('grid');
@@ -623,9 +632,10 @@ function connect() {
   es.onmessage = function (e) {
     var m = JSON.parse(e.data), d = m.data;
     if (m.type === 'state') {
-      var pageChanged = d.page !== st.page;
+      var pageChanged = d.page !== st.page, osChanged = d.os !== st.os;
       st = d;
-      if (pageChanged) { if (showSettings) openSettings(false); load(); } else render();
+      if (pageChanged && showSettings) openSettings(false);
+      if (pageChanged || osChanged) load(); else render();   // presets come per page and per OS
       if (d.message) toast(d.message, d.mode === 'error' ? 'fail' : 'warn');
     } else if (m.type === 'config') {
       load().then(function () { toast('Config reloaded', 'ok'); });

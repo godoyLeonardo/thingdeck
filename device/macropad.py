@@ -29,6 +29,7 @@ BRIGHTNESS_MIN = 5          # brightness levels run 5..255 (Settings slider)
 THEMES = ('dark', 'black', 'light', 'nord', 'dracula', 'catppuccin', 'gruvbox', 'tokyonight', 'solarized')
 ACCENTS = ('theme', 'green', 'blue', 'purple', 'orange', 'pink', 'red')   # palettes: web/index.html
 OS_MODES = ('auto', 'windows', 'mac', 'linux')
+OS_NAMES = ('windows', 'mac', 'linux')
 HTTP_PORT = 8765
 
 
@@ -583,7 +584,18 @@ class Pad:
         return True
 
     def pages(self):
-        return self.config.get('pages', [])
+        """Pages for the current host OS. A page may carry per-OS replacements, e.g.
+        {"name": "Meetings", "tiles": [...], "windows": {"name": "Discord", "tiles": [...]}}:
+        the override's keys replace the page's (name, presets, tiles, grid)."""
+        host = self.host_os()
+        resolved = []
+        for page in self.config.get('pages', []):
+            override = page.get(host)
+            if isinstance(override, dict):
+                page = dict((k, v) for k, v in page.items() if k not in OS_NAMES)
+                page.update(override)
+            resolved.append(page)
+        return resolved
 
     def dials(self):
         return self.config.get('dial_modes', [])
