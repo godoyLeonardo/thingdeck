@@ -1793,7 +1793,8 @@ function updatePlex() {
   if (load) {
     cpu = mcard('Server CPU', last(load.cpu) == null ? '–' : Math.round(last(load.cpu)) + '<small>%</small>',
       [load.plex_cpu != null ? 'Plex ' + Math.round(load.plex_cpu) + '%' : '', last(load.mem) != null ? 'RAM ' + Math.round(last(load.mem)) + '%' : '']
-        .filter(function (x) { return x; }).join(' · '), spark(load.cpu, 100, 'v', true, (load.cpu || []).length));
+        .filter(function (x) { return x; }).join('<br>'),       // short lines: the dial covers the right edge
+      spark(load.cpu, 100, 'v', true, (load.cpu || []).length));
   }
   if (net) {      // the total, with the part that leaves the local network (WAN) as the second line
     var total = (net.lan || []).map(function (v, i) { return v + ((net.wan || [])[i] || 0); });
