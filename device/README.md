@@ -133,6 +133,21 @@ exactly that, and the boot hook on the old slot was gone with it. So
 (120 s at most; the log can't be trusted because it rotates at 1 MB), and
 `hook.sh` installs the hook on both slots.
 
+### Now playing
+
+A host agent (`../host/`) posts the current track to `POST /api/nowplaying` through
+`adb forward tcp:28765 tcp:8765`, so it arrives as a local request. `NowPlaying`
+keeps the metadata and the cover separately: the cover comes base64 with an
+`art_key` (a hash of title, artist, album and app) only when the key changes, or
+when the reply asks for it (`need_art`, e.g. after a service restart). Position
+updates every 2 s stay small. The UI gets `nowplaying` events over SSE, loads the
+cover from `/api/nowplaying/art?k=…`, and moves the progress bar between updates.
+With no update for 15 s the data is dropped (computer off, agent stopped).
+
+A page with `"nowplaying": true` (Media, by default) switches to the now-playing
+layout while something plays: cover, details and progress on top, and its tiles
+as a compact row of controls below.
+
 ### Themes
 
 `web/index.html` defines each theme as CSS variables under
@@ -161,7 +176,7 @@ Top level:
 | `hardware` | `knob`, `back`, `menu`: `{"tap": action, "hold": action}`; `dial_invert` |
 | `dial_modes` | `[{"name", "cw", "ccw", "press"}]` |
 | `presets` | Default 4 top-button actions |
-| `pages` | `[{"name", "presets"?, "grid"?, "tiles": [...]}]`, or a choice slot (below) |
+| `pages` | `[{"name", "presets"?, "grid"?, "nowplaying"?, "tiles": [...]}]`, or a choice slot (below) |
 
 Tiles and presets are actions plus `label`, optional `icon` (emoji), `hint`
 (small text; generated if missing) and `color`.
@@ -217,6 +232,8 @@ page, or `adb shell`).
 | POST | `/api/preset` | `{"index"}` | Run a preset |
 | POST | `/api/page`, `/api/dial`, `/api/os` | `{"page"}` / `{"dial"}` / `{"os"}` | Switch page / dial mode / host OS |
 | POST | `/api/settings` | `{"theme": "nord", …}` | Change settings (saved in `state.json`) |
+| POST | `/api/nowplaying` | `{"title", "artist", "album", "album_artist", "track_number", "app", "playing", "position_ms", "duration_ms", "shuffle", "repeat", "art_key", "art"?, "art_type"?}` | From the host agent; `{"title": null}` clears. Replies `{"need_art": bool}` |
+| GET | `/api/nowplaying`, `/api/nowplaying/art` | | Current track metadata; its cover image |
 | POST | `/api/run` | any action | Run an action |
 | POST | `/api/system` | `{"do": "reconnect" \| "restart" \| "reboot"}` | Reconnect USB (software replug) / restart service / reboot |
 

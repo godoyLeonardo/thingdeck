@@ -21,6 +21,9 @@ as soon as you plug it in.
 - **Themes:** Dark, Black, Light, and the editor color schemes Nord, Dracula,
   Catppuccin, Gruvbox, Tokyo Night and Solarized, each with its own accent or
   one of six accent colors.
+- **Now playing (optional):** with a small agent on the computer, the Media page
+  shows the cover, title, artist, album, app and a live progress bar of whatever
+  is playing (see [Now playing](#now-playing)).
 - **Standby screen** while the computer sleeps; the pad reconnects by itself
   when it wakes up.
 
@@ -117,6 +120,36 @@ layout:
 
 Shortcuts made of letters, digits and named keys work with any layout.
 
+## Now playing
+
+The pad itself is just a USB keyboard, and computers never send track info to a
+keyboard. An optional agent on the computer reads the system's media session and
+sends it to the Car Thing **over the USB cable** (`adb forward`; no network). The
+Media page then shows the cover, title, artist, album, the app it plays in,
+playing/paused and a live progress bar, with the media controls in a row below.
+When nothing is playing, or the agent isn't running, it's the normal tile page.
+
+Install it once per computer (and once per OS on a dual-boot PC). It starts at
+login, survives unplugging and sleep, and needs `adb` (see [Requirements](#requirements)):
+
+| OS | Reads from | Install |
+|---|---|---|
+| Windows | The system media session (Spotify, browsers, Media Player, …) | `powershell -ExecutionPolicy Bypass -File hostwindowsinstall.ps1` |
+| Linux | MPRIS through `playerctl` (Spotify, browsers, VLC, …) | `host/unix/install.sh` |
+| macOS | `nowplaying-cli`, or Spotify and Music through AppleScript | `host/unix/install.sh` |
+
+- **Windows:** a Task Scheduler task at logon starts a tiny windowless launcher
+  in `%USERPROFILE%.streamthing`. Log: `%USERPROFILE%.streamthing
+owplaying.log`.
+- **Linux:** a systemd user service (`streamthing-nowplaying`). Needs `playerctl`
+  (`sudo dnf install playerctl`). Log: `journalctl --user -u streamthing-nowplaying`.
+- **macOS:** a LaunchAgent. `brew install nowplaying-cli` is recommended; recent
+  macOS versions restrict it, in which case the agent asks Spotify or Music
+  directly (macOS asks once to allow that).
+
+Uninstall with `install.ps1 -Uninstall` or `install.sh --uninstall`. To check what
+the agent sees without installing: `nowplaying.ps1 -Once` or `nowplaying.py --once`.
+
 ## When the computer sleeps
 
 When the computer sleeps or shuts down and the Car Thing still has power, the
@@ -165,5 +198,8 @@ switching, per-OS overrides) is in [device/README.md](device/README.md#configjso
   desktop shortcuts need adjusting.
 - **macOS F11:** the "Step into" preset sends F11, which macOS uses for Show
   Desktop unless you turn that shortcut off.
-- **No clock and no "now playing":** the pad only talks to the computer as a USB
-  keyboard, and computers never send time or track info to a keyboard.
+- **No clock:** the pad only talks to the computer as a USB keyboard, and
+  computers never send the time to a keyboard.
+- **Now playing needs the agent** on each computer; without it, the Media page
+  is the plain tile grid. The macOS and Linux agents are untested on real
+  machines so far.
