@@ -270,6 +270,12 @@
   .gh { flex: 1; min-width: 0; display: flex; }
   .gh-col { flex: 1; min-width: 0; min-height: 0; padding: 10px 6px 4px 14px; }
   .gh-col + .gh-col { margin-left: 8px; }
+  .gh-head { display: flex; align-items: center; }
+  .gh-refresh { margin-left: auto; margin-right: 6px; width: 44px; height: 32px; border-radius: 10px; background: var(--tile-hi);
+    display: flex; align-items: center; justify-content: center; color: var(--text); }
+  .gh-refresh svg { width: 18px; height: 18px; }
+  .gh-refresh .spin { width: 14px; height: 14px; color: var(--acc); }
+  .gh-refresh.down { filter: brightness(1.3); }
   .gh-row { display: flex; align-items: center; min-height: 56px; padding: 4px 8px; margin: 0 -8px; border-radius: 10px; }
   .gh-row.down { background: var(--tile-hi); }
   .gh-row.wrap .ev-title { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
@@ -1498,7 +1504,7 @@ function redraw(box, html) {
 }
 
 // ---- GitHub (widget "github"): the agent reads the repo in github.txt with the gh CLI
-var github = { state: 'unknown' };
+var github = { state: 'unknown' }, ghRefreshing = false;     // ghRefreshing: until the agent's next update
 function ago(iso) {
   var s = Math.max(0, (Date.now() - Date.parse(iso)) / 1000);
   return s < 60 ? 'now' : s < 3600 ? Math.floor(s / 60) + 'm' : s < 86400 ? Math.floor(s / 3600) + 'h' : Math.floor(s / 86400) + 'd';
@@ -1544,7 +1550,8 @@ function updateGitHub() {
       return ghRow(p.id, checksState(p.checks), p.title, sub.filter(function (x) { return x; }).join(' · '), ago(p.updated), true);
     }).join('');
     var error = g.error ? '<div class="ag-empty">' + esc(g.error) + '</div>' : '';
-    html = '<div class="card gh-col"><h3>Actions · ' + esc(repoName) + '</h3><div class="ag-list">' +
+    html = '<div class="card gh-col"><h3 class="gh-head">Actions · ' + esc(repoName) +
+        '<span class="gh-refresh" data-gh-refresh="1">' + (ghRefreshing ? '<i class="spin"></i>' : icon('repeat')) + '</span></h3><div class="ag-list">' +
         (runs || (g.error ? '' : '<div class="ag-empty">No workflow runs yet</div>')) + error + '</div></div>' +
       '<div class="card gh-col"><h3>My pull requests</h3><div class="ag-list">' +
         (prs || (g.error ? '' : '<div class="ag-empty">No open pull requests</div>')) + '</div></div>';
@@ -1939,7 +1946,7 @@ document.addEventListener('pointerdown', function (e) {
   startX = e.clientX; startY = e.clientY;
   startInBar = !!e.target.closest('#bar');
   startOnSlider = !!e.target.closest('[data-hue-bar], [data-hue-lbar]');   // dragging a light's brightness, not swiping
-  downEl = e.target.closest('.tile[data-i], .preset[data-i], #dial, .tab, #status, [data-set], [data-sys], [data-sec], [data-choice-slot], [data-media], [data-join], [data-guard], [data-kill], [data-ev], [data-sheet-close], [data-sheet-card], [data-audio], [data-audio-dev], [data-gh], #tabmore, [data-hue-room], [data-hue-toggle], [data-hue-ltoggle], [data-hue-scene], [data-hue-alloff], [data-hue-pair], [data-hue-bar], [data-hue-lbar], [data-tab-move], [data-tabs-reset], [data-tab-hide], [data-goto-media]');
+  downEl = e.target.closest('.tile[data-i], .preset[data-i], #dial, .tab, #status, [data-set], [data-sys], [data-sec], [data-choice-slot], [data-media], [data-join], [data-guard], [data-kill], [data-ev], [data-sheet-close], [data-sheet-card], [data-audio], [data-audio-dev], [data-gh], #tabmore, [data-hue-room], [data-hue-toggle], [data-hue-ltoggle], [data-hue-scene], [data-hue-alloff], [data-hue-pair], [data-hue-bar], [data-hue-lbar], [data-tab-move], [data-tabs-reset], [data-tab-hide], [data-goto-media], [data-gh-refresh]');
   if (downEl) downEl.classList.add('down');
 });
 document.addEventListener('pointercancel', function () { if (downEl) downEl.classList.remove('down'); downEl = null; });
@@ -1968,6 +1975,7 @@ document.addEventListener('pointerup', function (e) {
   else if (el.hasAttribute('data-tabs-reset')) post('/api/settings', { page_order: [], page_hidden: [] });
   else if (el.hasAttribute('data-tab-hide')) toggleTab(el.getAttribute('data-tab-hide'));
   else if (el.hasAttribute('data-goto-media')) gotoMedia();
+  else if (el.hasAttribute('data-gh-refresh')) { ghRefreshing = true; post('/api/github/refresh'); updateGitHub(); }
   else if (el.hasAttribute('data-hue-bar') || el.hasAttribute('data-hue-lbar')) { }       // handled by the drag code
   else if (el.hasAttribute('data-hue-toggle')) hueToggle(el.getAttribute('data-hue-toggle'), false);
   else if (el.hasAttribute('data-hue-ltoggle')) hueToggle(el.getAttribute('data-hue-ltoggle'), true);
@@ -2044,6 +2052,7 @@ function connect() {
     } else if (m.type === 'hue_dial') {
       showLightHud(d.room);
     } else if (m.type === 'github') {
+      ghRefreshing = false;
       github = d;
       updateGitHub();
     } else if (m.type === 'plex') {
