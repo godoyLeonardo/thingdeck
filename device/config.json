@@ -42,6 +42,7 @@
     {
       "name": "Media",
       "nowplaying": true,
+      "header": "clock",
       "tiles": [
         { "label": "Stop", "symbol": "stop", "media": "stop" },
         { "label": "Previous", "symbol": "prev", "media": "prev" },
