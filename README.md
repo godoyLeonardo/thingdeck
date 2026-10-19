@@ -20,7 +20,8 @@ as soon as you plug it in.
   direction, calls page (Discord or Meetings), themes, device info, and Reconnect / Restart / Reboot.
 - **Themes:** Dark, Black, Light, and the editor color schemes Nord, Dracula,
   Catppuccin, Gruvbox, Tokyo Night and Solarized, each with its own accent or
-  one of six accent colors.
+  one of six accent colors. Icons come in three styles (solid, outline, emoji) and three colors (neutral,
+  accent, or a color per tile category).
 - **Computer agent (optional):** a small background agent on the computer adds a
   **now playing** view to the Media page (cover, title, artist, album, app, live
   progress), a **clock**, and a **lock screen** with media controls (see
@@ -134,7 +135,7 @@ playing/paused and a live progress bar, with the media controls in a row below.
   The time shows in the bottom bar and, large with the date, on the standby
   screen; 24h/12h is under Settings → General → Clock.
 - **Lock screen:** while the computer is locked, the Car Thing shows the clock,
-  "🔒 Computer locked", what's playing, and media and volume buttons. Tiles,
+  "🔒 Computer locked", the cover and what's playing, and media buttons. Tiles,
   presets and dial modes that press keys are blocked while locked, so nothing gets
   typed into the password box; media keys, volume and the wheel still work.
 
@@ -200,9 +201,6 @@ switching, per-OS overrides) is in [device/README.md](device/README.md#configjso
 
 ## Known limitations
 
-- **Mic toggle:** Linux gets a real system-wide mic-mute key. Windows has none,
-  so it sends Win+Alt+K, which works in Teams and other apps that support Windows
-  11's call-mute shortcut. On macOS it sends Teams' mute (⌘⇧M).
 - **Linux overrides assume GNOME** (Fedora Workstation, Ubuntu). On KDE a few
   desktop shortcuts need adjusting.
 - **macOS F11:** the "Step into" preset sends F11, which macOS uses for Show

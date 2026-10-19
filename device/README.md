@@ -187,6 +187,8 @@ Top level:
 | `layout` | Host keyboard layout for typed text: `latam` or `us`. Settings can override it; `layout_<os>` sets one per OS |
 | `default_os` | Used until the host OS is detected: `windows`, `mac` or `linux` |
 | `other_os` | What a non-Windows host is taken to be: `linux` (default) or `mac` |
+| `icon_style` | `solid`, `outline` or `emoji` for `symbol` icons (Settings → Appearance can override it) |
+| `icon_color` | `neutral` (theme text color), `accent` or `category` (per action type) for `symbol` icons; Settings can override it |
 | `kiosk` | `false` keeps the stock UI |
 | `grid` | Tile grid `[columns, rows]`, default `[4, 2]`; pages can override it |
 | `hardware` | `knob`, `back`, `menu`: `{"tap": action, "hold": action}`; `dial_invert` |
@@ -194,8 +196,10 @@ Top level:
 | `presets` | Default 4 top-button actions |
 | `pages` | `[{"name", "presets"?, "grid"?, "nowplaying"?, "tiles": [...]}]`, or a choice slot (below) |
 
-Tiles and presets are actions plus `label`, optional `icon` (emoji), `hint`
-(small text; generated if missing) and `color`.
+Tiles and presets are actions plus `label`, optional `icon` (an emoji) or `symbol`
+(a built-in icon: `play`, `pause`, `prev`, `next`, `stop`, `mute`, `note`, drawn in
+the current icon style), `hint` (small text; generated if missing) and `color`. In
+the media card's control row, `"wide": true` makes a tile double width.
 
 ### Actions
 
