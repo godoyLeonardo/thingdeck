@@ -252,6 +252,40 @@ row ids; a tap posts `POST /api/github/open {id}`, and the link goes to the agen
 through the same `LinkOpener` as meeting links (the agent opens `https://github.com/`
 links and meeting links only).
 
+### Philips Hue
+
+The Car Thing has no network, so the agent talks to the Hue Bridge (local API v2,
+`https://<bridge>/clip/v2/…` with the `hue-application-key` header) and posts the
+result to `POST /api/hue`: `{state: "ok", rooms: [...]}` with each room and zone, its
+`grouped_light` id, on/brightness, its lights (on, brightness, CIE `xy` or `mirek`)
+and its scenes; or `{state: "none" | "pairing" | "error"}`. Structure (rooms, zones,
+devices, scenes) is read every 30 s, levels every 2 s and right after a command.
+The bridge's certificate comes from Philips' own authority, so the agent accepts it
+for the bridge's address only.
+
+Commands go the other way through a queue: the UI posts `POST /api/hue/command`
+(`{op: "group" | "light", id, on?, brightness?, mirek?}`, `{op: "scene", id}`,
+`{op: "all_off"}`, `{op: "pair"}`), and the agent collects them with
+`GET /api/commands` 4 times a second (once elsewhere). `HostHue` merges commands for
+the same light or group, so a drag or a fast dial turn sends one brightness, and
+updates its state right away (the next state from the agent corrects it). The
+widget `"lights"` draws a card per room (tinted with the average color of its lit
+lights, from `xy` or `mirek`); `POST /api/hue/select` makes a room the dial's
+target, and the action `{"hue": "up" | "down" | "toggle" | "all_off"}` (the
+**Lights** dial mode) changes it by 8 % per detent and sends a `hue_dial` event for
+the on-screen bar.
+
+Pairing: `{op: "pair"}` makes the agent find the bridge (Philips' discovery service),
+then ask `POST /api` for a key every 2 s for 30 s while you press the bridge's
+button; the address and key go to `hue.json` on the computer.
+
+### Tab order
+
+`state.json` keeps `page_order`, a list of page keys (a page's `name`, or a choice
+slot's `id`). `Pad.ordered_pages()` (and `orderedEntries()` in the UI) sorts
+`config.json`'s pages by it; pages it doesn't name keep their config order after
+the named ones, so new pages appear at the end. Changing it keeps the current page.
+
 ### Volume and audio devices
 
 The agent checks the default output's volume and mute, and the default output and
@@ -292,7 +326,7 @@ Symbols: `play pause prev next stop mute note` (media), `windows desktop snip
 clipboard folder smile activity lock search`, `command terminal files target pencil
 format sidebar`, `branch download diff list flask launch repeat interrupt`, `mic
 camera hand phone hangup headphones speaker inbox check`, and `x clock slash alert
-pr` (also used for GitHub statuses).
+pr` (also used for GitHub statuses), and `bulb power`.
 
 ### Actions
 
@@ -308,6 +342,7 @@ pr` (also used for GitHub statuses).
 | Page / dial mode | `{"page": "next"}`, `{"page": "Code"}`, `{"page": 0}`; `{"dial": "next"}`, `{"dial": "Volume"}` |
 | Dial press | `{"dial_press": true}` (runs the current dial mode's `press`) |
 | Message | `{"notify": "hello", "level": "ok"}` (shows a toast on the screen) |
+| Hue | `{"hue": "up"}` / `"down"` / `"toggle"` / `"all_off"` (the selected room; needs the agent paired with a Hue Bridge) |
 
 **Per-OS overrides:** any action can carry `windows`, `mac` and/or `linux`
 objects. When the host matches, the override replaces the action, keeping
@@ -338,8 +373,8 @@ page, or `adb shell`).
 | Method | Path | Body | Purpose |
 |---|---|---|---|
 | GET | `/api/ping` | | Health check (used by `shim.html`) |
-| GET | `/api/state` | | Config, state, presets, now playing, stats, agenda, audio, github |
-| GET | `/api/events` | | SSE stream: `state`, `config`, `fired`, `turn`, `hw`, `toast`, `nowplaying`, `stats`, `agenda`, `audio`, `github` |
+| GET | `/api/state` | | Config, state, presets, now playing, stats, agenda, audio, github, hue |
+| GET | `/api/events` | | SSE stream: `state`, `config`, `fired`, `turn`, `hw`, `toast`, `nowplaying`, `stats`, `agenda`, `audio`, `github`, `hue`, `hue_dial` |
 | GET | `/api/info` | | Uptime, temperature, memory, load, brightness |
 | POST | `/api/tap` | `{"page", "index"}` | Run a tile |
 | POST | `/api/preset` | `{"index"}` | Run a preset |
@@ -357,6 +392,10 @@ page, or `adb shell`).
 | POST | `/api/audio/set` | `{"id"}` | Make an output or input the default on the computer |
 | POST | `/api/github` | `{"repo", "runs", "prs", "error"?}` or `{"none": true}` | From the host agent |
 | POST | `/api/github/open` | `{"id"}` | Open a run or pull request on the computer |
+| POST | `/api/hue` | `{"state", "rooms"?, "error"?}` | From the host agent |
+| POST | `/api/hue/command` | `{"op", "id"?, "on"?, "brightness"?, "mirek"?}` | Queue a Hue command for the agent |
+| POST | `/api/hue/select` | `{"id"}` | Make a room the target of the Lights dial mode |
+| GET | `/api/commands` | | For the host agent: queued commands (`{"hue": [...]}`), emptied on read |
 | POST | `/api/run` | any action | Run an action |
 | POST | `/api/system` | `{"do": "reconnect" \| "restart" \| "reboot"}` | Reconnect USB (software replug) / restart service / reboot |
 
