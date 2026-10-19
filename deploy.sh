@@ -2,6 +2,7 @@
 # Push device/ to the Car Thing over ADB and restart the macro pad.
 #
 #   ./deploy.sh              copy files + restart the service
+#   ./deploy.sh all          the same, then reinstall the agent on this computer (after a git pull)
 #   ./deploy.sh config       copy config.json only (reloaded live, no restart)
 #   ./deploy.sh install      first install: copy files + enable start on boot + reboot
 #   ./deploy.sh uninstall    remove the boot hook and reboot to the stock UI
@@ -14,6 +15,7 @@ export MSYS_NO_PATHCONV=1          # stop Git Bash rewriting /var/... into C:/Pr
 ADB=${ADB:-adb}
 # Git Bash: adb.exe needs a Windows path (pwd -W); elsewhere plain pwd.
 SRC="$(cd "$(dirname "$0")/device" && { pwd -W 2>/dev/null || pwd; })"
+ROOT="$(cd "$(dirname "$0")" && pwd)"
 DEST=/var/macropad
 CHECK=/tmp/macropad-check
 FILES="macropad.py ics.py gadget.sh start.sh hook.sh macropad.conf config.json web/index.html web/shim.html tools/cdp.py"
@@ -38,8 +40,30 @@ push_files() {
     for f in $FILES; do
         "$ADB" push -q "$SRC/$f" "$DEST/$f"
     done
+    push_agent_versions
     "$ADB" shell "rm -rf $DEST/__pycache__"
     echo "files checked and pushed"
+}
+
+# The agents' fingerprints in this repo, so the Car Thing can tell when the agent on the
+# computer is older (the agent sends the fingerprint of its own script).
+fingerprint() { { sha1sum "$1" 2>/dev/null || shasum "$1"; } | cut -c1-12; }
+push_agent_versions() {
+    local tmp
+    tmp=$(mktemp)
+    printf '{"windows": "%s", "unix": "%s"}\n' "$(fingerprint "$ROOT/host/windows/nowplaying.ps1")" \
+        "$(fingerprint "$ROOT/host/unix/nowplaying.py")" > "$tmp"
+    "$ADB" push -q "$(cygpath -w "$tmp" 2>/dev/null || echo "$tmp")" "$DEST/agents.json"
+    rm -f "$tmp"
+}
+
+# Reinstall the agent on this computer (Windows from Git Bash, Linux, macOS).
+install_agent() {
+    case "$(uname -s)" in
+        MINGW*|MSYS*|CYGWIN*) powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(cygpath -w "$ROOT/host/windows/install.ps1")" ;;
+        Linux|Darwin) "$ROOT/host/unix/install.sh" ;;
+        *) echo "unknown system $(uname -s): install the agent from host/ by hand"; return 1 ;;
+    esac
 }
 
 # Restarting re-creates the USB device, which drops ADB for a few seconds,
@@ -63,6 +87,12 @@ case "${1:-}" in
         detached "supervisorctl restart macropad"
         echo "restarting (USB reconnects in ~10 s)"
         ;;
+    all)
+        push_files
+        detached "supervisorctl restart macropad"
+        echo "restarting (USB reconnects in ~10 s); now the agent:"
+        install_agent
+        ;;
     config)
         check_files
         "$ADB" push -q "$SRC/config.json" "$DEST/config.json"
@@ -84,6 +114,6 @@ case "${1:-}" in
         echo "boot hook removed (files stay in $DEST); rebooting to the stock UI"
         ;;
     *)
-        sed -n '2,9p' "$0"; exit 2
+        sed -n '2,10p' "$0"; exit 2
         ;;
 esac
