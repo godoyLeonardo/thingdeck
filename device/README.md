@@ -228,7 +228,7 @@ Top level:
 | `hardware` | `knob`, `back`, `menu`: `{"tap": action, "hold": action}`; `dial_invert` |
 | `dial_modes` | `[{"name", "cw", "ccw", "press"}]` |
 | `presets` | Default 4 top-button actions |
-| `pages` | `[{"name", "presets"?, "grid"?, "nowplaying"?, "header"?, "tiles": [...]}]`, or a choice slot (below) |
+| `pages` | `[{"name", "presets"?, "grid"?, "nowplaying"?, "header"?, "widgets"?, "tiles": [...]}]`, or a choice slot (below) |
 
 Tiles and presets are actions plus `label`, optional `icon` (an emoji) or `symbol`
 (a built-in icon drawn in the current icon style, or as an emoji in the emoji style),

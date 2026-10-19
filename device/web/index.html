@@ -176,6 +176,54 @@
   .icon.sym.own { color: var(--accent) !important; }   /* a tile's own "color" (hang up) beats the icon color */
   .np-art svg { width: 84px; height: 84px; color: var(--faint); }
   .np-empty { justify-content: center; }
+  /* page option "widgets": the agenda and the system monitor, side by side */
+  .dash { display: flex; height: 100%; min-height: 0; }
+  .dash > * + * { margin-left: 8px; }
+  .agenda { flex: 1.15; min-width: 0; min-height: 0; padding: 10px 6px 4px 14px; }
+  .ag-list { flex: 1; min-height: 0; overflow-y: auto; padding-right: 8px; }
+  .ag-list::-webkit-scrollbar { display: none; }
+  .ag-day { font: 600 calc(11px * var(--ts)) GeistMono, monospace; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--muted); margin: 10px 0 2px; }
+  .ag-day:first-child { margin-top: 4px; }
+  .ev { display: flex; align-items: center; min-height: 50px; padding: 3px 8px; margin: 0 -8px; border-radius: 10px; }
+  .ev.next { background: var(--acc-soft); }
+  .ev-time { flex: none; width: 66px; font-size: calc(15px * var(--ts)); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .ev-time small { display: block; font-size: .72em; font-weight: 500; color: var(--muted); }
+  .ev.next .ev-time { color: var(--acc); }
+  .ev-main { flex: 1; min-width: 0; }
+  .ev-title { font-size: calc(16px * var(--ts)); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ev-sub { font-size: calc(12.5px * var(--ts)); color: var(--muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ev-sub b { color: var(--acc); font-weight: 600; }
+  .ev-join { flex: none; width: 46px; height: 40px; margin-left: 8px; border-radius: 10px; background: var(--tile-hi);
+    color: var(--text); display: flex; align-items: center; justify-content: center; }
+  .ev.next .ev-join { background: var(--acc); color: var(--on-acc); }
+  .ev-join svg { width: 22px; height: 22px; }
+  .ev-join .emoji { font-size: 20px; }
+  .ev-join.down, .ev-join.fire { filter: brightness(1.2); }
+  .agenda.cols { display: flex; padding: 0; }
+  .ag-col { flex: 1; min-width: 0; padding: 10px 6px 4px 14px; }
+  .ag-col + .ag-col { margin-left: 8px; }
+  .cols .ev { min-height: 58px; }
+  .ev-when { font-size: calc(13px * var(--ts)); font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .ev.next .ev-when { color: var(--acc); }
+  .ag-empty { color: var(--muted); font-size: calc(14px * var(--ts)); line-height: 1.4; margin-top: 6px; }
+  .ag-empty b { display: block; color: var(--text); font-size: calc(17px * var(--ts)); margin-bottom: 4px; }
+  .monitor { flex: 1; min-width: 0; display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: minmax(0, 1fr); grid-gap: 8px; }
+  .monitor.half { grid-template-columns: 1fr 1fr; grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); }
+  .mcard { background: var(--tile); border-radius: 16px; padding: 10px 12px 0; display: flex; flex-direction: column;
+    min-width: 0; min-height: 0; overflow: hidden; }
+  .mcard.wide { grid-column: span 2; }
+  .mcard.msg { grid-column: 1 / -1; grid-row: 1 / -1; padding-bottom: 10px; }
+  .m-label { font: 600 calc(11px * var(--ts)) GeistMono, monospace; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  .m-value { font-size: calc(30px * var(--ts)); font-weight: 700; letter-spacing: -.02em; margin-top: 2px; white-space: nowrap;
+    font-variant-numeric: tabular-nums; }
+  .m-value small { font-size: .55em; font-weight: 600; color: var(--muted); margin-left: 2px; letter-spacing: 0; }
+  .m-detail { font: 500 calc(12px * var(--ts)) GeistMono, monospace; color: var(--muted); white-space: nowrap; overflow: hidden;
+    text-overflow: ellipsis; }
+  .m-spark { flex: 1; min-height: 20px; width: calc(100% + 24px); margin: 6px -12px 0; display: block; }
+  .m-spark polyline { fill: none; stroke: var(--acc); stroke-width: 2; vector-effect: non-scaling-stroke; stroke-linejoin: round; }
+  .m-spark polygon { fill: var(--acc-soft); }
+  .m-spark polyline.tx { stroke: var(--muted); stroke-width: 1.5; }
   .np-empty .np-title { margin-top: 0; }
   .np-empty .np-album { margin-top: 8px; white-space: normal; }
   .tile.mini .label { font-size: calc(14px * var(--ts)); font-weight: 600; margin-top: 4px; max-width: 100%; text-align: center;
@@ -398,6 +446,8 @@ function load() {
   return fetch('/api/state').then(function (r) { return r.json(); }).then(function (j) {
     cfg = j.config || cfg; st = j.state || st; presets = j.presets || [];
     setNowPlaying(j.nowplaying);
+    stats = j.stats || null;
+    agenda = j.agenda || agenda;
     render();
   });
 }
@@ -488,7 +538,9 @@ function render() {
   var page = pages[st.page] || { tiles: [] };
   var grid = page.grid || cfg.grid || [4, 2];
   var g = $('grid');
-  if (page.nowplaying) {
+  if (page.widgets) {
+    renderWidgets(page, g);
+  } else if (page.nowplaying) {
     renderNowPlaying(page, g);
   } else {
   g.removeAttribute('data-np');
@@ -867,6 +919,146 @@ function updateNowPlaying() {
 }
 setInterval(updateNowPlaying, 500);
 
+// ---- the agenda and system monitor (a page with "widgets": ["agenda", "monitor"]), both
+// from the computer agent: its calendars (read on the device) and its stats every 2 s.
+var stats = null, agenda = { state: 'unknown', events: [] };
+function renderWidgets(page, g) {
+  var key = 'w|' + page.widgets.join(',') + '|' + st.page;
+  if (g.getAttribute('data-np') !== key) {
+    g.setAttribute('data-np', key);
+    g.style.gridTemplateColumns = '1fr';
+    g.style.gridTemplateRows = 'minmax(0, 1fr)';     // the lists scroll inside instead of growing the page
+    g.innerHTML = '<div class="dash">' + page.widgets.map(function (w) {
+      if (w === 'agenda' && page.widgets.length === 1) return '<div class="agenda cols" id="agenda"></div>';   // a column per day
+      if (w === 'agenda') return '<div class="card agenda"><h3>Agenda</h3><div class="ag-list" id="agenda"></div></div>';
+      if (w === 'monitor') return '<div class="monitor' + (page.widgets.length > 1 ? ' half' : '') + '" id="monitor"></div>';
+      return '';
+    }).join('') + '</div>';
+  }
+  updateAgenda();
+  updateMonitor();
+}
+function localParts(ms) {          // this Chromium has no Intl: shift by the computer's offset, read as UTC
+  return new Date(ms + (st.clock ? st.clock.utc_offset * 1000 : 0));
+}
+function fmtClock(ms) {
+  var d = localParts(ms), h = d.getUTCHours(), m = d.getUTCMinutes(), mm = (m < 10 ? '0' : '') + m;
+  if (st.settings && st.settings.clock_24h === false) return ((h + 11) % 12 + 1) + ':' + mm + ' ' + (h < 12 ? 'AM' : 'PM');
+  return (h < 10 ? '0' : '') + h + ':' + mm;
+}
+function dayNumber(ms) { return Math.floor(localParts(ms).getTime() / 86400000); }
+function dayLabel(ms) {
+  var diff = dayNumber(ms) - dayNumber(Date.now()), d = localParts(ms);
+  if (diff === 0) return 'Today';
+  if (diff === 1) return 'Tomorrow';
+  return DAYS[d.getUTCDay()].slice(0, 3) + ' ' + d.getUTCDate() + ' ' + MONTHS[d.getUTCMonth()].slice(0, 3);
+}
+function untilText(ms) {
+  var min = Math.max(1, Math.round((ms - Date.now()) / 60000));
+  return min < 60 ? min + ' min' : Math.floor(min / 60) + ' h' + (min % 60 ? ' ' + (min % 60) + ' min' : '');
+}
+// One event. In the list the time is its own column; in a day column (cols) it goes
+// above the title, which leaves the narrow column's width to the title.
+function eventHTML(e, isNext, cols) {
+  var now = Date.now(), when = e.all_day ? 'All day' : fmtClock(e.start) + (cols ? ' – ' + fmtClock(e.end) : '');
+  var status = !isNext ? '' : e.start <= now ? '<b>Now</b>' : e.start - now < 12 * 3600000 ? '<b>In ' + untilText(e.start) + '</b>' : '';
+  var sub = cols ? [status, esc(e.where)] : [status, e.all_day ? '' : 'until ' + fmtClock(e.end), esc(e.where)];
+  sub = sub.filter(function (x) { return x; }).join(' · ');
+  return '<div class="ev' + (isNext ? ' next' : '') + '">' +
+    (cols ? '' : '<div class="ev-time">' + (e.all_day ? '<small>All day</small>' : when) + '</div>') +
+    '<div class="ev-main">' + (cols ? '<div class="ev-when">' + when + '</div>' : '') +
+      '<div class="ev-title">' + esc(e.title) + '</div>' + (sub ? '<div class="ev-sub">' + sub + '</div>' : '') + '</div>' +
+    (e.link ? '<div class="ev-join" data-join="' + esc(e.id) + '">' + icon('camera') + '</div>' : '') + '</div>';
+}
+function updateAgenda() {
+  var box = $('agenda');
+  if (!box) return;
+  var cols = box.classList.contains('cols');
+  var now = Date.now(), today = dayNumber(now), events = (agenda.events || []).filter(function (e) { return e.end > now; });
+  var html = '', day = null, next = null;
+  for (var i = 0; i < events.length && !next; i++) if (!events[i].all_day) next = events[i];
+  if (cols && events.length) {
+    // Today | Tomorrow | the rest of the week, each a card that scrolls on its own.
+    var parts = ['', '', ''], laterDay = null;
+    events.forEach(function (e) {
+      var d = dayNumber(Math.max(e.start, now)), c = Math.min(2, d - today);
+      if (c === 2 && d !== laterDay) { laterDay = d; parts[2] += '<div class="ag-day">' + dayLabel(Math.max(e.start, now)) + '</div>'; }
+      parts[c] += eventHTML(e, e === next, true);
+    });
+    var titles = ['Today', 'Tomorrow', 'Later this week'];
+    html = parts.map(function (p, c) {
+      return '<div class="card ag-col"><h3>' + titles[c] + '</h3><div class="ag-list">' +
+        (p || '<div class="ag-empty">' + (c === 0 ? 'Nothing else today' : 'Nothing planned') + '</div>') + '</div></div>';
+    }).join('');
+  }
+  if (!cols) events.forEach(function (e) {
+    var d = dayNumber(Math.max(e.start, now));
+    if (d !== day) { day = d; html += '<div class="ag-day">' + dayLabel(Math.max(e.start, now)) + '</div>'; }
+    html += eventHTML(e, e === next, false);
+  });
+  if (!events.length) {
+    var msg;
+    if (agenda.state === 'none') msg = '<b>No calendar yet</b>Put your Google Calendar’s secret iCal address in calendars.txt on the computer (see README).';
+    else if (agenda.error) msg = '<b>Couldn’t get the calendar</b>' + esc(agenda.error);
+    else if (agenda.state === 'ok') msg = '<b>Nothing coming up</b>No events in the next 7 days.';
+    else msg = st.clock ? 'Waiting for the calendar…' : '<b>No computer agent</b>Install it to see your calendar here (see README).';
+    html = cols ? '<div class="card ag-col"><h3>Calendar</h3><div class="ag-empty">' + msg + '</div></div>'
+                : '<div class="ag-empty">' + msg + '</div>';
+  }
+  if (box.innerHTML !== html) {
+    var top = box.scrollTop;
+    box.innerHTML = html;
+    box.scrollTop = top;
+  }
+}
+setInterval(updateAgenda, 20000);
+function fmtRate(b) {
+  if (b == null) return '–';
+  if (b >= 1e6) return (b / 1e6).toFixed(b >= 1e7 ? 0 : 1) + '<small>MB/s</small>';
+  return (b >= 1e3 ? Math.round(b / 1e3) : 0) + '<small>KB/s</small>';
+}
+function fmtGB(mb) { return (mb / 1024).toFixed(mb >= 10240 ? 0 : 1); }
+// A graph of the last 2 minutes (60 samples), right-aligned; gaps repeat the previous value.
+function spark(values, max, cls, area) {
+  var pts = [], last = 0, n = values ? values.length : 0;
+  for (var i = 0; i < n; i++) {
+    if (values[i] != null) last = values[i];
+    pts.push(((60 - n + i) / 59 * 100).toFixed(1) + ',' + (30 - Math.min(1, last / max) * 28).toFixed(1));
+  }
+  if (pts.length < 2) return '';
+  return (area ? '<polygon points="' + pts[0].split(',')[0] + ',30 ' + pts.join(' ') + ' 100,30"/>' : '') +
+    '<polyline class="' + cls + '" points="' + pts.join(' ') + '"/>';
+}
+function mcard(label, value, detail, graph, wide) {
+  return '<div class="mcard' + (wide ? ' wide' : '') + '"><div class="m-label">' + label + '</div>' +
+    '<div class="m-value">' + value + '</div><div class="m-detail">' + (detail || '&nbsp;') + '</div>' +
+    '<svg class="m-spark" viewBox="0 0 100 30" preserveAspectRatio="none">' + graph + '</svg></div>';
+}
+function updateMonitor() {
+  var box = $('monitor');
+  if (!box) return;
+  var s = stats, h = s && s.history || {};
+  if (!s) {
+    box.innerHTML = '<div class="mcard msg"><div class="m-label">System</div><div class="ag-empty">' +
+      (st.clock ? 'Waiting for stats from the computer…' : '<b>No computer agent</b>Install it to see CPU, memory, GPU and network here (see README).') +
+      '</div></div>';
+    return;
+  }
+  var pct = function (v) { return v == null ? '–' : Math.round(v) + '<small>%</small>'; };
+  var mem = s.mem_total_mb ? s.mem_used_mb / s.mem_total_mb * 100 : null;
+  var netMax = Math.max.apply(null, [64e3].concat((h.net_rx || []).concat(h.net_tx || []).filter(function (v) { return v != null; })));
+  var html = mcard('CPU', pct(s.cpu), s.cpu_temp != null ? s.cpu_temp + ' °C' : '', spark(h.cpu, 100, 'v', true)) +
+    mcard('Memory', pct(mem), s.mem_total_mb ? fmtGB(s.mem_used_mb) + ' / ' + fmtGB(s.mem_total_mb) + ' GB' : '', spark(h.mem, 100, 'v', true));
+  if (s.gpu != null) {
+    html += mcard('GPU', pct(s.gpu), [s.gpu_temp != null ? s.gpu_temp + ' °C' : '',
+      s.gpu_mem_total_mb ? fmtGB(s.gpu_mem_used_mb) + ' / ' + fmtGB(s.gpu_mem_total_mb) + ' GB' : ''].filter(function (x) { return x; }).join(' · '),
+      spark(h.gpu, 100, 'v', true));
+  }
+  html += mcard('Network ↓', fmtRate(s.net_rx), '↑ ' + fmtRate(s.net_tx).replace(/<\/?small>/g, ' ').trim(),
+    spark(h.net_rx, netMax, 'v', true) + spark(h.net_tx, netMax, 'tx', false), s.gpu == null);
+  box.innerHTML = html;
+}
+
 // ---- feedback
 function fire(el) {
   if (!el) return;
@@ -972,7 +1164,7 @@ function updateLock() {
 var startX = 0, startY = 0, downEl = null;
 document.addEventListener('pointerdown', function (e) {
   startX = e.clientX; startY = e.clientY;
-  downEl = e.target.closest('.tile[data-i], .preset[data-i], #dial, .tab, #status, [data-set], [data-sys], [data-sec], [data-choice-slot], [data-media]');
+  downEl = e.target.closest('.tile[data-i], .preset[data-i], #dial, .tab, #status, [data-set], [data-sys], [data-sec], [data-choice-slot], [data-media], [data-join]');
   if (downEl) downEl.classList.add('down');
 });
 document.addEventListener('pointercancel', function () { if (downEl) downEl.classList.remove('down'); downEl = null; });
@@ -991,7 +1183,8 @@ document.addEventListener('pointerup', function (e) {
   }
   if (!el || Math.abs(dx) > 25 || Math.abs(dy) > 25) return;
   var i = parseInt(el.getAttribute('data-i'), 10);
-  if (el.hasAttribute('data-media')) post('/api/run', { media: el.getAttribute('data-media') });
+  if (el.hasAttribute('data-join')) { fire(el); post('/api/calendar/open', { id: el.getAttribute('data-join') }); }
+  else   if (el.hasAttribute('data-media')) post('/api/run', { media: el.getAttribute('data-media') });
   else   if (el.hasAttribute('data-choice-slot')) {
     var choices = JSON.parse(JSON.stringify((st.settings || {}).page_choices || {}));
     choices[el.getAttribute('data-choice-slot')] = JSON.parse(el.getAttribute('data-val'));   // null = default
@@ -1044,6 +1237,12 @@ function connect() {
       setNowPlaying(d);
       if (!!np !== had || (np && [np.art, np.title, np.artist, np.album, np.app, np.playing].join('|') !== track)) render();
       else updateNowPlaying();
+    } else if (m.type === 'stats') {
+      stats = d;
+      updateMonitor();
+    } else if (m.type === 'agenda') {
+      agenda = d;
+      updateAgenda();
     } else if (m.type === 'toast') {
       toast(d.text, d.level);
     }
