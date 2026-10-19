@@ -835,7 +835,7 @@ class GitHubStatus:
         return bool(link)
 
 
-PLEX_TTL = 30           # seconds without an update before the Plex data counts as gone
+PLEX_TTL = 75           # seconds without an update before the Plex data counts as gone (off screen: every 30 s)
 PLEX_POSTERS = 16       # posters kept for the streams list
 PLEX_FIELDS = ('server', 'sessions', 'load', 'net', 'libraries', 'activities')
 
@@ -1304,6 +1304,14 @@ class Pad:
     # The Car Thing cannot wake the computer: with the host asleep the Amlogic USB PHY is
     # in low-power mode and never drives the resume signal, and asking the controller to
     # send it locked it up until a power cycle. So nothing touches the controller here.
+    def visible_widgets(self):
+        """The live panels on screen ("lights", "monitor", "github", …): the agent updates those
+        often and the rest slowly. None on the standby or lock screen."""
+        if self.standby() or self.host.locked:
+            return []
+        pages = self.pages()
+        return list(pages[self.page].get('widgets') or []) if self.page < len(pages) else []
+
     def standby(self):
         return self.mode == 'ok' and self.hid.status != 'connected'
 
@@ -1496,7 +1504,8 @@ class Handler(BaseHTTPRequestHandler):
             self._send(200, pad.agenda.details.get(eid) or {'notes': '', 'calendar': ''})
         elif path == '/api/commands':
             refresh, pad.github.refresh = pad.github.refresh, False
-            self._send(200, {'hue': pad.hue.take(), 'github_refresh': refresh})   # the agent collects these several times a second
+            self._send(200, {'hue': pad.hue.take(), 'github_refresh': refresh,   # the agent collects these several times a second
+                             'visible': pad.visible_widgets()})
         elif path == '/api/events':
             self._events()
         else:
