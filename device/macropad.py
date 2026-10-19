@@ -44,6 +44,11 @@ def log(*args):
     print(time.strftime('%H:%M:%S'), *args, flush=True)
 
 
+def page_key(entry):
+    """What the tab order calls a config.json page entry: a choice slot's id, else its name."""
+    return entry.get('id') if 'choices' in entry else entry.get('name')
+
+
 # ---------------------------------------------------------------- HID tables
 
 REPORT_DESCRIPTOR = bytes([
@@ -592,6 +597,107 @@ class HostAudio:
             self.ui.publish('audio', None)
 
 
+HUE_OPS = ('pair', 'group', 'light', 'scene', 'all_off')
+HUE_STEP = 8            # brightness % per dial detent
+
+
+class HostHue:
+    """Philips Hue, through the host agent: the Car Thing has no network, so the agent
+    talks to the Hue Bridge and posts its rooms, zones, lights and scenes here. Commands
+    from the UI and the dial wait in a queue the agent collects several times a second
+    (GET /api/commands); changes to the same thing merge, so a fast dial turn sends one
+    brightness, not dozens. The UI is updated right away and corrected by the next state."""
+
+    def __init__(self, ui):
+        self.ui = ui
+        self.lock = threading.Lock()
+        self.published = {'state': 'unknown'}
+        self.commands = []
+        self.selected = None      # the room/zone the dial controls
+
+    def update(self, body):
+        state = str(body.get('state') or 'error')
+        data = {'state': state, 'error': str(body['error']) if body.get('error') else None,
+                'rooms': body.get('rooms') if isinstance(body.get('rooms'), list) else []}
+        with self.lock:
+            self.published = data
+        self.publish()
+
+    def publish(self):
+        self.ui.publish('hue', self.snapshot())
+
+    def snapshot(self):
+        return dict(self.published, selected=self.selected)
+
+    def room(self, rid):
+        return next((r for r in self.published.get('rooms') or [] if r.get('id') == rid), None)
+
+    def command(self, cmd):
+        """Queue a command from the UI: {op, id?, on?, brightness?, mirek?}."""
+        if not isinstance(cmd, dict) or cmd.get('op') not in HUE_OPS:
+            raise ValueError('bad hue command')
+        cmd = {k: cmd[k] for k in ('op', 'id', 'on', 'brightness', 'mirek') if k in cmd}
+        with self.lock:
+            same = next((c for c in self.commands if c['op'] == cmd['op'] and c.get('id') == cmd.get('id')
+                         and cmd['op'] in ('group', 'light')), None)
+            if same:
+                same.update(cmd)
+            else:
+                self.commands.append(cmd)
+            self.optimistic(cmd)
+        self.publish()
+
+    def optimistic(self, cmd):
+        """Show a change before the bridge confirms it."""
+        targets = []
+        for room in self.published.get('rooms') or []:
+            if cmd['op'] == 'group' and room.get('group') == cmd.get('id'):
+                targets.append(room)
+            if cmd['op'] == 'all_off':
+                targets.append(room)
+            if cmd['op'] == 'light':
+                targets += [l for l in room.get('lights') or [] if l.get('id') == cmd.get('id')]
+        for t in targets:
+            if cmd['op'] == 'all_off':
+                t['on'] = False
+            if 'on' in cmd:
+                t['on'] = bool(cmd['on'])
+            if 'brightness' in cmd:
+                t['brightness'] = cmd['brightness']
+
+    def take(self):
+        with self.lock:
+            commands, self.commands = self.commands, []
+        return commands
+
+    def select(self, rid):
+        if self.room(rid):
+            self.selected = rid
+            self.publish()
+
+    def action(self, what):
+        """The dial or a tile: {"hue": "up" | "down" | "toggle" | "all_off"} on the selected room."""
+        if what == 'all_off':
+            return self.command({'op': 'all_off'})
+        rooms = self.published.get('rooms') or []
+        room = self.room(self.selected) or (rooms[0] if rooms else None)
+        if not room or not room.get('group'):
+            raise ValueError('no Hue room yet')
+        self.selected = room['id']
+        brightness = float(room.get('brightness') or 0) if room.get('on') else 0.0
+        if what == 'toggle':
+            self.command({'op': 'group', 'id': room['group'], 'on': not room.get('on')})
+        elif what in ('up', 'down'):
+            target = brightness + (HUE_STEP if what == 'up' else -HUE_STEP)
+            if target < 1:
+                self.command({'op': 'group', 'id': room['group'], 'on': False})
+            else:
+                self.command({'op': 'group', 'id': room['group'], 'on': True, 'brightness': min(100.0, target)})
+        else:
+            raise ValueError('unknown hue action %r' % what)
+        self.ui.publish('hue_dial', {'room': room['id']})
+
+
 AGENDA_DAYS = 7         # today and the next days
 AGENDA_MAX = 80         # events sent to the UI
 EPOCH = datetime.datetime(1970, 1, 1)
@@ -776,6 +882,7 @@ class Pad:
         self.agenda = Agenda(self.ui, self.host, self.opener)
         self.github = GitHubStatus(self.ui, self.opener)
         self.audio = HostAudio(self.ui)
+        self.hue = HostHue(self.ui)
         self.hid = Hid(lambda status: self.on_usb_status(status))
         self.config = {}
         self.config_mtime = 0
@@ -790,7 +897,7 @@ class Pad:
                          'brightness_auto': True, 'brightness': 180,
                          'theme': 'dark', 'accent': 'theme', 'page_choices': {},
                          'clock_24h': True, 'icon_style': None,
-                         'icon_color': None}
+                         'icon_color': None, 'page_order': []}
         self._als_running = None    # stock light-sensor service state, as last set by us
         self._dimmed = False
         self._dim_timer = None
@@ -843,11 +950,17 @@ class Pad:
             'icon_style': lambda v: v is None or v in ICON_STYLES,
             'icon_color': lambda v: v is None or v in ICON_COLORS,
             'page_choices': self._valid_page_choices,
+            'page_order': lambda v: isinstance(v, list) and len(v) <= 64 and all(isinstance(x, str) for x in v),
             'brightness_auto': lambda v: isinstance(v, bool),
             'brightness': lambda v: isinstance(v, int) and BRIGHTNESS_MIN <= v <= 255,
         }
         if key not in valid or not valid[key](value):
             raise ValueError('bad setting %s=%r' % (key, value))
+        if key == 'page_order':          # stay on the same page when the tabs move
+            current = page_key(self.ordered_pages()[self.page]) if self.page < len(self.ordered_pages()) else None
+            self.settings[key] = value
+            keys = [page_key(p) for p in self.ordered_pages()]
+            self.page = keys.index(current) if current in keys else 0
         self.settings[key] = value
         if key.startswith('brightness'):
             self.apply_brightness()
@@ -970,8 +1083,15 @@ class Pad:
         return True
 
     def pages(self):
-        """The pages as shown: a slot with "choices" shows one of them (see page_choice)."""
-        return [self.page_choice(p)[1] if 'choices' in p else p for p in self.config.get('pages', [])]
+        """The pages as shown: in the Settings order, and a slot with "choices" shows one of them (see page_choice)."""
+        return [self.page_choice(p)[1] if 'choices' in p else p for p in self.ordered_pages()]
+
+    def ordered_pages(self):
+        """config.json's page entries in the order picked in Settings → Tabs. Entries the order
+        doesn't name (new in config.json) keep their config order, after the named ones."""
+        entries = self.config.get('pages', [])
+        rank = {key: i for i, key in enumerate(self.settings.get('page_order') or [])}
+        return [p for _, p in sorted(enumerate(entries), key=lambda e: (rank.get(page_key(e[1]), len(rank)), e[0]))]
 
     def page_choice(self, slot):
         """(name, page) a choice slot shows: the one picked in Settings, else its default
@@ -1082,6 +1202,8 @@ class Pad:
         elif 'dial_press' in a:
             mode = self.dials()[self.dial] if self.dials() else {}
             self._run(mode.get('press') or {})
+        elif 'hue' in a:
+            self.hue.action(a['hue'])
         elif 'notify' in a:
             self.toast(a['notify'], a.get('level', 'info'))
         else:
@@ -1292,7 +1414,8 @@ class Handler(BaseHTTPRequestHandler):
         elif path == '/api/state':
             self._send(200, {'config': pad.config, 'state': pad.state(), 'presets': pad.presets(),
                              'nowplaying': pad.np.meta, 'stats': pad.stats.snapshot(), 'agenda': pad.agenda.published,
-                             'audio': pad.audio.state, 'github': pad.github.published})
+                             'audio': pad.audio.state, 'github': pad.github.published,
+                             'hue': pad.hue.snapshot()})
         elif path == '/api/nowplaying':
             self._send(200, {'nowplaying': pad.np.meta})
         elif path == '/api/nowplaying/art':
@@ -1304,6 +1427,8 @@ class Handler(BaseHTTPRequestHandler):
         elif path == '/api/calendar/event':
             eid = (urllib.parse.parse_qs(self.path.partition('?')[2]).get('id') or [''])[0]
             self._send(200, pad.agenda.details.get(eid) or {'notes': '', 'calendar': ''})
+        elif path == '/api/commands':
+            self._send(200, {'hue': pad.hue.take()})        # the agent collects these several times a second
         elif path == '/api/events':
             self._events()
         else:
@@ -1377,6 +1502,15 @@ class Handler(BaseHTTPRequestHandler):
             pad.stats.update(body)
             return self._send(200, {'ok': True, 'open': pad.opener.take(), 'kill': pad.stats.take_kill(),
                                     'need_calendar': pad.agenda.needs_calendar()})
+        elif path == '/api/hue':
+            pad.hue.update(body)
+        elif path == '/api/hue/command':
+            try:
+                pad.hue.command(body)
+            except ValueError as e:
+                return self._send(400, {'error': str(e)})
+        elif path == '/api/hue/select':
+            pad.hue.select(str(body.get('id')))
         elif path == '/api/github':
             pad.github.update(body)
         elif path == '/api/github/open':

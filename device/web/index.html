@@ -212,6 +212,56 @@
   .ag-empty { color: var(--muted); font-size: calc(14px * var(--ts)); line-height: 1.4; margin-top: 6px; }
   .ag-empty b { display: block; color: var(--text); font-size: calc(17px * var(--ts)); margin-bottom: 4px; }
   /* widget "github": a repo's latest workflow runs and your open pull requests */
+  /* widget "lights": Philips Hue rooms and zones (--lc: the color the lights show) */
+  .lights { flex: 1; min-width: 0; display: grid; grid-template-columns: repeat(3, 1fr); grid-auto-rows: 124px; grid-gap: 8px;
+    overflow-y: auto; align-content: start; }
+  .lights::-webkit-scrollbar { display: none; }
+  .lights.msg { display: flex; }
+  .lcard { position: relative; overflow: hidden; display: flex; flex-direction: column; padding: 12px 14px; border-radius: 16px;
+    background: var(--tile); border: 2px solid transparent; }
+  .lcard.sel { border-color: var(--acc); }
+  .lglow { position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; opacity: .3; transition: opacity .3s;
+    background: radial-gradient(circle at 90% 0%, var(--lc) 0%, transparent 75%); }
+  .lcard.off .lglow { opacity: 0; }
+  .lc-top { position: relative; display: flex; align-items: center; }
+  .lc-name { flex: 1; min-width: 0; font-size: calc(18px * var(--ts)); font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .lc-sub { position: relative; font-size: calc(12.5px * var(--ts)); color: var(--muted); margin-top: 2px; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis; }
+  .lcard.alloff { align-items: center; justify-content: center; color: var(--muted); font-size: calc(16px * var(--ts)); font-weight: 600; }
+  .lcard.alloff svg { width: 30px; height: 30px; margin-bottom: 6px; }
+  .lcard.down, .lcard.fire { background: var(--tile-hi); }
+  .hswitch { flex: none; position: relative; width: 54px; height: 32px; margin-left: 10px; border-radius: 16px; background: var(--tile-hi);
+    transition: background .15s; }
+  .hswitch::after { content: ''; position: absolute; top: 4px; left: 4px; width: 24px; height: 24px; border-radius: 50%;
+    background: var(--muted); transition: transform .15s, background .15s; }
+  .hswitch.on { background: var(--acc); }
+  .hswitch.on::after { transform: translateX(22px); background: var(--on-acc); }
+  .hbar { position: relative; margin-top: auto; height: 32px; border-radius: 10px; background: var(--tile-hi); overflow: hidden; touch-action: none; }
+  .hbar i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--lc, var(--acc)); opacity: .85; }
+  .lcard.off .hbar i, .hl-row.off .hbar i { opacity: .2; }
+  .hbar span { position: absolute; left: 10px; top: 0; bottom: 0; display: flex; align-items: center; font: 600 calc(13px * var(--ts)) GeistMono, monospace;
+    color: var(--text); text-shadow: 0 1px 3px var(--tile); }
+  .hue-msg { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; padding: 0 30px; }
+  .hue-msg .btn { flex: none; margin-top: 16px; padding: 0 28px; background: var(--acc); color: var(--on-acc); height: 48px; line-height: 48px; }
+  /* the room card (a sheet) */
+  .sh-head { display: flex; align-items: center; margin-top: 6px; }
+  .sh-head .sh-title { flex: 1; min-width: 0; margin-top: 0; }
+  .sh-scroll { flex: 1; min-height: 0; overflow-y: auto; margin-top: 10px; }
+  .sh-scroll::-webkit-scrollbar { display: none; }
+  .sh-scroll .m-label { margin: 12px 0 6px; }
+  .scenes { display: flex; flex-wrap: wrap; }
+  .scene { height: 40px; line-height: 40px; padding: 0 16px; margin: 0 8px 8px 0; border-radius: 20px; background: var(--tile-hi);
+    font-size: calc(14px * var(--ts)); font-weight: 600; }
+  .scene.on { background: var(--acc-soft); color: var(--acc); }
+  .scene.down { filter: brightness(1.2); }
+  .hl-row { display: flex; align-items: center; min-height: 48px; }
+  .hl-row .hl-name { width: 170px; font-size: calc(15px * var(--ts)); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hl-row .hbar { flex: 1; margin: 0 0 0 12px; height: 30px; }
+  .hl-row .hswitch { margin-left: 12px; }
+  #huect { width: 100%; margin: 0; }
+  #huect::-webkit-slider-runnable-track { height: 10px; border-radius: 5px;
+    background: linear-gradient(to right, #cfe3ff, #fff6e6, #ffc46b, #ff9a3c); }
+  #huect::-webkit-slider-thumb { margin-top: -10px; border: 3px solid var(--tile); }
   .gh { flex: 1; min-width: 0; display: flex; }
   .gh-col { flex: 1; min-width: 0; min-height: 0; padding: 10px 6px 4px 14px; }
   .gh-col + .gh-col { margin-left: 8px; }
@@ -355,6 +405,16 @@
   body.settings #grid { display: none; }
   #snav { align-self: flex-start; margin-bottom: 8px; }
   #snav div { padding: 0 16px; }
+  #sec-tabs { grid-template-rows: minmax(0, 1fr); }        /* the list scrolls inside its card */
+  #sec-tabs .card { min-height: 0; }
+  .to-row { display: flex; align-items: center; min-height: 46px; }
+  .to-n { width: 28px; font: 500 calc(13px * var(--ts)) GeistMono, monospace; color: var(--muted); }
+  .to-name { flex: 1; min-width: 0; font-size: calc(16px * var(--ts)); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .to-btn { flex: none; width: 50px; height: 38px; margin-left: 6px; border-radius: 10px; background: var(--tile-hi);
+    display: flex; align-items: center; justify-content: center; }
+  .to-btn svg { width: 22px; height: 22px; }
+  .to-btn.off { opacity: .25; }
+  .to-btn.down { filter: brightness(1.3); }
   .sec { flex: 1; display: none; grid-template-columns: 1fr 1fr; grid-gap: 8px; min-height: 0; }
   .sec.on { display: grid; }
   #themes { display: grid; grid-template-columns: repeat(3, 1fr); grid-gap: 8px; margin-top: 4px; }
@@ -479,7 +539,7 @@
   </div>
   <div id="grid"></div>
   <div id="settings">
-    <div id="snav" class="seg"><div data-sec="general">General</div><div data-sec="appearance">Appearance</div><div data-sec="device">Device</div></div>
+    <div id="snav" class="seg"><div data-sec="general">General</div><div data-sec="appearance">Appearance</div><div data-sec="tabs">Tabs</div><div data-sec="device">Device</div></div>
     <div class="sec" id="sec-appearance">
       <div class="card"><h3>Theme</h3><div id="themes"></div></div>
       <div class="card"><h3>Accent</h3><div id="accents"></div>
@@ -488,6 +548,12 @@
         <div class="row"><label>Style</label><div class="seg"><div data-set="icon_style" data-val="&quot;solid&quot;">Solid</div><div data-set="icon_style" data-val="&quot;outline&quot;">Outline</div><div data-set="icon_style" data-val="&quot;emoji&quot;">Emoji</div></div></div>
         <div class="row"><label>Color</label><div class="seg"><div data-set="icon_color" data-val="&quot;neutral&quot;">Neutral</div><div data-set="icon_color" data-val="&quot;accent&quot;">Accent</div><div data-set="icon_color" data-val="&quot;category&quot;">Category</div></div></div>
         <div class="hint-text">“Theme” is the scheme’s own accent; slide for any hue.</div></div>
+    </div>
+    <div class="sec" id="sec-tabs">
+      <div class="card"><h3>Tab order</h3><div class="ag-list" id="taborder"></div></div>
+      <div class="card"><h3>Order</h3>
+        <div class="ag-empty">Move a page up or down with the arrows. The order is saved on the Car Thing and kept across restarts; pages added to config.json later appear at the end.</div>
+        <div class="action"><div class="btn" data-tabs-reset="1">Reset</div><small>Back to the order in config.json</small></div></div>
     </div>
     <div class="sec" id="sec-device">
       <div class="card"><h3>Device</h3><div class="kv" id="kv"></div></div>
@@ -567,6 +633,7 @@ function load() {
     agenda = j.agenda || agenda;
     audio = j.audio || null;
     github = j.github || github;
+    hue = j.hue || hue;
     render();
   });
 }
@@ -635,6 +702,35 @@ function renderPageChoices(s) {
       }).join('') + '</div></div>';
   }).join('');
 }
+// The page entries in the order picked in Settings → Tabs (same rules as Pad.ordered_pages).
+function pageKey(p) { return p.choices ? p.id : p.name; }
+function orderedEntries() {
+  var order = (st.settings || {}).page_order || [], rank = {};
+  order.forEach(function (k, i) { rank[k] = i; });
+  return (cfg.pages || []).map(function (p, i) { return [p, i]; }).sort(function (a, b) {
+    var ra = pageKey(a[0]) in rank ? rank[pageKey(a[0])] : order.length, rb = pageKey(b[0]) in rank ? rank[pageKey(b[0])] : order.length;
+    return ra - rb || a[1] - b[1];
+  }).map(function (e) { return e[0]; });
+}
+var ARROW = { up: '<path d="M6 15l6-6 6 6"/>', down: '<path d="M6 9l6 6 6-6"/>' };
+function renderTabOrder() {
+  var entries = orderedEntries();
+  $('taborder').innerHTML = entries.map(function (p, i) {
+    var name = p.choices ? resolvePage(p).name + ' (' + (p.label || 'choice') + ')' : p.name;
+    var btn = function (dir, disabled) {
+      return '<div class="to-btn' + (disabled ? ' off' : '') + '"' + (disabled ? '' : ' data-tab-move="' + esc(pageKey(p)) + '|' + dir + '"') + '>' +
+        CHEVRON + ARROW[dir < 0 ? 'up' : 'down'] + '</svg></div>';
+    };
+    return '<div class="to-row"><span class="to-n">' + (i + 1) + '</span><span class="to-name">' + esc(name) + '</span>' +
+      btn(-1, i === 0) + btn(1, i === entries.length - 1) + '</div>';
+  }).join('');
+}
+function moveTab(key, dir) {
+  var keys = orderedEntries().map(pageKey), i = keys.indexOf(key), j = i + dir;
+  if (i < 0 || j < 0 || j >= keys.length) return;
+  keys[i] = keys[j]; keys[j] = key;
+  post('/api/settings', { page_order: keys });
+}
 function resolvePage(p) {
   if (!p.choices) return p;
   var name = choiceName(p);
@@ -653,7 +749,7 @@ function kind(a) {
 
 // ---- rendering
 function render() {
-  var pages = (cfg.pages || []).map(resolvePage);
+  var pages = orderedEntries().map(resolvePage);
   var page = pages[st.page] || { tiles: [] };
   currentPage = page;
   var grid = page.grid || cfg.grid || [4, 2];
@@ -793,7 +889,7 @@ var showSettings = false, settingsSec = 'general', info = null, dragging = false
 function renderSettings() {
   var s = st.settings || {};
   if (builtFor !== s.theme) { builtFor = s.theme; buildAppearance(); }   // swatches show the theme's tints
-  var secs = ['general', 'appearance', 'device'];
+  var secs = ['general', 'appearance', 'tabs', 'device'];
   for (var j = 0; j < secs.length; j++) {
     $('sec-' + secs[j]).classList.toggle('on', secs[j] === settingsSec);
     $('snav').children[j].classList.toggle('on', secs[j] === settingsSec);
@@ -815,6 +911,7 @@ function renderSettings() {
   }
   $('osdet').textContent = { windows: 'detected: Windows', other: 'detected: Linux or macOS' }[st.os_detected] || 'not detected yet';
   renderPageChoices(s);
+  renderTabOrder(s);
   $('bnow').textContent = s.brightness_auto ? 'light sensor' : Math.round((s.brightness || 0) / 2.55) + '%';
   if (info) {
     var up = Math.floor(info.uptime), h = Math.floor(up / 3600), m = Math.floor(up % 3600 / 60);
@@ -950,7 +1047,9 @@ var ICON_LINES = {
   clock:      ['<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>', '🕒'],
   slash:      ['<circle cx="12" cy="12" r="8.5"/><path d="M6 18L18 6"/>', '⛔'],
   alert:      ['<path d="M12 4l9 16H3z"/><path d="M12 10v4M12 17.5h.01"/>', '⚠️'],
-  pr:         ['<circle cx="6" cy="6" r="2.2"/><circle cx="6" cy="18" r="2.2"/><circle cx="18" cy="18" r="2.2"/><path d="M6 8.2v7.6M18 15.8V10a3 3 0 0 0-3-3h-4m2 2l-2-2 2-2"/>', '🔀']
+  pr:         ['<circle cx="6" cy="6" r="2.2"/><circle cx="6" cy="18" r="2.2"/><circle cx="18" cy="18" r="2.2"/><path d="M6 8.2v7.6M18 15.8V10a3 3 0 0 0-3-3h-4m2 2l-2-2 2-2"/>', '🔀'],
+  bulb:       ['<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.7.7 1 1.4 1 2.5h6c0-1.1.3-1.8 1-2.5A6 6 0 0 0 12 3z"/>', '💡'],
+  power:      ['<path d="M12 3v9M6.3 6.3a8 8 0 1 0 11.4 0"/>', '⏻']
 };
 function icon(name) {
   var style = iconStyle(), shape = ICON_SETS[style][name], line = ICON_LINES[name];
@@ -1060,6 +1159,7 @@ function renderWidgets(page, g) {
       if (w === 'agenda') return '<div class="card agenda"><h3>Agenda</h3><div class="ag-list" id="agenda"></div></div>';
       if (w === 'monitor') return '<div class="monitor' + (page.widgets.length > 1 ? ' half' : '') + '" id="monitor"></div>';
       if (w === 'github') return '<div class="gh" id="github"></div>';
+      if (w === 'lights') return '<div class="lights" id="lights"></div>';
       return '';
     }).join('') + '</div>' + (page.kill ? KILL_HTML : '') + '</div>';
   }
@@ -1067,6 +1167,7 @@ function renderWidgets(page, g) {
   updateMonitor();
   updateFocus();
   updateGitHub();
+  updateLights();
 }
 // The kill switch: lifting the cover is the confirmation, and it locks the target in:
 // the service only kills that process id if it still has focus.
@@ -1350,6 +1451,146 @@ function updateGitHub() {
   if (box.innerHTML !== html) box.innerHTML = html;
 }
 setInterval(updateGitHub, 15000);       // the times ("3m") move on between updates
+
+// ---- Philips Hue (widget "lights"): the agent talks to the bridge; taps queue commands
+var hue = { state: 'unknown' }, hueDrag = null;
+function hueCmd(cmd) { post('/api/hue/command', cmd); }
+function gammaRGB(r, g, b) {
+  var m = Math.max(r, g, b, 1e-6), f = function (v) {
+    v = Math.max(0, v / m);
+    return Math.round(255 * (v <= 0.0031308 ? 12.92 * v : 1.055 * Math.pow(v, 1 / 2.4) - 0.055));
+  };
+  return [f(r), f(g), f(b)];
+}
+function lightRGB(l) {          // the color a light shows, from CIE xy or its white temperature
+  if (l.mirek && !l.xy) {
+    var k = 1e6 / l.mirek / 100, r, g, b;
+    r = k <= 66 ? 255 : 329.7 * Math.pow(k - 60, -0.1332);
+    g = k <= 66 ? 99.47 * Math.log(k) - 161.12 : 288.1 * Math.pow(k - 60, -0.0755);
+    b = k >= 66 ? 255 : k <= 19 ? 0 : 138.5 * Math.log(k - 10) - 305;
+    return [r, g, b].map(function (v) { return Math.round(Math.max(0, Math.min(255, v))); });
+  }
+  if (!l.xy) return [255, 214, 150];
+  var x = l.xy[0], y = Math.max(l.xy[1], 1e-6), X = x / y, Z = (1 - x - y) / y;
+  return gammaRGB(X * 1.656492 - 0.354851 - Z * 0.255038, -X * 0.707196 + 1.655397 + Z * 0.036152,
+    X * 0.051713 - 0.121364 + Z * 1.011530);
+}
+function roomRGB(room) {
+  var on = (room.lights || []).filter(function (l) { return l.on; });
+  if (!on.length) return null;
+  var sum = [0, 0, 0];
+  on.forEach(function (l) { lightRGB(l).forEach(function (v, i) { sum[i] += v; }); });
+  return 'rgb(' + sum.map(function (v) { return Math.round(v / on.length); }).join(',') + ')';
+}
+function pct(v) { return v == null ? '' : Math.round(v) + '%'; }
+function hueBar(attr, id, on, brightness) {
+  var w = on ? Math.max(2, brightness || 0) : (brightness || 0);
+  return '<div class="hbar" ' + attr + '="' + esc(id) + '"><i style="width:' + w + '%"></i><span>' + (on ? pct(brightness) : 'Off') + '</span></div>';
+}
+function hueRoom(id) { return (hue.rooms || []).filter(function (r) { return r.id === id; })[0]; }
+function updateLights() {
+  var box = $('lights');
+  if (!box || hueDrag) return;
+  var html;
+  if (hue.state === 'ok') {
+    html = (hue.rooms || []).map(function (r) {
+      var lit = r.lights.filter(function (l) { return l.on; }).length, active = r.scenes.filter(function (s) { return s.active; })[0];
+      var sub = [r.kind === 'zone' ? 'Zone' : '', lit ? lit + ' of ' + r.lights.length + ' on' : r.lights.length + (r.lights.length === 1 ? ' light' : ' lights'), active ? active.name : '']
+        .filter(function (x) { return x; }).join(' · ');
+      return '<div class="lcard' + (r.on ? '' : ' off') + (r.id === hue.selected ? ' sel' : '') + '" data-hue-room="' + esc(r.id) + '"' +
+        ' style="--lc:' + (roomRGB(r) || 'var(--acc)') + '"><div class="lglow"></div>' +
+        '<div class="lc-top"><div class="lc-name">' + esc(r.name) + '</div>' +
+        (r.group ? '<div class="hswitch' + (r.on ? ' on' : '') + '" data-hue-toggle="' + esc(r.group) + '"></div>' : '') + '</div>' +
+        '<div class="lc-sub">' + esc(sub) + '</div>' + (r.group ? hueBar('data-hue-bar', r.group, r.on, r.brightness) : '') + '</div>';
+    }).join('') + '<div class="lcard alloff" data-hue-alloff="1">' + icon('power') + 'All off</div>';
+    box.className = 'lights';
+  } else {
+    var title, text, pair = false;
+    if (hue.state === 'none') { title = 'Connect your Hue Bridge'; text = 'Tap Pair, then press the round button on top of the bridge within 30 seconds.'; pair = true; }
+    else if (hue.state === 'pairing') { title = 'Press the bridge’s button'; text = 'Press the round button on top of your Hue Bridge now…'; }
+    else if (hue.state === 'error') { title = 'Hue isn’t answering'; text = hue.error || 'Unknown error'; pair = true; }
+    else { title = st.clock ? 'Waiting for the computer…' : 'No computer agent'; text = st.clock ? '' : 'Install it to control your lights (see README).'; }
+    html = '<div class="card hue-msg"><div class="m-label">Philips Hue</div><div class="ag-empty"><b>' + esc(title) + '</b>' + esc(text) + '</div>' +
+      (pair ? '<div class="btn" data-hue-pair="1">' + (hue.state === 'error' ? 'Pair again' : 'Pair') + '</div>' : '') + '</div>';
+    box.className = 'lights msg';
+  }
+  if (box.innerHTML !== html) box.innerHTML = html;
+  if (sheetMode === 'room') renderRoomSheet();
+}
+function renderRoomSheet() {
+  var r = hueRoom(hueSheetRoom);
+  if (!r) return closeSheet();
+  var ct = r.lights.filter(function (l) { return l.ct; }), mirek = ct.length && (ct.filter(function (l) { return l.mirek; })[0] || {}).mirek;
+  $('sheetcard').innerHTML =
+    '<div class="m-label">' + (r.kind === 'zone' ? 'Zone' : 'Room') + ' · ' + r.lights.length + (r.lights.length === 1 ? ' light' : ' lights') + '</div>' +
+    '<div class="sh-head"><div class="sh-title">' + esc(r.name) + '</div>' +
+      (r.group ? '<div class="hswitch' + (r.on ? ' on' : '') + '" data-hue-toggle="' + esc(r.group) + '"></div>' : '') + '</div>' +
+    '<div class="sh-scroll" style="--lc:' + (roomRGB(r) || 'var(--acc)') + '">' +
+      (r.group ? hueBar('data-hue-bar', r.group, r.on, r.brightness) : '') +
+      (ct.length ? '<div class="m-label">White</div><input type="range" id="huect" min="153" max="500" step="1" value="' + (mirek || 366) + '">' : '') +
+      (r.scenes.length ? '<div class="m-label">Scenes</div><div class="scenes">' + r.scenes.map(function (s) {
+        return '<div class="scene' + (s.active ? ' on' : '') + '" data-hue-scene="' + esc(s.id) + '">' + esc(s.name) + '</div>';
+      }).join('') + '</div>' : '') +
+      '<div class="m-label">Lights</div>' + r.lights.map(function (l) {
+        return '<div class="hl-row' + (l.on ? '' : ' off') + '" style="--lc:rgb(' + lightRGB(l).join(',') + ')"><div class="hl-name">' + esc(l.name) + '</div>' +
+          (l.brightness != null ? hueBar('data-hue-lbar', l.id, l.on, l.brightness) : '<div style="flex:1"></div>') +
+          '<div class="hswitch' + (l.on ? ' on' : '') + '" data-hue-ltoggle="' + esc(l.id) + '"></div></div>';
+      }).join('') +
+    '</div><div class="sh-actions"><div class="btn" data-sheet-close="1">Close</div></div>';
+  var slider = $('huect');
+  if (slider) slider.addEventListener('change', function () { hueCmd({ op: 'group', id: r.group, mirek: parseInt(this.value, 10) }); });
+}
+var hueSheetRoom = null;
+function openRoom(id) {
+  hueSheetRoom = id;
+  post('/api/hue/select', { id: id });        // the dial's Lights mode now controls this room
+  sheetMode = 'room';
+  sheetOpen = true;
+  renderRoomSheet();
+  $('sheet').className = 'show';
+}
+function hueToggle(groupOrLight, isLight) {
+  var target = null;
+  (hue.rooms || []).forEach(function (r) {
+    if (!isLight && r.group === groupOrLight) target = r;
+    if (isLight) r.lights.forEach(function (l) { if (l.id === groupOrLight) target = l; });
+  });
+  if (target) hueCmd({ op: isLight ? 'light' : 'group', id: groupOrLight, on: !target.on });
+}
+// Brightness bars: drag (or tap) to set; sends while dragging, merged on the device.
+function hueBarSet(e, final) {
+  var r = hueDrag.rect, v = Math.max(1, Math.min(100, Math.round((e.clientX - r.left) / r.width * 100)));
+  hueDrag.bar.querySelector('i').style.width = v + '%';
+  hueDrag.bar.querySelector('span').textContent = v + '%';
+  var now = Date.now();
+  if (final || now - hueDrag.sent > 150) {
+    hueDrag.sent = now;
+    hueCmd({ op: hueDrag.light ? 'light' : 'group', id: hueDrag.id, on: true, brightness: v });
+  }
+}
+document.addEventListener('pointerdown', function (e) {
+  var bar = e.target.closest('[data-hue-bar], [data-hue-lbar]');
+  if (!bar) return;
+  hueDrag = { bar: bar, rect: bar.getBoundingClientRect(), sent: 0, light: bar.hasAttribute('data-hue-lbar'),
+    id: bar.getAttribute('data-hue-bar') || bar.getAttribute('data-hue-lbar') };
+  hueBarSet(e, false);
+});
+document.addEventListener('pointermove', function (e) { if (hueDrag) hueBarSet(e, false); });
+document.addEventListener('pointerup', function (e) { if (hueDrag) { hueBarSet(e, true); hueDrag = null; } });
+document.addEventListener('pointercancel', function () { hueDrag = null; });
+// The dial's Lights mode: a brightness bar like the volume one.
+function showLightHud(id) {
+  var r = hueRoom(id);
+  if (!r) return;
+  var hud = $('volhud');
+  hud.querySelector('.vh-icon').innerHTML = icon('bulb');
+  hud.querySelector('.vh-bar i').style.width = (r.on ? r.brightness || 0 : 0) + '%';
+  hud.querySelector('.vh-num').textContent = r.on ? Math.round(r.brightness || 0) : 'Off';
+  hud.classList.toggle('muted', !r.on);
+  hud.classList.add('show');
+  clearTimeout(volTimer);
+  volTimer = setTimeout(function () { hud.classList.remove('show'); }, 1500);
+}
 function fmtRate(b) {
   if (b == null) return '–';
   if (b >= 1e6) return (b / 1e6).toFixed(b >= 1e7 ? 0 : 1) + '<small>MB/s</small>';
@@ -1515,11 +1756,12 @@ function scrollTabs() {
   else t.scrollTo({ left: 0, behavior: 'smooth' });
 }
 $('tabs').addEventListener('scroll', tabFades);
-var startInBar = false;     // a drag on the bottom bar scrolls the tabs, not the pages
+var startInBar = false, startOnSlider = false;     // drags on the bottom bar or a slider don't change pages
 document.addEventListener('pointerdown', function (e) {
   startX = e.clientX; startY = e.clientY;
   startInBar = !!e.target.closest('#bar');
-  downEl = e.target.closest('.tile[data-i], .preset[data-i], #dial, .tab, #status, [data-set], [data-sys], [data-sec], [data-choice-slot], [data-media], [data-join], [data-guard], [data-kill], [data-ev], [data-sheet-close], [data-sheet-card], [data-audio], [data-audio-dev], [data-gh], #tabmore');
+  startOnSlider = !!e.target.closest('[data-hue-bar], [data-hue-lbar]');   // dragging a light's brightness, not swiping
+  downEl = e.target.closest('.tile[data-i], .preset[data-i], #dial, .tab, #status, [data-set], [data-sys], [data-sec], [data-choice-slot], [data-media], [data-join], [data-guard], [data-kill], [data-ev], [data-sheet-close], [data-sheet-card], [data-audio], [data-audio-dev], [data-gh], #tabmore, [data-hue-room], [data-hue-toggle], [data-hue-ltoggle], [data-hue-scene], [data-hue-alloff], [data-hue-pair], [data-hue-bar], [data-hue-lbar], [data-tab-move], [data-tabs-reset]');
   if (downEl) downEl.classList.add('down');
 });
 document.addEventListener('pointercancel', function () { if (downEl) downEl.classList.remove('down'); downEl = null; });
@@ -1529,7 +1771,7 @@ document.addEventListener('pointerup', function (e) {
   var dx = e.clientX - startX, dy = e.clientY - startY, el = downEl;
   downEl = null;
   if (el) el.classList.remove('down');
-  if (!showSettings && !sheetOpen && !startInBar && Math.abs(dx) > 70 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+  if (!showSettings && !sheetOpen && !startInBar && !startOnSlider && Math.abs(dx) > 70 && Math.abs(dx) > Math.abs(dy) * 1.5) {
     var g = $('grid');
     g.className = dx < 0 ? 'swipe-l' : 'swipe-r';
     setTimeout(function () { g.className = ''; }, 140);
@@ -1544,6 +1786,15 @@ document.addEventListener('pointerup', function (e) {
   else if (el.hasAttribute('data-audio')) openAudio();
   else if (el.hasAttribute('data-gh')) post('/api/github/open', { id: el.getAttribute('data-gh') });
   else if (el.id === 'tabmore') scrollTabs();
+  else if (el.hasAttribute('data-tab-move')) { var mv = el.getAttribute('data-tab-move').split('|'); moveTab(mv[0], parseInt(mv[1], 10)); }
+  else if (el.hasAttribute('data-tabs-reset')) post('/api/settings', { page_order: [] });
+  else if (el.hasAttribute('data-hue-bar') || el.hasAttribute('data-hue-lbar')) { }       // handled by the drag code
+  else if (el.hasAttribute('data-hue-toggle')) hueToggle(el.getAttribute('data-hue-toggle'), false);
+  else if (el.hasAttribute('data-hue-ltoggle')) hueToggle(el.getAttribute('data-hue-ltoggle'), true);
+  else if (el.hasAttribute('data-hue-scene')) { fire(el); hueCmd({ op: 'scene', id: el.getAttribute('data-hue-scene') }); }
+  else if (el.hasAttribute('data-hue-alloff')) { fire(el); hueCmd({ op: 'all_off' }); }
+  else if (el.hasAttribute('data-hue-pair')) hueCmd({ op: 'pair' });
+  else if (el.hasAttribute('data-hue-room')) openRoom(el.getAttribute('data-hue-room'));
   else if (el.hasAttribute('data-audio-dev')) chooseAudio(el.getAttribute('data-audio-dev'));
   else if (el.hasAttribute('data-guard')) openGuard();
   else if (el.hasAttribute('data-kill')) pressKill();
@@ -1607,6 +1858,11 @@ function connect() {
       stats = d;
       updateMonitor();
       updateFocus();
+    } else if (m.type === 'hue') {
+      hue = d;
+      updateLights();
+    } else if (m.type === 'hue_dial') {
+      showLightHud(d.room);
     } else if (m.type === 'github') {
       github = d;
       updateGitHub();
