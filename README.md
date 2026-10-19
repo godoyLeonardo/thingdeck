@@ -5,8 +5,8 @@ Stream Deck. It needs **no app on the computer**. The computer sees a standard
 USB keyboard, media keys and mouse wheel, so it works on Windows, macOS and Linux
 as soon as you plug it in.
 
-- **Touchscreen:** pages of large tiles (Media, Desktop, Code, Shell, and Discord
-  on Windows or Meetings on macOS/Linux), each sending a shortcut, a media key, typed text or a sequence of steps.
+- **Touchscreen:** pages of large tiles (Media, Desktop, Code, Shell, and a calls
+  page: Discord or Meetings), each sending a shortcut, a media key, typed text or a sequence of steps.
 - **4 top buttons:** presets that change with the page. Labels are shown on the
   screen right under the buttons.
 - **Dial:** volume, scroll, zoom, scrub (arrow keys), browser tabs, undo/redo.
@@ -17,7 +17,7 @@ as soon as you plug it in.
 - **Keyboard layouts:** typed text is translated for the host layout
   (Latin American and US are included).
 - **Settings:** brightness (light sensor or manual), host OS, layout, dial
-  direction, themes, device info, and Reconnect / Restart / Reboot.
+  direction, calls page (Discord or Meetings), themes, device info, and Reconnect / Restart / Reboot.
 - **Themes:** Dark, Black, Light, and the editor color schemes Nord, Dracula,
   Catppuccin, Gruvbox, Tokyo Night and Solarized, each with its own accent or
   one of six accent colors.
@@ -82,13 +82,9 @@ All of these can be changed in `device/config.json`.
 
 ## Host OS
 
-Shortcuts differ per OS, so tiles, and whole pages, can carry `"windows"`,
-`"mac"` and `"linux"` overrides. On Windows the Meetings page is replaced by a
-**Discord** page (mute, deafen, answer/decline, quick switcher, …), using
-Discord's default shortcuts. Mute and deafen work even when Discord isn't
-focused. The
-defaults use standard shortcuts: Mission Control and Spotlight on macOS,
-GNOME's on Linux.
+Shortcuts differ per OS, so tiles can carry `"windows"`, `"mac"` and `"linux"`
+overrides. The defaults use standard shortcuts: Mission Control and Spotlight on
+macOS, GNOME's on Linux.
 
 Over USB, Windows identifies itself, but macOS and Linux look the same. So:
 
@@ -100,6 +96,14 @@ Over USB, Windows identifies itself, but macOS and Linux look the same. So:
 
 The choice is saved on the Car Thing. If you move between a Mac and a Linux
 machine, switch it in Settings.
+
+## Calls page
+
+The last tab is either **Discord** (mute, deafen, answer/decline, quick switcher,
+back to voice, inbox, mark read) or **Meetings** (Teams, Zoom and Meet mic/camera).
+Pick it under Settings → General → Pages → Calls page. **Auto** shows Discord on
+Windows and Meetings on macOS and Linux. Discord uses its default shortcuts;
+mute and deafen work even when Discord isn't focused.
 
 ## Keyboard layout
 

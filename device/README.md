@@ -161,7 +161,7 @@ Top level:
 | `hardware` | `knob`, `back`, `menu`: `{"tap": action, "hold": action}`; `dial_invert` |
 | `dial_modes` | `[{"name", "cw", "ccw", "press"}]` |
 | `presets` | Default 4 top-button actions |
-| `pages` | `[{"name", "presets"?, "grid"?, "tiles": [...]}]` |
+| `pages` | `[{"name", "presets"?, "grid"?, "tiles": [...]}]`, or a choice slot (below) |
 
 Tiles and presets are actions plus `label`, optional `icon` (emoji), `hint`
 (small text; generated if missing) and `color`.
@@ -191,13 +191,15 @@ objects. When the host matches, the override replaces the action, keeping
   "linux": { "label": "Overview", "key": "win" } }
 ```
 
-Pages can be replaced per OS the same way: the override's keys (`name`, `presets`,
-`tiles`, `grid`) replace the page's. The default config uses this for the
-Windows-only Discord page:
+**Choice slots:** a page entry with `choices` holds alternative pages for one
+tab. Settings → General → Pages picks one (saved as `page_choices` in
+`state.json`). "Auto" uses `default`, which can be a name or a per-OS map with an
+`other` fallback:
 
 ```json
-{ "name": "Meetings", "presets": [...], "tiles": [...],
-  "windows": { "name": "Discord", "presets": [...], "tiles": [...] } }
+{ "id": "calls", "label": "Calls page",
+  "default": { "windows": "Discord", "other": "Meetings" },
+  "choices": [ { "name": "Meetings", "tiles": [...] }, { "name": "Discord", "tiles": [...] } ] }
 ```
 
 ## HTTP API
