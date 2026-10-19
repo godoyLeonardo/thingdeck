@@ -474,7 +474,7 @@
   .theme span { display: block; font-size: calc(12px * var(--ts)); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   #accents { display: grid; grid-template-columns: repeat(7, 1fr); grid-gap: 4px; margin-top: 8px; }
   .swatch { display: flex; flex-direction: column; align-items: center; padding: 6px 0; border-radius: 10px; }
-  .swatch i { width: 32px; height: 32px; border-radius: 50%; border: 3px solid transparent; background-clip: padding-box;
+  .swatch i { width: 40px; height: 40px; border-radius: 50%; border: 3px solid transparent; background-clip: padding-box;
     box-shadow: 0 0 0 2px var(--tile); }
   .swatch.on i { box-shadow: 0 0 0 2px var(--tile), 0 0 0 4px var(--text); }
   .swatch span { font-size: calc(11px * var(--ts)); color: var(--muted); margin-top: 6px; }
@@ -589,13 +589,13 @@
   <div id="settings">
     <div id="snav" class="seg"><div data-sec="general">General</div><div data-sec="appearance">Appearance</div><div data-sec="tabs">Tabs</div><div data-sec="device">Device</div></div>
     <div class="sec" id="sec-appearance">
-      <div class="card"><h3>Theme</h3><div id="themes"></div></div>
       <div class="card"><h3>Accent</h3><div id="accents"></div>
         <input type="range" id="hue" min="0" max="359" step="1">
         <h3 style="margin-top:14px">Icons</h3>
         <div class="row"><label>Style</label><div class="seg"><div data-set="icon_style" data-val="&quot;solid&quot;">Solid</div><div data-set="icon_style" data-val="&quot;outline&quot;">Outline</div><div data-set="icon_style" data-val="&quot;emoji&quot;">Emoji</div></div></div>
         <div class="row"><label>Color</label><div class="seg"><div data-set="icon_color" data-val="&quot;neutral&quot;">Neutral</div><div data-set="icon_color" data-val="&quot;accent&quot;">Accent</div><div data-set="icon_color" data-val="&quot;category&quot;">Category</div></div></div>
         <div class="hint-text">“Theme” is the scheme’s own accent; slide for any hue.</div></div>
+      <div class="card"><h3>Theme</h3><div id="themes"></div></div>
     </div>
     <div class="sec" id="sec-tabs">
       <div class="card"><h3>Tab order</h3><div class="ag-list" id="taborder"></div></div>
