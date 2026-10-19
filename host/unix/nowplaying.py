@@ -39,6 +39,9 @@ import urllib.request
 PORT = int(os.environ.get('THINGDECK_PORT', '28765'))   # the device listens on 8765
 ADB = os.environ.get('ADB') or shutil.which('adb') or 'adb'
 MAX_COVER = 3 * 1024 * 1024
+# This script's fingerprint: deploy.sh puts the repo's on the Car Thing, which says when they differ.
+with open(os.path.abspath(__file__), 'rb') as _f:
+    AGENT_VERSION = hashlib.sha1(_f.read()).hexdigest()[:12]
 
 
 def run(cmd, timeout=5):
@@ -987,10 +990,10 @@ def mac_locked():
 
 
 def heartbeat(locked):
-    """Time and UTC offset (they set the Car Thing's clock) plus the lock state."""
+    """Time and UTC offset (they set the Car Thing's clock), the lock state and the agent's version."""
     offset = datetime.datetime.now().astimezone().utcoffset()
     return {'time_ms': int(time.time() * 1000), 'utc_offset_min': int(offset.total_seconds() // 60),
-            'locked': locked}
+            'locked': locked, 'agent': {'os': 'unix', 'version': AGENT_VERSION}}
 
 
 def send(path, body):
