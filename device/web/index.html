@@ -469,7 +469,7 @@
   #tabs { flex: 1; display: flex; align-items: center; overflow-x: auto; min-width: 0; height: 100%; scroll-snap-type: x mandatory; }
   #tabs::-webkit-scrollbar { display: none; }
   .tab[data-settings] { font-size: calc(24px * var(--ts)); }
-  .tab { flex: 0 0 25%; box-sizing: border-box; padding: 0 8px; height: 48px; line-height: 48px; border-radius: 24px; text-align: center;
+  .tab { flex: 0 0 var(--tabw, 25%); box-sizing: border-box; padding: 0 8px; height: 48px; line-height: 48px; border-radius: 24px; text-align: center;
     font-size: calc(19px * var(--ts)); font-weight: 500; color: var(--muted); scroll-snap-align: start;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   #tabmore { flex: none; width: 56px; height: 48px; margin-left: 6px; border-radius: 24px; background: var(--tile); color: var(--text);
@@ -496,7 +496,7 @@
   #standby { position: fixed; left: 0; top: 0; right: 0; bottom: 0; background: var(--standby); display: none; z-index: 5;
     flex-direction: column; align-items: center; justify-content: center; }
   #standby.show { display: flex; }
-  #clock { flex: none; font-size: calc(19px * var(--ts)); font-weight: 600; font-variant-numeric: tabular-nums; margin: 0 4px 0 10px; letter-spacing: -.01em; }
+  #clock { display: none; flex: none; font-size: calc(19px * var(--ts)); font-weight: 600; font-variant-numeric: tabular-nums; margin: 0 4px 0 10px; letter-spacing: -.01em; }
   #clock.hidden, .bigclock.hidden, .bigdate.hidden, #sbicon.hidden { display: none; }
   .bigclock { font-size: 120px; font-weight: 300; line-height: 1; letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
   .bc-suffix { font-size: calc(32px * var(--ts)); font-weight: 400; letter-spacing: 0; margin-left: 10px; color: var(--muted); }
@@ -790,6 +790,9 @@ function render() {
   }).join('') + '<div class="tab' + (showSettings ? ' on' : '') + '" data-settings="1" title="Settings">⚙</div>';
   var on = $('tabs').querySelector('.on');
   if (on) on.scrollIntoView({ inline: 'nearest', block: 'nearest' });
+  // Up to 6 tabs share the bar evenly (no scrolling); more show 4 at a time and scroll.
+  var count = $('tabs').children.length;
+  $('tabs').style.setProperty('--tabw', count <= 6 ? (100 / count) + '%' : '25%');
 
   applyTheme();
   document.body.classList.toggle('settings', showSettings);
