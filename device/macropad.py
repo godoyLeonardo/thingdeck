@@ -539,7 +539,8 @@ class Agenda:
             try:
                 since = datetime.datetime.utcfromtimestamp(time.time()) if time.time() > VALID_TIME else None
                 calendar = ics.Calendar(text, since)
-                log('calendar: %d events read in %.1f s' % (len(calendar.events), time.monotonic() - started))
+                log('calendar: %d KB, %d events kept, read in %.1f s' % (len(text) // 1024, len(calendar.events),
+                                                                      time.monotonic() - started))
             except Exception as e:     # a malformed file must not take the service down
                 log('calendar: could not read it:', e)
                 error = error or 'Could not read the calendar: %s' % e
