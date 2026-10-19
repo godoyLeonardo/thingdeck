@@ -5,8 +5,9 @@ Stream Deck. It needs **no app on the computer**. The computer sees a standard
 USB keyboard, media keys and mouse wheel, so it works on Windows, macOS and Linux
 as soon as you plug it in.
 
-- **Touchscreen:** pages of large tiles (Media, Desktop, Code, Shell, and a calls
-  page: Discord or Meetings), each sending a shortcut, a media key, typed text or a sequence of steps.
+- **Touchscreen:** pages of large tiles (Media, Desktop, Shell, and a calls
+  page: Discord or Meetings), each sending a shortcut, a media key, typed text or a sequence of steps,
+  and live pages from the computer agent (Calendar, Status, Code).
 - **4 top buttons:** presets that change with the page. Labels are shown on the
   screen right under the buttons.
 - **Dial:** volume, scroll, zoom, scrub (arrow keys), browser tabs, undo/redo.
@@ -154,6 +155,11 @@ playing/paused and a live progress bar, with the media controls in a row below.
   - Linux: X11 (`xprop`), Hyprland, Sway, KDE Wayland with `kdotool`, and GNOME
     Wayland with the [Window Calls](https://extensions.gnome.org/extension/4724/window-calls/)
     extension, since GNOME doesn't share the focused window otherwise.
+- **Code (GitHub):** the latest run of each workflow in one repository (up to 5:
+  running, queued, passed, failed or cancelled, with branch, commit and time) and
+  your open pull requests on any repository, with their checks, review state and
+  draft flag. Tap a row to open it in the browser on the computer. It refreshes every
+  minute, or every 15 seconds while a workflow runs (see [Adding GitHub](#adding-github)).
 - **Volume and audio devices:** when the volume or mute changes (the dial, the Mute
   tile, your keyboard), a volume bar shows at the top for a moment. The Media page
   header shows the current output; tap it to pick the output and input devices.
@@ -209,6 +215,24 @@ The agent reads calendars from their private iCal address, so it needs no sign-i
 The secret address lets anyone who has it read that calendar, so keep the file to
 yourself; if it leaks, reset it on the same Google Calendar settings page. Work
 accounts may have it turned off by an administrator.
+
+### Adding GitHub
+
+The agent asks GitHub through the [GitHub CLI](https://cli.github.com), which keeps
+your sign-in; no token is stored by streamthing.
+
+1. Install it and sign in once:
+   - Windows: `winget install GitHub.cli`
+   - Fedora: `sudo dnf install gh`
+   - macOS: `brew install gh`
+
+   Then run `gh auth login`.
+2. Put the repository for the Code page in `github.txt`, next to `calendars.txt`:
+   its name if it is one of yours (`my-repo`), or `owner/name`. Lines starting with
+   `#` are ignored.
+
+The file stays on your computer, so the repository's name is never in this repo.
+Your open pull requests come from any repository; the Actions card shows that one.
 
 ## When the computer sleeps
 

@@ -231,6 +231,18 @@ number (0–359), drawn light on dark themes and dark on light ones.
 dimmer. Auto mode keeps the stock `sp-als-backlight` light-sensor service running.
 Manual mode stops it and writes `260 - level`.
 
+### GitHub
+
+The widget `"github"` (the Code page) shows what the agent reads with the `gh` CLI,
+for the repository in `github.txt` on the computer: the newest run of each workflow
+(5 at most) and the user's open pull requests (one GraphQL query, any repository,
+with the check rollup and review decision). The agent posts it to `POST /api/github`
+every minute, or every 15 s while a run is queued or running; `{"none": true}` means
+there is no `github.txt`. `GitHubStatus` keeps each row's link and gives the UI only
+row ids; a tap posts `POST /api/github/open {id}`, and the link goes to the agent
+through the same `LinkOpener` as meeting links (the agent opens `https://github.com/`
+links and meeting links only).
+
 ### Volume and audio devices
 
 The agent checks the default output's volume and mute, and the default output and
@@ -316,8 +328,8 @@ page, or `adb shell`).
 | Method | Path | Body | Purpose |
 |---|---|---|---|
 | GET | `/api/ping` | | Health check (used by `shim.html`) |
-| GET | `/api/state` | | Config, state, presets, now playing, stats, agenda, audio |
-| GET | `/api/events` | | SSE stream: `state`, `config`, `fired`, `turn`, `hw`, `toast`, `nowplaying`, `stats`, `agenda`, `audio` |
+| GET | `/api/state` | | Config, state, presets, now playing, stats, agenda, audio, github |
+| GET | `/api/events` | | SSE stream: `state`, `config`, `fired`, `turn`, `hw`, `toast`, `nowplaying`, `stats`, `agenda`, `audio`, `github` |
 | GET | `/api/info` | | Uptime, temperature, memory, load, brightness |
 | POST | `/api/tap` | `{"page", "index"}` | Run a tile |
 | POST | `/api/preset` | `{"index"}` | Run a preset |
@@ -333,6 +345,8 @@ page, or `adb shell`).
 | POST | `/api/kill` | `{"pid"}` | Kill the focused app (it must still have focus); goes to the agent with its next stats reply |
 | POST | `/api/audio` | `{"volume", "muted", "output", "input", "outputs"?, "inputs"?}` | From the host agent. Replies `{"set": {"id", "kind"} or null, "need_lists": bool}` |
 | POST | `/api/audio/set` | `{"id"}` | Make an output or input the default on the computer |
+| POST | `/api/github` | `{"repo", "runs", "prs", "error"?}` or `{"none": true}` | From the host agent |
+| POST | `/api/github/open` | `{"id"}` | Open a run or pull request on the computer |
 | POST | `/api/run` | any action | Run an action |
 | POST | `/api/system` | `{"do": "reconnect" \| "restart" \| "reboot"}` | Reconnect USB (software replug) / restart service / reboot |
 
