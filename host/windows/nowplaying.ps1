@@ -730,7 +730,9 @@ function Invoke-HueCommand($cmd) {
 
 # Several times a second: commands from the Car Thing, pairing, and the lights' state.
 function Update-Hue {
-    $commands = (Invoke-RestMethod -Uri "http://127.0.0.1:$Port/api/commands" -TimeoutSec 5).hue
+    $polled = Invoke-RestMethod -Uri "http://127.0.0.1:$Port/api/commands" -TimeoutSec 5
+    $commands = $polled.hue
+    if ($polled.github_refresh) { $script:gitHubFetched = [DateTime]::MinValue }     # the refresh button on the Code page
     if (-not $script:hue -and -not $script:huePairing) { $script:hue = Read-HueConfig }
     foreach ($cmd in @($commands)) {
         if (-not $cmd) { continue }

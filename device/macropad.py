@@ -807,6 +807,7 @@ class GitHubStatus:
         self.ui, self.opener = ui, opener
         self.links = {}
         self.published = {'state': 'unknown'}
+        self.refresh = False      # a refresh asked for on the Car Thing, for the agent's next command poll
 
     def update(self, body):
         if body.get('none'):
@@ -1494,7 +1495,8 @@ class Handler(BaseHTTPRequestHandler):
             eid = (urllib.parse.parse_qs(self.path.partition('?')[2]).get('id') or [''])[0]
             self._send(200, pad.agenda.details.get(eid) or {'notes': '', 'calendar': ''})
         elif path == '/api/commands':
-            self._send(200, {'hue': pad.hue.take()})        # the agent collects these several times a second
+            refresh, pad.github.refresh = pad.github.refresh, False
+            self._send(200, {'hue': pad.hue.take(), 'github_refresh': refresh})   # the agent collects these several times a second
         elif path == '/api/events':
             self._events()
         else:
@@ -1581,6 +1583,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, {'ok': True, 'need_art': pad.plex.update(body)})
         elif path == '/api/github':
             pad.github.update(body)
+        elif path == '/api/github/refresh':
+            pad.github.refresh = True
         elif path == '/api/github/open':
             if not pad.stats.alive():
                 pad.toast('The computer agent is not running', 'warn')

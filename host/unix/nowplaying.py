@@ -478,6 +478,7 @@ HUE_FILE = os.path.join(os.path.dirname(CALENDAR_FILE), 'hue.json')
 class HueLink:
     def __init__(self):
         self.config = None             # {'bridge', 'key'}
+        self.github_refresh = False    # set from the command poll, cleared by the main loop
         self.pairing = None            # {'until', 'next', 'bridge'} while waiting for the button
         self.lists, self.listed = None, 0.0
         self.fetched, self.sent, self.sent_at = 0.0, None, 0.0
@@ -608,7 +609,9 @@ class HueLink:
     def update(self):
         """Commands from the Car Thing, pairing, and the lights' state every 2 s."""
         with urllib.request.urlopen('http://127.0.0.1:%d/api/commands' % PORT, timeout=5) as r:
-            commands = json.loads(r.read().decode('utf-8')).get('hue') or []
+            polled = json.loads(r.read().decode('utf-8'))
+        commands = polled.get('hue') or []
+        self.github_refresh = self.github_refresh or bool(polled.get('github_refresh'))   # the Code page's refresh button
         if not self.config and not self.pairing:
             self.load()
         for cmd in commands:
@@ -1044,6 +1047,8 @@ def main():
                 if reply.get('need_calendar'):
                     calendar_hash = None
             # GitHub every minute, or every 15 s while a workflow runs.
+            if hue.github_refresh:
+                github_fetched, hue.github_refresh = None, False
             if github_fetched is None or time.monotonic() - github_fetched >= (15 if github_busy else 60):
                 github_fetched = time.monotonic()
                 status = github.read()
