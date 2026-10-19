@@ -154,6 +154,13 @@ playing/paused and a live progress bar, with the media controls in a row below.
   - Linux: X11 (`xprop`), Hyprland, Sway, KDE Wayland with `kdotool`, and GNOME
     Wayland with the [Window Calls](https://extensions.gnome.org/extension/4724/window-calls/)
     extension, since GNOME doesn't share the focused window otherwise.
+- **Volume and audio devices:** when the volume or mute changes (the dial, the Mute
+  tile, your keyboard), a volume bar shows at the top for a moment. The Media page
+  header shows the current output; tap it to pick the output and input devices.
+  - Windows: Core Audio, the same switch the Sound settings use (all roles, so calls
+    move too).
+  - Linux: `pactl` (PipeWire or PulseAudio).
+  - macOS: the volume always; switching devices needs `brew install switchaudio-osx`.
 - **Clock:** the agent sets the Car Thing's clock and time zone (DST included).
   The time shows in the bottom bar, large with the date at the top of the Media
   page and on the standby screen; 24h/12h is under Settings → General → Clock.

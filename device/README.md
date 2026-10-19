@@ -231,6 +231,18 @@ number (0–359), drawn light on dark themes and dark on light ones.
 dimmer. Auto mode keeps the stock `sp-als-backlight` light-sensor service running.
 Manual mode stops it and writes `260 - level`.
 
+### Volume and audio devices
+
+The agent checks the default output's volume and mute, and the default output and
+input, several times a second (4 on Windows, 1 elsewhere), and posts `POST /api/audio`
+when they change and at least every 2 s; device lists are read every 3 s and sent only
+when they change (the reply asks for them with `need_lists` after a restart).
+`HostAudio` sends `audio` events; the UI shows its volume bar when the volume or
+mute changes, and right away when the volume dial turns. A page with `"audio": true`
+(Media) shows the output in its clock header; tapping it opens the device picker,
+which posts `POST /api/audio/set {id}`. The pick goes to the agent as `set: {id,
+kind}` in the reply to its next audio update, so switching takes under a second.
+
 ## config.json
 
 Top level:
@@ -247,7 +259,7 @@ Top level:
 | `hardware` | `knob`, `back`, `menu`: `{"tap": action, "hold": action}`; `dial_invert` |
 | `dial_modes` | `[{"name", "cw", "ccw", "press"}]` |
 | `presets` | Default 4 top-button actions |
-| `pages` | `[{"name", "presets"?, "grid"?, "nowplaying"?, "header"?, "widgets"?, "kill"?, "tiles": [...]}]`, or a choice slot (below) |
+| `pages` | `[{"name", "presets"?, "grid"?, "nowplaying"?, "header"?, "widgets"?, "kill"?, "audio"?, "tiles": [...]}]`, or a choice slot (below) |
 
 Tiles and presets are actions plus `label`, optional `icon` (an emoji) or `symbol`
 (a built-in icon drawn in the current icon style, or as an emoji in the emoji style),
@@ -304,8 +316,8 @@ page, or `adb shell`).
 | Method | Path | Body | Purpose |
 |---|---|---|---|
 | GET | `/api/ping` | | Health check (used by `shim.html`) |
-| GET | `/api/state` | | Config, state, presets, now playing, stats, agenda |
-| GET | `/api/events` | | SSE stream: `state`, `config`, `fired`, `turn`, `hw`, `toast`, `nowplaying`, `stats`, `agenda` |
+| GET | `/api/state` | | Config, state, presets, now playing, stats, agenda, audio |
+| GET | `/api/events` | | SSE stream: `state`, `config`, `fired`, `turn`, `hw`, `toast`, `nowplaying`, `stats`, `agenda`, `audio` |
 | GET | `/api/info` | | Uptime, temperature, memory, load, brightness |
 | POST | `/api/tap` | `{"page", "index"}` | Run a tile |
 | POST | `/api/preset` | `{"index"}` | Run a preset |
@@ -319,6 +331,8 @@ page, or `adb shell`).
 | POST | `/api/calendar/open` | `{"id"}` | Open an event's meeting link on the computer |
 | GET | `/api/calendar/event?id=…` | | An event's notes and calendar name |
 | POST | `/api/kill` | `{"pid"}` | Kill the focused app (it must still have focus); goes to the agent with its next stats reply |
+| POST | `/api/audio` | `{"volume", "muted", "output", "input", "outputs"?, "inputs"?}` | From the host agent. Replies `{"set": {"id", "kind"} or null, "need_lists": bool}` |
+| POST | `/api/audio/set` | `{"id"}` | Make an output or input the default on the computer |
 | POST | `/api/run` | any action | Run an action |
 | POST | `/api/system` | `{"do": "reconnect" \| "restart" \| "reboot"}` | Reconnect USB (software replug) / restart service / reboot |
 
