@@ -978,7 +978,7 @@ function renderSettings() {
     $('kv').innerHTML =
       '<span>Uptime</span><b>' + h + 'h ' + m + 'm</b>' +
       '<span>SoC temp</span><b>' + info.temp_c.toFixed(1) + ' °C</b>' +
-      '<span>Memory free</span><b>' + info.mem_avail_mb + ' / ' + info.mem_total_mb + ' MB</b>' +
+      '<span>Memory in use</span><b>' + (info.mem_total_mb - info.mem_avail_mb) + ' of ' + info.mem_total_mb + ' MB</b>' +
       '<span>Load</span><b>' + info.load.join(' ') + '</b>' +
       '<span>USB</span><b>' + st.usb + '</b>';
   }
@@ -1713,10 +1713,10 @@ function updateMonitor() {
   var mem = s.mem_total_mb ? s.mem_used_mb / s.mem_total_mb * 100 : null;
   var netMax = Math.max.apply(null, [64e3].concat((h.net_rx || []).concat(h.net_tx || []).filter(function (v) { return v != null; })));
   var html = mcard('CPU', pct(s.cpu), s.cpu_temp != null ? s.cpu_temp + ' °C' : '', spark(h.cpu, 100, 'v', true)) +
-    mcard('Memory', pct(mem), s.mem_total_mb ? fmtGB(s.mem_used_mb) + ' / ' + fmtGB(s.mem_total_mb) + ' GB' : '', spark(h.mem, 100, 'v', true));
+    mcard('Memory in use', pct(mem), s.mem_total_mb ? fmtGB(s.mem_used_mb) + ' of ' + fmtGB(s.mem_total_mb) + ' GB' : '', spark(h.mem, 100, 'v', true));
   if (s.gpu != null) {
     html += mcard('GPU', pct(s.gpu), [s.gpu_temp != null ? s.gpu_temp + ' °C' : '',
-      s.gpu_mem_total_mb ? fmtGB(s.gpu_mem_used_mb) + ' / ' + fmtGB(s.gpu_mem_total_mb) + ' GB' : ''].filter(function (x) { return x; }).join(' · '),
+      s.gpu_mem_total_mb ? fmtGB(s.gpu_mem_used_mb) + ' of ' + fmtGB(s.gpu_mem_total_mb) + ' GB' : ''].filter(function (x) { return x; }).join(' · '),
       spark(h.gpu, 100, 'v', true));
   }
   html += mcard('Network ↓', fmtRate(s.net_rx), '↑ ' + fmtRate(s.net_tx).replace(/<\/?small>/g, ' ').trim(),
