@@ -543,6 +543,55 @@ class HostStats:
             self.ui.publish('stats', None)
 
 
+AUDIO_TTL = 10          # seconds without audio updates before the state is dropped
+
+
+class HostAudio:
+    """The computer's volume, mute and audio devices, from the host agent: several times a
+    second while they change, and at least every 2 s. A device picked on the Media page is
+    queued and goes to the agent in the reply to its next update."""
+
+    def __init__(self, ui):
+        self.ui = ui
+        self.state = None
+        self.lists = {'outputs': [], 'inputs': []}    # the agent sends them only when they change
+        self.updated = None
+        self.pending = None       # ({id, kind}, monotonic time)
+
+    def update(self, body):
+        for key in ('outputs', 'inputs'):
+            if isinstance(body.get(key), list):
+                self.lists[key] = [{'id': str(d['id']), 'name': str(d.get('name') or d['id'])}
+                                   for d in body[key] if isinstance(d, dict) and d.get('id')]
+        volume = body.get('volume')
+        state = {'volume': volume if isinstance(volume, int) and not isinstance(volume, bool) else None,
+                 'muted': bool(body.get('muted')),
+                 'output': body['output'] if isinstance(body.get('output'), str) else None,
+                 'input': body['input'] if isinstance(body.get('input'), str) else None,
+                 'outputs': self.lists['outputs'], 'inputs': self.lists['inputs']}
+        if state != self.state:
+            self.state = state
+            self.ui.publish('audio', state)
+        self.updated = time.monotonic()
+        pending, self.pending = self.pending, None
+        return {'ok': True, 'set': pending[0] if pending and time.monotonic() - pending[1] < 10 else None,
+                'need_lists': not any(self.lists.values())}
+
+    def choose(self, device_id):
+        """Queue a device to become the default; returns its name, or None if unknown."""
+        for kind in ('output', 'input'):
+            for d in self.lists[kind + 's']:
+                if d['id'] == device_id:
+                    self.pending = ({'id': device_id, 'kind': kind}, time.monotonic())
+                    return d['name']
+        return None
+
+    def expire(self):
+        if self.state is not None and time.monotonic() - self.updated > AUDIO_TTL:
+            self.state = None
+            self.ui.publish('audio', None)
+
+
 AGENDA_DAYS = 7         # today and the next days
 AGENDA_MAX = 80         # events sent to the UI
 EPOCH = datetime.datetime(1970, 1, 1)
@@ -673,6 +722,7 @@ class Pad:
         self.host = HostLink(lambda: self.publish_state())
         self.stats = HostStats(self.ui, self.toast)
         self.agenda = Agenda(self.ui, self.host)
+        self.audio = HostAudio(self.ui)
         self.hid = Hid(lambda status: self.on_usb_status(status))
         self.config = {}
         self.config_mtime = 0
@@ -1188,7 +1238,8 @@ class Handler(BaseHTTPRequestHandler):
             self._send(200, pad.info())
         elif path == '/api/state':
             self._send(200, {'config': pad.config, 'state': pad.state(), 'presets': pad.presets(),
-                             'nowplaying': pad.np.meta, 'stats': pad.stats.snapshot(), 'agenda': pad.agenda.published})
+                             'nowplaying': pad.np.meta, 'stats': pad.stats.snapshot(), 'agenda': pad.agenda.published,
+                             'audio': pad.audio.state})
         elif path == '/api/nowplaying':
             self._send(200, {'nowplaying': pad.np.meta})
         elif path == '/api/nowplaying/art':
@@ -1273,6 +1324,11 @@ class Handler(BaseHTTPRequestHandler):
             pad.stats.update(body)
             return self._send(200, {'ok': True, 'open': pad.agenda.take_open(), 'kill': pad.stats.take_kill(),
                                     'need_calendar': pad.agenda.needs_calendar()})
+        elif path == '/api/audio':
+            return self._send(200, pad.audio.update(body))
+        elif path == '/api/audio/set':
+            name = pad.audio.choose(str(body.get('id')))
+            pad.toast('Switching to %s…' % name if name else 'That audio device is gone', 'info' if name else 'warn')
         elif path == '/api/kill':
             problem = pad.stats.kill(body.get('pid'))
             if problem:
@@ -1483,6 +1539,7 @@ def main():
             pad.np.expire()
             pad.host.expire()
             pad.stats.expire()
+            pad.audio.expire()
             pad.agenda.refresh()
     finally:
         pad.hid.close()
