@@ -132,8 +132,8 @@ them to the Car Thing **over the USB cable** (`adb forward`; no network):
 playing/paused and a live progress bar, with the media controls in a row below.
   When nothing is playing, or the agent isn't running, it's the normal tile page.
 - **Clock:** the agent sets the Car Thing's clock and time zone (DST included).
-  The time shows in the bottom bar and, large with the date, on the standby
-  screen; 24h/12h is under Settings → General → Clock.
+  The time shows in the bottom bar, large with the date at the top of the Media
+  page and on the standby screen; 24h/12h is under Settings → General → Clock.
 - **Lock screen:** while the computer is locked, the Car Thing shows the clock,
   "🔒 Computer locked", the cover and what's playing, and media buttons. Tiles,
   presets and dial modes that press keys are blocked while locked, so nothing gets

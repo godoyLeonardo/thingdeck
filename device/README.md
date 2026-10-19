@@ -160,7 +160,9 @@ updates every 2 s stay small. The UI gets `nowplaying` events over SSE, loads th
 cover from `/api/nowplaying/art?k=…`, and moves the progress bar between updates.
 With no update for 15 s the data is dropped (computer off, agent stopped).
 
-A page with `"nowplaying": true` (Media, by default) switches to the now-playing
+A page with `"header": "clock"` (Media, by default) shows a big clock and the date
+in place of the preset labels and dial chip, as long as the agent has set the
+time; the presets and dial still work. A page with `"nowplaying": true` (Media, by default) switches to the now-playing
 layout while something plays: cover, details and progress on top, and its tiles
 as a compact row of controls below.
 
@@ -194,7 +196,7 @@ Top level:
 | `hardware` | `knob`, `back`, `menu`: `{"tap": action, "hold": action}`; `dial_invert` |
 | `dial_modes` | `[{"name", "cw", "ccw", "press"}]` |
 | `presets` | Default 4 top-button actions |
-| `pages` | `[{"name", "presets"?, "grid"?, "nowplaying"?, "tiles": [...]}]`, or a choice slot (below) |
+| `pages` | `[{"name", "presets"?, "grid"?, "nowplaying"?, "header"?, "tiles": [...]}]`, or a choice slot (below) |
 
 Tiles and presets are actions plus `label`, optional `icon` (an emoji) or `symbol`
 (a built-in icon: `play`, `pause`, `prev`, `next`, `stop`, `mute`, `note`, drawn in
