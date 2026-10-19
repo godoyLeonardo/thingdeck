@@ -17,6 +17,7 @@ STREAMTHING_PORT (host side of the forward, default 28765), STREAMTHING_CALENDAR
 (calendars.txt; default ~/.config/streamthing/ on Linux,
 ~/Library/Application Support/streamthing/ on macOS).
 """
+import ast
 import base64
 import datetime
 import glob
@@ -25,6 +26,7 @@ import json
 import os
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import time
@@ -275,6 +277,110 @@ class Stats:
             return
 
 
+# ------------------------------------------------------------------ focused app (kill switch)
+
+# Never offered for killing: the session, the compositor or window server, and this agent.
+PROTECTED = {'systemd', 'init', 'gnome-shell', 'gnome-session-b', 'mutter', 'kwin_wayland', 'kwin_x11', 'plasmashell',
+             'xorg', 'xwayland', 'sway', 'hyprland', 'gdm', 'sddm', 'finder', 'dock', 'windowserver', 'loginwindow',
+             'systemuiserver', 'controlcenter'}
+
+
+def process_name(pid):
+    if sys.platform == 'darwin':
+        return (run(['ps', '-p', str(pid), '-o', 'comm=']) or '').strip().rsplit('/', 1)[-1] or None
+    return (read_file('/proc/%d/comm' % pid) or '').strip() or None
+
+
+def window_from_tree(node):
+    """Sway's focused window in its layout tree."""
+    if node.get('focused') and node.get('pid'):
+        return node
+    for child in node.get('nodes', []) + node.get('floating_nodes', []):
+        found = window_from_tree(child)
+        if found:
+            return found
+    return None
+
+
+def linux_focus():
+    """(pid, window title) of the focused window, or (None, why not)."""
+    env = os.environ
+    if env.get('HYPRLAND_INSTANCE_SIGNATURE'):
+        window = json.loads(run(['hyprctl', 'activewindow', '-j']) or '{}')
+        return window.get('pid'), window.get('title', '')
+    if env.get('SWAYSOCK'):
+        window = window_from_tree(json.loads(run(['swaymsg', '-t', 'get_tree']) or '{}')) or {}
+        return window.get('pid'), window.get('name', '')
+    desktop = env.get('XDG_CURRENT_DESKTOP', '').upper()
+    wayland = env.get('XDG_SESSION_TYPE') == 'wayland' or env.get('WAYLAND_DISPLAY')
+    if 'GNOME' in desktop and wayland:
+        # GNOME keeps the focused window to itself; the "Window Calls" extension shares it.
+        out = run(['gdbus', 'call', '--session', '--dest', 'org.gnome.Shell', '--object-path',
+                   '/org/gnome/Shell/Extensions/Windows', '--method', 'org.gnome.Shell.Extensions.Windows.List'])
+        if out is None:
+            return None, 'needs the Window Calls GNOME extension'
+        try:
+            windows = json.loads(ast.literal_eval(out.strip())[0])
+        except (ValueError, SyntaxError, IndexError):
+            return None, 'Window Calls gave an unexpected answer'
+        window = next((w for w in windows if w.get('focus')), {})
+        return window.get('pid'), window.get('title') or window.get('wm_class') or ''
+    if 'KDE' in desktop and wayland:
+        if not shutil.which('kdotool'):
+            return None, 'needs kdotool on KDE Wayland'
+        window = (run(['kdotool', 'getactivewindow']) or '').strip()
+        return as_int(run(['kdotool', 'getwindowpid', window])), (run(['kdotool', 'getwindowname', window]) or '').strip()
+    if env.get('DISPLAY') and shutil.which('xprop'):
+        active = re.search(r'0x[0-9a-f]+', run(['xprop', '-root', '_NET_ACTIVE_WINDOW']) or '')
+        if active:
+            props = run(['xprop', '-id', active.group(0), '_NET_WM_PID', '_NET_WM_NAME']) or ''
+            pid, title = re.search(r'_NET_WM_PID\(CARDINAL\) = (\d+)', props), re.search(r'_NET_WM_NAME\(\w+\) = "(.*)"', props)
+            return (int(pid.group(1)) if pid else None), (title.group(1) if title else '')
+    return None, 'not supported on this desktop'
+
+
+def mac_focus():
+    """The frontmost app through lsappinfo, which needs no permission prompt."""
+    front = (run(['lsappinfo', 'front']) or '').strip()
+    info = run(['lsappinfo', 'info', '-only', 'pid', '-only', 'name', front]) if front else None
+    pid, name = re.search(r'"pid"=(\d+)', info or ''), re.search(r'"LSDisplayName"="(.*?)"', info or '')
+    return (int(pid.group(1)) if pid else None), (name.group(1) if name else '')
+
+
+def focus():
+    """{'pid', 'name', 'app', 'title', 'protected'} of the focused app, or {'error': why not}."""
+    pid, title = mac_focus() if sys.platform == 'darwin' else linux_focus()
+    if not pid:
+        return {'error': title} if title else None
+    name = process_name(pid)
+    if not name:
+        return None
+    return {'pid': pid, 'name': name, 'app': (title if sys.platform == 'darwin' else '') or name,
+            'title': '' if sys.platform == 'darwin' else title,
+            'protected': name.lower() in PROTECTED or pid in (os.getpid(), os.getppid())}
+
+
+def kill_focused(target):
+    """Kill what the Car Thing showed: the same process id and still the same program."""
+    result = {'name': str(target.get('app') or target.get('name')), 'ok': False}
+    pid = as_int(target.get('pid'))
+    name = process_name(pid) if pid else None
+    if not name or name != target.get('name'):
+        result['error'] = 'it is not running anymore'
+    elif name.lower() in PROTECTED or pid in (os.getpid(), os.getppid()):
+        result['error'] = 'it is protected'
+    else:
+        try:
+            os.kill(pid, signal.SIGKILL)     # what Force Quit does
+            log('killed %s (%d)' % (name, pid))
+            result['ok'] = True
+        except PermissionError:
+            result['error'] = 'permission denied: it runs as another user'
+        except OSError as e:
+            result['error'] = str(e)
+    return result
+
+
 # ------------------------------------------------------------------ calendars
 
 # Each line is an iCal address, such as Google Calendar's "Secret address in iCal format".
@@ -372,13 +478,14 @@ def main():
         stats.read()
         time.sleep(1)
         print(json.dumps(stats.read(), indent=2))
+        print(json.dumps(focus(), indent=2, ensure_ascii=False))
         return
     log('started (adb: %s, port %d)' % (ADB, PORT))
     tunnel = False
     last_signature, last_sent = None, 0.0
     cover_sent_for, cover_tries = '', 0
     last_host, last_host_sent = None, 0.0
-    last_stats = 0.0
+    last_stats, kill_result = 0.0, None
     calendars, calendars_fetched, fetched_hash, calendar_hash = None, None, None, None
     while True:
         try:
@@ -389,10 +496,17 @@ def main():
                     continue
                 tunnel = True
                 last_signature, cover_sent_for, last_host, calendar_hash = None, '', None, None
-            # Stats every 2 s; the reply may ask to open a meeting link or to resend the calendars.
+            # Stats (and the focused app) every 2 s; the reply may ask to kill that app, open a
+            # meeting link or resend the calendars.
             if time.monotonic() - last_stats >= 2:
                 last_stats = time.monotonic()
-                reply = send('stats', stats.read())
+                body = stats.read()
+                body['focus'] = focus()
+                if kill_result:
+                    body['kill_result'], kill_result = kill_result, None
+                reply = send('stats', body)
+                if reply.get('kill'):
+                    kill_result, last_stats = kill_focused(reply['kill']), 0.0     # report it right away
                 link = reply.get('open')
                 if link and MEETING_URL.match(link):
                     log('opening', link.split('?')[0])
