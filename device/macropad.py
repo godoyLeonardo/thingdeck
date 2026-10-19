@@ -28,7 +28,7 @@ WEBAPP_DIR = '/usr/share/qt-superbird-app/webapp'
 BACKLIGHT = '/sys/class/backlight/aml-bl/brightness'
 BRIGHTNESS_MIN = 5          # brightness levels run 5..255 (Settings slider)
 THEMES = ('dark', 'black', 'light', 'nord', 'dracula', 'catppuccin', 'gruvbox', 'tokyonight', 'solarized')
-ACCENTS = ('theme', 'green', 'blue', 'purple', 'orange', 'pink', 'red')   # palettes: web/index.html
+ACCENTS = ('theme', 'green', 'blue', 'purple', 'orange', 'pink', 'red')   # palettes: web/index.html; or a hue 0-359
 OS_MODES = ('auto', 'windows', 'mac', 'linux')
 ICON_STYLES = ('solid', 'outline', 'emoji')   # icon sets: web/index.html
 ICON_COLORS = ('neutral', 'accent', 'category')
@@ -569,7 +569,7 @@ class Pad:
             'layout': lambda v: v is None or v in LAYOUTS,
             'dial_invert': lambda v: v is None or isinstance(v, bool),
             'theme': lambda v: v in THEMES,
-            'accent': lambda v: v in ACCENTS,
+            'accent': lambda v: v in ACCENTS or (type(v) is int and 0 <= v < 360),
             'clock_24h': lambda v: isinstance(v, bool),
             'icon_style': lambda v: v is None or v in ICON_STYLES,
             'icon_color': lambda v: v is None or v in ICON_COLORS,
