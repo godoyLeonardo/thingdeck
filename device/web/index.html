@@ -122,7 +122,7 @@
   body.topclock #topclock { display: flex; }
   .tc-time { font-size: 52px; font-weight: 600; line-height: 1; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
   .tc-suffix { font-size: calc(22px * var(--ts)); font-weight: 500; color: var(--muted); margin-left: 6px; }
-  .tc-date { font-size: calc(22px * var(--ts)); font-weight: 500; color: var(--muted); margin-left: 18px; overflow: hidden; text-overflow: ellipsis; }
+  .tc-date { flex: 0 1 auto; min-width: 0; font-size: calc(22px * var(--ts)); font-weight: 500; color: var(--muted); margin-left: 18px; overflow: hidden; text-overflow: ellipsis; }
   #presets { flex: 1; display: grid; grid-template-columns: repeat(4, 1fr); grid-gap: 8px; margin-right: 8px; }
   .preset { display: flex; align-items: center; background: var(--panel); border-radius: 12px; padding: 0 10px;
     min-width: 0; transition: background .15s; }
@@ -328,6 +328,14 @@
   #volhud.muted .vh-bar i { background: var(--muted); }
   #volhud.muted .vh-num { color: var(--muted); }
   .vh-num { width: 42px; text-align: right; font-size: calc(21px * var(--ts)); font-weight: 700; font-variant-numeric: tabular-nums; }
+  /* the song playing, in the clock header of pages other than Media; tap for Media */
+  #topnp { flex: 0 1 auto; min-width: 0; max-width: 48%; align-self: center; margin-left: auto; display: flex; align-items: center;
+    height: 42px; padding: 0 16px 0 12px; border-radius: 21px; background: var(--tile); font-size: calc(15px * var(--ts)); }
+  #topnp svg { flex: none; width: 20px; height: 20px; margin-right: 8px; color: var(--acc); }
+  #topnp .emoji { font-size: 17px; margin-right: 8px; }
+  #topnp span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
+  #topnp b { color: var(--text); font-weight: 600; }
+  #topnp.down { background: var(--tile-hi); }
   #audiopill { flex: none; align-self: center; margin-left: auto; display: flex; align-items: center; max-width: 290px;
     height: 42px; padding: 0 16px 0 12px; border-radius: 21px; background: var(--tile); font-size: calc(15px * var(--ts)); font-weight: 600; }
   #audiopill svg { flex: none; width: 22px; height: 22px; margin-right: 8px; color: var(--muted); }
@@ -532,7 +540,7 @@
 </head>
 <body>
   <div id="top">
-    <div id="topclock"><span class="tc-time"></span><span class="tc-suffix"></span><span class="tc-date"></span><div id="audiopill" data-audio="1"></div></div>
+    <div id="topclock"><span class="tc-time"></span><span class="tc-suffix"></span><span class="tc-date"></span><div id="topnp" data-goto-media="1"></div><div id="audiopill" data-audio="1"></div></div>
     <div id="presets"></div>
     <div id="dial">
       <svg viewBox="0 0 26 26" fill="none"><circle cx="13" cy="13" r="10.5" style="stroke:var(--muted)" stroke-width="2"/><line x1="13" y1="4.5" x2="13" y2="9.5" style="stroke:var(--acc)" stroke-width="2.4" stroke-linecap="round"/></svg>
@@ -814,6 +822,7 @@ function render() {
   if (showSettings) renderSettings();
   renderStatus();
   updateAudioPill();
+  updateTopNp();
   updateStandby();
   updateLock();
   tick();
@@ -1143,6 +1152,7 @@ function renderNowPlaying(page, g) {
   updateNowPlaying();
 }
 function updateNowPlaying() {
+  updateTopNp();
   if (lockShown) updateLock();
   var pp = $('grid').querySelector('[data-playpause]');
   if (pp) {
@@ -1335,6 +1345,18 @@ function deviceIcon(name, input) {
 }
 function currentDevice(kind) {
   return audio && (audio[kind + 's'] || []).filter(function (d) { return d.id === audio[kind]; })[0];
+}
+// The song playing, in the clock header of every page but the media card itself.
+function updateTopNp() {
+  var box = $('topnp'), show = !!(np && np.title && currentPage.header === 'clock' && !currentPage.nowplaying);
+  box.style.display = show ? '' : 'none';
+  if (!show) return;
+  var html = icon(np.playing ? 'note' : 'pause') + '<span><b>' + esc(np.title) + '</b>' + (np.artist ? ' · ' + esc(np.artist) : '') + '</span>';
+  if (box.innerHTML !== html) box.innerHTML = html;
+}
+function gotoMedia() {
+  var i = orderedEntries().map(resolvePage).findIndex(function (p) { return p.nowplaying; });
+  if (i >= 0) post('/api/page', { page: i });
 }
 function updateAudioPill() {
   var pill = $('audiopill'), out = currentDevice('output');
@@ -1778,7 +1800,7 @@ document.addEventListener('pointerdown', function (e) {
   startX = e.clientX; startY = e.clientY;
   startInBar = !!e.target.closest('#bar');
   startOnSlider = !!e.target.closest('[data-hue-bar], [data-hue-lbar]');   // dragging a light's brightness, not swiping
-  downEl = e.target.closest('.tile[data-i], .preset[data-i], #dial, .tab, #status, [data-set], [data-sys], [data-sec], [data-choice-slot], [data-media], [data-join], [data-guard], [data-kill], [data-ev], [data-sheet-close], [data-sheet-card], [data-audio], [data-audio-dev], [data-gh], #tabmore, [data-hue-room], [data-hue-toggle], [data-hue-ltoggle], [data-hue-scene], [data-hue-alloff], [data-hue-pair], [data-hue-bar], [data-hue-lbar], [data-tab-move], [data-tabs-reset], [data-tab-hide]');
+  downEl = e.target.closest('.tile[data-i], .preset[data-i], #dial, .tab, #status, [data-set], [data-sys], [data-sec], [data-choice-slot], [data-media], [data-join], [data-guard], [data-kill], [data-ev], [data-sheet-close], [data-sheet-card], [data-audio], [data-audio-dev], [data-gh], #tabmore, [data-hue-room], [data-hue-toggle], [data-hue-ltoggle], [data-hue-scene], [data-hue-alloff], [data-hue-pair], [data-hue-bar], [data-hue-lbar], [data-tab-move], [data-tabs-reset], [data-tab-hide], [data-goto-media]');
   if (downEl) downEl.classList.add('down');
 });
 document.addEventListener('pointercancel', function () { if (downEl) downEl.classList.remove('down'); downEl = null; });
@@ -1806,6 +1828,7 @@ document.addEventListener('pointerup', function (e) {
   else if (el.hasAttribute('data-tab-move')) { var mv = el.getAttribute('data-tab-move').split('|'); moveTab(mv[0], parseInt(mv[1], 10)); }
   else if (el.hasAttribute('data-tabs-reset')) post('/api/settings', { page_order: [], page_hidden: [] });
   else if (el.hasAttribute('data-tab-hide')) toggleTab(el.getAttribute('data-tab-hide'));
+  else if (el.hasAttribute('data-goto-media')) gotoMedia();
   else if (el.hasAttribute('data-hue-bar') || el.hasAttribute('data-hue-lbar')) { }       // handled by the drag code
   else if (el.hasAttribute('data-hue-toggle')) hueToggle(el.getAttribute('data-hue-toggle'), false);
   else if (el.hasAttribute('data-hue-ltoggle')) hueToggle(el.getAttribute('data-hue-ltoggle'), true);
