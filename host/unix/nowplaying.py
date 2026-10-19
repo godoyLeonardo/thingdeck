@@ -461,8 +461,69 @@ class AudioLink:
 CALENDAR_FILE = os.environ.get('STREAMTHING_CALENDARS') or os.path.expanduser(
     '~/Library/Application Support/streamthing/calendars.txt' if sys.platform == 'darwin'
     else '~/.config/streamthing/calendars.txt')
-# Meeting links the Car Thing may ask to open: https links of known meeting services.
-MEETING_URL = re.compile(r'^https://(meet\.google\.com|([a-z0-9-]+\.)?zoom\.us|teams\.microsoft\.com|teams\.live\.com)/')
+# Links the Car Thing may ask to open: https links of known meeting services, and GitHub.
+OPENABLE_URL = re.compile(
+    r'^https://(meet\.google\.com|([a-z0-9-]+\.)?zoom\.us|teams\.microsoft\.com|teams\.live\.com|github\.com)/')
+
+# ------------------------------------------------------------------ GitHub
+
+# A repo's latest workflow runs and your open pull requests, through the gh CLI, which
+# keeps the login (nothing is stored here). The repo is the first line of github.txt next
+# to calendars.txt ("name" for one of yours, or "owner/name").
+GITHUB_FILE = os.path.join(os.path.dirname(CALENDAR_FILE), 'github.txt')
+PR_QUERY = ('query { viewer { pullRequests(states: OPEN, first: 20, orderBy: {field: UPDATED_AT, direction: DESC}) '
+            '{ nodes { number title url isDraft updatedAt reviewDecision repository { nameWithOwner } '
+            'commits(last: 1) { nodes { commit { statusCheckRollup { state } } } } } } } }')
+
+
+def gh(*args, stdin=None):
+    out = subprocess.run(['gh'] + list(args), input=stdin, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                         timeout=30, universal_newlines=True)
+    if out.returncode != 0:
+        raise OSError((out.stderr.strip().split('\n') or ['gh failed'])[0])
+    return out.stdout
+
+
+class GitHub:
+    def __init__(self):
+        self.name, self.full = '', ''      # the github.txt line and what it resolved to
+
+    def read(self):
+        try:
+            with open(GITHUB_FILE) as f:
+                name = next((l.strip() for l in f if l.strip() and not l.strip().startswith('#')), '')
+        except OSError:
+            name = ''
+        if not name:
+            return {'none': True}
+        result = {'repo': name, 'runs': [], 'prs': []}
+        if not shutil.which('gh'):
+            result['error'] = 'Install the GitHub CLI (gh) and sign in (see README)'
+            return result
+        try:
+            if self.name != name:              # "name" alone: one of the signed-in account's repos
+                full = name if '/' in name else gh('repo', 'view', name, '--json', 'nameWithOwner', '-q', '.nameWithOwner').strip()
+                self.name, self.full = name, full
+            result['repo'] = self.full
+            seen = set()
+            for run in json.loads(gh('run', 'list', '-R', self.full, '-L', '40', '--json',
+                                     'workflowName,displayTitle,status,conclusion,headBranch,event,createdAt,updatedAt,url')):
+                if run['workflowName'] in seen or len(result['runs']) == 5:     # the newest run of each workflow
+                    continue
+                seen.add(run['workflowName'])
+                result['runs'].append({'workflow': run['workflowName'], 'status': run['status'], 'conclusion': run['conclusion'],
+                                       'branch': run['headBranch'], 'title': run['displayTitle'], 'event': run['event'],
+                                       'created': run['createdAt'], 'updated': run['updatedAt'], 'url': run['url']})
+            prs = json.loads(gh('api', 'graphql', '--input', '-', stdin=json.dumps({'query': PR_QUERY})))
+            for pr in prs['data']['viewer']['pullRequests']['nodes']:
+                commits = pr['commits']['nodes']
+                rollup = commits[0]['commit']['statusCheckRollup'] if commits else None
+                result['prs'].append({'repo': pr['repository']['nameWithOwner'], 'number': pr['number'], 'title': pr['title'],
+                                      'draft': pr['isDraft'], 'review': pr['reviewDecision'], 'updated': pr['updatedAt'],
+                                      'url': pr['url'], 'checks': rollup['state'] if rollup else None})
+        except (OSError, ValueError, KeyError, TypeError, subprocess.TimeoutExpired) as e:
+            result['error'] = str(e)
+        return result
 
 
 def fetch_calendars():
@@ -562,6 +623,7 @@ def main():
     last_stats, kill_result = 0.0, None
     audio = AudioLink()
     calendars, calendars_fetched, fetched_hash, calendar_hash = None, None, None, None
+    github, github_fetched, github_busy = GitHub(), None, False
     while True:
         try:
             if not tunnel:
@@ -583,11 +645,17 @@ def main():
                 if reply.get('kill'):
                     kill_result, last_stats = kill_focused(reply['kill']), 0.0     # report it right away
                 link = reply.get('open')
-                if link and MEETING_URL.match(link):
+                if link and OPENABLE_URL.match(link):
                     log('opening', link.split('?')[0])
                     open_link(link)
                 if reply.get('need_calendar'):
                     calendar_hash = None
+            # GitHub every minute, or every 15 s while a workflow runs.
+            if github_fetched is None or time.monotonic() - github_fetched >= (15 if github_busy else 60):
+                github_fetched = time.monotonic()
+                status = github.read()
+                github_busy = any(r['status'] != 'completed' for r in status.get('runs', []))
+                send('github', status)
             if calendars_fetched is None or time.monotonic() - calendars_fetched >= 300:
                 calendars_fetched = time.monotonic()
                 calendars = fetch_calendars()
