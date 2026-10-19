@@ -7,13 +7,13 @@
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
-NAME=streamthing-nowplaying
+NAME=thingdeck-agent
 
 need() { command -v "$1" >/dev/null || { echo "missing: $1. $2"; exit 1; }; }
 
 case "$(uname -s)" in
 Linux)
-    DIR="$HOME/.local/share/streamthing"
+    DIR="$HOME/.local/share/thingdeck"
     UNIT="$HOME/.config/systemd/user/$NAME.service"
     if [ "${1:-}" = "--uninstall" ]; then
         systemctl --user disable --now "$NAME" 2>/dev/null || true
@@ -28,7 +28,7 @@ Linux)
     cp "$HERE/nowplaying.py" "$DIR/nowplaying.py"
     cat > "$UNIT" <<EOF
 [Unit]
-Description=streamthing: send what is playing to the Car Thing over adb
+Description=thingdeck agent: send the Car Thing the time, what is playing, stats, calendars and GitHub status over adb
 
 [Service]
 ExecStart=$(command -v python3) $DIR/nowplaying.py
@@ -45,8 +45,8 @@ EOF
     echo "installed and started. Log: journalctl --user -u $NAME -f"
     ;;
 Darwin)
-    DIR="$HOME/Library/Application Support/streamthing"
-    PLIST="$HOME/Library/LaunchAgents/com.streamthing.nowplaying.plist"
+    DIR="$HOME/Library/Application Support/thingdeck"
+    PLIST="$HOME/Library/LaunchAgents/com.thingdeck.agent.plist"
     if [ "${1:-}" = "--uninstall" ]; then
         launchctl bootout "gui/$(id -u)" "$PLIST" 2>/dev/null || true
         rm -f "$PLIST" "$DIR/nowplaying.py"
@@ -62,7 +62,7 @@ Darwin)
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>Label</key><string>com.streamthing.nowplaying</string>
+  <key>Label</key><string>com.thingdeck.agent</string>
   <key>ProgramArguments</key>
   <array><string>$(command -v python3)</string><string>$DIR/nowplaying.py</string></array>
   <key>EnvironmentVariables</key>

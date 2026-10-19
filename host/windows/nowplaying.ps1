@@ -1,5 +1,5 @@
 <#
-streamthing agent for Windows.
+thingdeck agent for Windows.
 
 Sends the Car Thing the computer's time (for its clock) and lock state, system stats
 (CPU, memory, GPU, network), the focused app, the volume and audio devices, the
@@ -17,7 +17,7 @@ install.ps1 sets it up to start at logon.
 param(
     [string]$Adb = '',
     [int]$Port = 28765,      # host side of the adb forward; the device listens on 8765
-    [string]$LogFile = "$env:USERPROFILE\.streamthing\nowplaying.log",
+    [string]$LogFile = "$env:USERPROFILE\.thingdeck\nowplaying.log",
     [switch]$Once
 )
 $ErrorActionPreference = 'Stop'
@@ -142,7 +142,7 @@ function Send-Json([string]$path, $body) {
 Add-Type @'
 using System;
 using System.Runtime.InteropServices;
-public static class StreamthingStats {
+public static class ThingdeckStats {
     [StructLayout(LayoutKind.Sequential)]
     public class MemoryStatus {
         public uint Length = 64; public uint Load; public ulong TotalPhys; public ulong AvailPhys;
@@ -168,7 +168,7 @@ public static class StreamthingStats {
     }
 }
 '@
-[void][StreamthingStats]::Cpu()
+[void][ThingdeckStats]::Cpu()
 
 # --- the focused app, for the Status page's kill switch. A Store app's window belongs to
 # ApplicationFrameHost; the app itself owns one of its child windows.
@@ -176,7 +176,7 @@ Add-Type @'
 using System;
 using System.Runtime.InteropServices;
 using System.Text;
-public static class StreamthingFocus {
+public static class ThingdeckFocus {
     delegate bool EnumProc(IntPtr hWnd, IntPtr lParam);
     [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
     [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint pid);
@@ -210,12 +210,12 @@ public static class StreamthingFocus {
 # Never offered for killing: Windows itself, the shell (Explorer also draws the taskbar), and this agent.
 $ProtectedNames = @('explorer', 'dwm', 'csrss', 'winlogon', 'wininit', 'lsass', 'services', 'smss', 'svchost', 'system',
     'idle', 'logonui', 'lockapp', 'sihost', 'shellexperiencehost', 'startmenuexperiencehost', 'searchhost',
-    'textinputhost', 'applicationframehost', 'streamthing-nowplaying')
+    'textinputhost', 'applicationframehost', 'thingdeck-agent')
 $SelfIds = @($PID, (Get-CimInstance Win32_Process -Filter "ProcessId = $PID").ParentProcessId)
 $focusApp = @{ pid = 0; app = '' }      # the last focused process's display name, looked up once per process
 
 function Get-Focus {
-    $id = [StreamthingFocus]::Pid()
+    $id = [ThingdeckFocus]::Pid()
     $proc = if ($id) { Get-Process -Id $id -ErrorAction SilentlyContinue }
     if (-not $proc) { return $null }
     if ($script:focusApp.pid -ne $id) {
@@ -223,7 +223,7 @@ function Get-Focus {
         $script:focusApp = @{ pid = $id; app = $(if ($description) { $description } else { $proc.ProcessName }) }
     }
     [ordered]@{
-        pid = [int]$id; name = $proc.ProcessName; app = $script:focusApp.app; title = [StreamthingFocus]::Title
+        pid = [int]$id; name = $proc.ProcessName; app = $script:focusApp.app; title = [ThingdeckFocus]::Title
         protected = ($ProtectedNames -contains $proc.ProcessName.ToLower()) -or ($SelfIds -contains [int]$id)
     }
 }
@@ -253,7 +253,7 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 
-namespace StreamthingAudio {
+namespace ThingdeckAudio {
     [ComImport, Guid("A95664D2-9614-4F35-A746-DE8DB63617E6"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
     interface IMMDeviceEnumerator {
         int EnumAudioEndpoints(int dataFlow, int stateMask, out IMMDeviceCollection devices);
@@ -380,7 +380,7 @@ $audioLists = $null
 $audioSent = $null; $audioListsSent = $null; $audioSentAt = [DateTime]::MinValue
 
 function Get-AudioDevices([string]$kind) {
-    foreach ($d in [StreamthingAudio.Audio]::Devices($kind)) { [ordered]@{ id = $d[0]; name = $d[1] } }
+    foreach ($d in [ThingdeckAudio.Audio]::Devices($kind)) { [ordered]@{ id = $d[0]; name = $d[1] } }
 }
 
 function Read-Audio {
@@ -389,10 +389,10 @@ function Read-Audio {
         $script:audioLists = [ordered]@{ outputs = @(Get-AudioDevices 'output'); inputs = @(Get-AudioDevices 'input') }
     }
     $muted = $false
-    $volume = [StreamthingAudio.Audio]::Volume([ref]$muted)
+    $volume = [ThingdeckAudio.Audio]::Volume([ref]$muted)
     [ordered]@{
         volume = $(if ($volume -ge 0) { $volume } else { $null }); muted = $muted
-        output = [StreamthingAudio.Audio]::DefaultId('output'); input = [StreamthingAudio.Audio]::DefaultId('input')
+        output = [ThingdeckAudio.Audio]::DefaultId('output'); input = [ThingdeckAudio.Audio]::DefaultId('input')
     }
 }
 
@@ -410,7 +410,7 @@ function Update-Audio {
     if ($reply.need_lists) { $script:audioListsSent = $null }
     if ($reply.set) {
         try {
-            [StreamthingAudio.Audio]::SetDefault([string]$reply.set.id)
+            [ThingdeckAudio.Audio]::SetDefault([string]$reply.set.id)
             $script:audioListed = [DateTime]::MinValue
         } catch { Write-Log "audio: could not switch: $($_.Exception.Message)" }
     }
@@ -419,8 +419,8 @@ $nvidiaSmi = (Get-Command nvidia-smi.exe -ErrorAction SilentlyContinue).Source
 $lastNet = $null
 
 function Get-Stats {
-    $cpu = [StreamthingStats]::Cpu()
-    $mem = [StreamthingStats]::Memory()
+    $cpu = [ThingdeckStats]::Cpu()
+    $mem = [ThingdeckStats]::Memory()
     $stats = [ordered]@{
         cpu = $(if ($cpu -ge 0) { [Math]::Round($cpu, 1) } else { $null })
         mem_total_mb = [int64]($mem[0] / 1MB)

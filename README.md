@@ -1,4 +1,4 @@
-# streamthing
+# thingdeck
 
 Turns a Spotify Car Thing into a USB macro pad and media controller, a small
 Stream Deck. It needs **no app on the computer**. The computer sees a standard
@@ -185,9 +185,9 @@ login, survives unplugging and sleep, and needs `adb` (see [Requirements](#requi
 | macOS | `nowplaying-cli`, or Spotify and Music through AppleScript | `host/unix/install.sh` |
 
 - **Windows:** a Task Scheduler task at logon starts a tiny windowless launcher
-  in `%USERPROFILE%\.streamthing`. Log: `%USERPROFILE%\.streamthing\nowplaying.log`.
-- **Linux:** a systemd user service (`streamthing-nowplaying`). Needs `playerctl`
-  (`sudo dnf install playerctl`). Log: `journalctl --user -u streamthing-nowplaying`.
+  in `%USERPROFILE%\.thingdeck`. Log: `%USERPROFILE%\.thingdeck\nowplaying.log`.
+- **Linux:** a systemd user service (`thingdeck-agent`). Needs `playerctl`
+  (`sudo dnf install playerctl`). Log: `journalctl --user -u thingdeck-agent`.
 - **macOS:** a LaunchAgent. `brew install nowplaying-cli` is recommended; recent
   macOS versions restrict it, in which case the agent asks Spotify or Music
   directly (macOS asks once to allow that).
@@ -203,9 +203,9 @@ The agent reads calendars from their private iCal address, so it needs no sign-i
    "Settings for my calendars", and copy **Secret address in iCal format** from
    "Integrate calendar".
 2. Put it on its own line in `calendars.txt` (create the file):
-   - Windows: `%USERPROFILE%\.streamthing\calendars.txt`
-   - Linux: `~/.config/streamthing/calendars.txt`
-   - macOS: `~/Library/Application Support/streamthing/calendars.txt`
+   - Windows: `%USERPROFILE%\.thingdeck\calendars.txt`
+   - Linux: `~/.config/thingdeck/calendars.txt`
+   - macOS: `~/Library/Application Support/thingdeck/calendars.txt`
 
    Add one line per calendar. Any iCal address works (Outlook's published calendars
    too); lines starting with `#` are ignored.
@@ -219,7 +219,7 @@ accounts may have it turned off by an administrator.
 ### Adding GitHub
 
 The agent asks GitHub through the [GitHub CLI](https://cli.github.com), which keeps
-your sign-in; no token is stored by streamthing.
+your sign-in; no token is stored by thingdeck.
 
 1. Install it and sign in once:
    - Windows: `winget install GitHub.cli`

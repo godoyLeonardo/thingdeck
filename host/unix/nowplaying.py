@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""streamthing agent for Linux and macOS.
+"""thingdeck agent for Linux and macOS.
 
 Sends the Car Thing the computer's time (for its clock) and lock state, system stats
 (CPU, memory, GPU, network), the focused app, the volume and audio devices, the
@@ -14,9 +14,9 @@ devices when the Car Thing asks. What is playing comes from:
   python3 nowplaying.py --once   # print one snapshot
 
 install.sh sets it up to start at login. Environment: ADB (path to adb),
-STREAMTHING_PORT (host side of the forward, default 28765), STREAMTHING_CALENDARS
-(calendars.txt; default ~/.config/streamthing/ on Linux,
-~/Library/Application Support/streamthing/ on macOS).
+THINGDECK_PORT (host side of the forward, default 28765), THINGDECK_CALENDARS
+(calendars.txt; default ~/.config/thingdeck/ on Linux,
+~/Library/Application Support/thingdeck/ on macOS).
 """
 import ast
 import base64
@@ -34,7 +34,7 @@ import time
 import urllib.parse
 import urllib.request
 
-PORT = int(os.environ.get('STREAMTHING_PORT', '28765'))   # the device listens on 8765
+PORT = int(os.environ.get('THINGDECK_PORT', '28765'))   # the device listens on 8765
 ADB = os.environ.get('ADB') or shutil.which('adb') or 'adb'
 MAX_COVER = 3 * 1024 * 1024
 
@@ -458,9 +458,9 @@ class AudioLink:
 
 # Each line is an iCal address, such as Google Calendar's "Secret address in iCal format".
 # The Car Thing reads the files itself (repeats, time zones); this only downloads them.
-CALENDAR_FILE = os.environ.get('STREAMTHING_CALENDARS') or os.path.expanduser(
-    '~/Library/Application Support/streamthing/calendars.txt' if sys.platform == 'darwin'
-    else '~/.config/streamthing/calendars.txt')
+CALENDAR_FILE = os.environ.get('THINGDECK_CALENDARS') or os.path.expanduser(
+    '~/Library/Application Support/thingdeck/calendars.txt' if sys.platform == 'darwin'
+    else '~/.config/thingdeck/calendars.txt')
 # Links the Car Thing may ask to open: https links of known meeting services, and GitHub.
 OPENABLE_URL = re.compile(
     r'^https://(meet\.google\.com|([a-z0-9-]+\.)?zoom\.us|teams\.microsoft\.com|teams\.live\.com|github\.com)/')

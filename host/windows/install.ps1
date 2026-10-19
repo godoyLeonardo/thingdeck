@@ -4,19 +4,19 @@ Install the now-playing agent so it starts at logon (no admin needed).
   powershell -ExecutionPolicy Bypass -File install.ps1              # install + start
   powershell -ExecutionPolicy Bypass -File install.ps1 -Uninstall   # stop + remove
 
-Copies nowplaying.ps1 to %USERPROFILE%\.streamthing, builds a small windowless
+Copies nowplaying.ps1 to %USERPROFILE%\.thingdeck, builds a small windowless
 launcher next to it, and registers a Task Scheduler task for the current user that
-starts it at logon. The log is %USERPROFILE%\.streamthing\nowplaying.log.
+starts it at logon. The log is %USERPROFILE%\.thingdeck\nowplaying.log.
 #>
 param([switch]$Uninstall)
 $ErrorActionPreference = 'Stop'
 
-$taskName = 'streamthing now playing'
+$taskName = 'thingdeck agent'
 # Not %LOCALAPPDATA%: when run from a packaged (MSIX) app, writes there are virtualized
 # into the package and Task Scheduler can't see them. %USERPROFILE% is never redirected.
-$dir = Join-Path $env:USERPROFILE '.streamthing'
+$dir = Join-Path $env:USERPROFILE '.thingdeck'
 $script = Join-Path $dir 'nowplaying.ps1'
-$launcher = Join-Path $dir 'streamthing-nowplaying.exe'
+$launcher = Join-Path $dir 'thingdeck-agent.exe'
 
 # A console program started by Task Scheduler gets a visible console window, and
 # "conhost --headless" exits at once there. A GUI-subsystem launcher has no window.
@@ -24,7 +24,7 @@ $launcherSource = @'
 using System;
 using System.Diagnostics;
 using System.IO;
-public static class StreamthingNowPlaying {
+public static class ThingdeckAgent {
     public static int Main() {
         string dir = AppDomain.CurrentDomain.BaseDirectory;
         string powershell = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System),
@@ -40,9 +40,9 @@ public static class StreamthingNowPlaying {
 
 function Stop-Agent {
     Stop-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
-    Get-Process streamthing-nowplaying -ErrorAction SilentlyContinue | Stop-Process -Force
+    Get-Process thingdeck-agent -ErrorAction SilentlyContinue | Stop-Process -Force
     Get-CimInstance Win32_Process -Filter "Name = 'powershell.exe'" |
-        Where-Object { $_.CommandLine -like '*streamthing*nowplaying.ps1*' } |
+        Where-Object { $_.CommandLine -like '*thingdeck*nowplaying.ps1*' } |
         ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
 }
 
@@ -71,6 +71,6 @@ $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoi
     -ExecutionTimeLimit ([TimeSpan]::Zero) -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) `
     -MultipleInstances IgnoreNew
 Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Settings $settings -Force `
-    -Description 'Sends what is playing to the streamthing Car Thing over adb.' | Out-Null
+    -Description 'The thingdeck agent: sends the Car Thing the time, what is playing, stats, calendars and GitHub status over adb.' | Out-Null
 Start-ScheduledTask -TaskName $taskName
 "Installed and started. It runs at every logon; log: $dir\nowplaying.log"
