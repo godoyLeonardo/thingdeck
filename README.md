@@ -285,3 +285,16 @@ switching, per-OS overrides) is in [device/README.md](device/README.md#configjso
   are untested on real machines so far.
 - **No Windows CPU temperature:** Windows only gives it to programs running as
   administrator with a hardware driver, so the Status page leaves it out there.
+
+## License
+
+[PolyForm Noncommercial 1.0.0](LICENSE). In short:
+
+- **Allowed:** using, changing and sharing thingdeck for personal, hobby, research
+  or educational use, and by non-profits, schools and public bodies.
+- **Not allowed:** any commercial use, or use by a business.
+- **Credit:** every copy, changed or not, must include the license and its
+  `Required Notice:` line, which credits Leonardo Godoy and links to this repository.
+
+For commercial use, ask the author. Versions published before the license changed
+were under GPL-3.0, and those copies keep that license.
