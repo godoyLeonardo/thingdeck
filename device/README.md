@@ -161,7 +161,7 @@ updates every 2 s stay small. The UI gets `nowplaying` events over SSE, loads th
 cover from `/api/nowplaying/art?k=…`, and moves the progress bar between updates.
 With no update for 15 s the data is dropped (computer off, agent stopped).
 
-A page with `"header": "clock"` (Media, Calendar, Status and Code, by default)
+A page with `"header": "clock"` (Media, Calendar, Status, Code and Plex, by default)
 shows a big clock and the date in place of the preset labels and dial chip, as long
 as the agent has set the time; the presets and dial still work. A page with
 `"nowplaying": true` (Media) is the media card: cover, details and progress on top
@@ -284,6 +284,35 @@ Pairing: `{op: "pair"}` makes the agent find the bridge (Philips' discovery serv
 then ask `POST /api` for a key every 2 s for 30 s while you press the bridge's
 button; the address and key go to `hue.json` on the computer.
 
+### Plex
+
+The Car Thing has no network, so the agent reads the Plex Media Server whose address
+is the first line of `plex.txt` on the computer. A second line holds a Plex token,
+which the agent sends as the `X-Plex-Token` header. The agent asks for JSON
+(`Accept: application/json`). The Windows agent reads it with `JavaScriptSerializer`,
+because Plex items can have keys that differ only in case (`guid` and `Guid`).
+`ConvertFrom-Json` in Windows PowerShell refuses those keys.
+
+Every 3 s the agent reads `/`, `/status/sessions`, `/activities`, and the server's own
+history of load and bandwidth (`/statistics/resources` and `/statistics/bandwidth`,
+Plex Pass only). Then it posts the result to `POST /api/plex`. Every 5 minutes it
+counts the items of each library and reads `/updater/status`. A count is one request
+with `X-Plex-Container-Size=0`, which gives `totalSize` and no items. When the server
+does not answer, the agent tries again after 30 s, so the other pages do not wait.
+
+The bandwidth history has one row per device and sample, at uneven times. The agent
+adds up the rows per 6 s, LAN and WAN apart, and sends bytes per second.
+
+`HostPlex` keeps the last update and clears it 30 s after the agent stops. Posters
+work like the now-playing cover. Each stream has an `art` key, a hash of its poster
+path. The reply lists the keys that the device does not have (`need_art`). The agent
+sends those posters in its next update, as base64 from Plex's photo transcoder.
+`GET /api/plex/art?k=…` serves them with `max-age`, because a key always names the
+same image.
+
+The widget `"plex"` redraws the streams card and the side cards separately, and it
+changes the progress bars in place.
+
 ### Tab order
 
 `state.json` keeps `page_order`, a list of page keys (a page's `name`, or a choice
@@ -381,8 +410,8 @@ page, or `adb shell`).
 | Method | Path | Body | Purpose |
 |---|---|---|---|
 | GET | `/api/ping` | | Health check (used by `shim.html`) |
-| GET | `/api/state` | | Config, state, presets, now playing, stats, agenda, audio, github, hue |
-| GET | `/api/events` | | SSE stream: `state`, `config`, `fired`, `turn`, `hw`, `toast`, `nowplaying`, `stats`, `agenda`, `audio`, `github`, `hue`, `hue_dial` |
+| GET | `/api/state` | | Config, state, presets, now playing, stats, agenda, audio, github, hue, plex |
+| GET | `/api/events` | | SSE stream: `state`, `config`, `fired`, `turn`, `hw`, `toast`, `nowplaying`, `stats`, `agenda`, `audio`, `github`, `hue`, `hue_dial`, `plex` |
 | GET | `/api/info` | | Uptime, temperature, memory, load, brightness |
 | POST | `/api/tap` | `{"page", "index"}` | Run a tile |
 | POST | `/api/preset` | `{"index"}` | Run a preset |
@@ -403,6 +432,8 @@ page, or `adb shell`).
 | POST | `/api/hue` | `{"state", "rooms"?, "error"?}` | From the host agent |
 | POST | `/api/hue/command` | `{"op", "id"?, "on"?, "brightness"?, "mirek"?}` | Queue a Hue command for the agent |
 | POST | `/api/hue/select` | `{"id"}` | Make a room the target of the Lights dial mode |
+| POST | `/api/plex` | `{"state", "server"?, "sessions"?, "load"?, "net"?, "libraries"?, "activities"?, "posters"?, "error"?}` | From the host agent every 3 s. Replies `{"need_art": [keys]}` |
+| GET | `/api/plex/art?k=…` | | A stream's poster |
 | GET | `/api/commands` | | For the host agent: queued commands (`{"hue": [...]}`), emptied on read |
 | POST | `/api/run` | any action | Run an action |
 | POST | `/api/system` | `{"do": "reconnect" \| "restart" \| "reboot"}` | Reconnect USB (software replug) / restart service / reboot |

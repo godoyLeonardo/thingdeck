@@ -8,7 +8,7 @@ as soon as you plug it in.
 - **Touchscreen:** pages of large tiles (Desktop, Shell, and a calls page: Discord
   or Meetings), each sending a shortcut, a media key, typed text or a sequence of
   steps, plus live pages filled by the computer agent: Media, Lights (Philips Hue),
-  Calendar, Status and Code (GitHub). Up to six tabs share the bottom bar; with more,
+  Calendar, Status, Code (GitHub) and Plex. Up to six tabs share the bottom bar; with more,
   it shows four at a time and scrolls. Settings → Tabs sets their order and hides any
   you don't use. On live pages, the top bar also shows the song playing (tap it for Media).
 - **4 top buttons:** presets that change with the page. Tile pages show their
@@ -32,6 +32,7 @@ as soon as you plug it in.
 - **Computer agent (optional):** a small background agent on the computer adds what's
   playing with its cover, Philips Hue lights, your calendar with Join buttons, CPU/memory/GPU/network
   graphs, a kill switch for the app in focus, GitHub Actions runs and pull requests,
+  the streams and load of your Plex server,
   a volume bar, an audio device picker, a clock and a lock screen (see
   [Computer agent](#computer-agent)).
 - **Standby screen** while the computer sleeps; the pad reconnects by itself
@@ -58,8 +59,8 @@ The Car Thing's screen is 800×480. These use made-up demo data.
 | **Lights:** Philips Hue rooms and zones | **A room:** brightness, white, scenes, each light |
 | ![Desktop page: a grid of shortcut tiles with line icons](docs/screenshots/desktop.png) | ![Settings, Appearance: themes, accent colors, the hue slider and icon options](docs/screenshots/settings.png) |
 | **Desktop:** a tile page | **Settings → Appearance** |
-| ![Settings, Tabs: the pages in order with up and down arrows](docs/screenshots/tabs.png) | |
-| **Settings → Tabs:** the tab order | |
+| ![Settings, Tabs: the pages in order with up and down arrows](docs/screenshots/tabs.png) | ![Plex page: three streams with posters and transcode tags, the server's CPU and bandwidth graphs, and the libraries](docs/screenshots/plex.png) |
+| **Settings → Tabs:** the tab order | **Plex:** streams, server load and libraries |
 
 ## Requirements
 
@@ -196,6 +197,12 @@ them to the Car Thing **over the USB cable** (`adb forward`; no network):
   draft flag. Both lists scroll. Tap a row to open it in the browser on the computer.
   It refreshes every minute, or every 15 seconds while a workflow runs (see
   [Adding GitHub](#adding-github)).
+- **Plex:** the streams on your Plex Media Server. Each stream shows its poster, the
+  user and player, the progress and the quality. A tag shows how the server sends it:
+  direct play, direct stream, or transcode (HW for a hardware transcode). Next to the
+  streams are graphs of the server's CPU and bandwidth, and the size of each library,
+  with any library scan in progress. The graphs need Plex Pass. The page refreshes
+  every 3 seconds (see [Connecting Plex](#connecting-plex)).
 - **Volume and audio devices:** when the volume or mute changes (the dial, the Mute
   tile, your keyboard), a volume bar shows at the top for a moment. The Media page
   header shows the current output; tap it to pick the output and input devices.
@@ -205,7 +212,7 @@ them to the Car Thing **over the USB cable** (`adb forward`; no network):
   - macOS: the volume always; switching devices needs `brew install switchaudio-osx`.
 - **Clock:** the agent sets the Car Thing's clock and time zone (DST included).
   The time shows large with the date at the top of the live pages (Media, Lights,
-  Calendar, Status, Code), and on the standby and lock
+  Calendar, Status, Code, Plex), and on the standby and lock
   screens; 24h/12h is under Settings → General → Clock.
 - **Lock screen:** while the computer is locked, the Car Thing shows the clock,
   "🔒 Computer locked", the cover and what's playing, and media buttons. Tiles,
@@ -286,6 +293,29 @@ Hue app, a switch) show on the Car Thing within about 2 seconds. Lights only wor
 while the computer is on and the agent is running, and they need a Hue Bridge;
 lights used only through Bluetooth can't be reached.
 
+### Connecting Plex
+
+The Car Thing has no network of its own, so the agent reads your Plex Media Server
+on the local network. It uses the server's own API, not the Plex cloud.
+
+1. Find the local address of the server. In Plex Web, open Settings → Remote Access.
+   The page shows the private address, for example `192.168.1.20:32400`.
+2. Put the address on the first line of `plex.txt`, next to `calendars.txt`. If the
+   line has no port, the agent uses 32400.
+3. If the Plex page shows "The server asks for a Plex token", put your token on the
+   second line of `plex.txt`. Plex's article
+   [Finding an authentication token](https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/)
+   shows where to find it.
+
+By default, a Plex server asks for a token, also on the local network. A server
+that lists your network under Settings → Network → "List of IP addresses and
+networks that are allowed without auth" does not ask for one. The agent reads
+`plex.txt` on each refresh, so a change shows within 3 seconds and needs no restart.
+
+The token gives access to your Plex account, so keep `plex.txt` to yourself. The
+graphs of CPU and bandwidth need Plex Pass. Without it, the page shows the streams and
+libraries only.
+
 ## When the computer sleeps
 
 When the computer sleeps or shuts down and the Car Thing still has power, the
@@ -332,11 +362,11 @@ switching, per-OS overrides) is in [device/README.md](device/README.md#configjso
 
 - **Linux overrides assume GNOME** (Fedora Workstation, Ubuntu). On KDE a few
   desktop shortcuts need adjusting.
-- **Hue goes through the computer:** with the computer off or asleep, the Lights page
-  can't reach the bridge.
+- **Hue and Plex go through the computer:** with the computer off or asleep, the
+  Lights and Plex pages cannot reach the bridge or the server.
 - **The live pages, the clock and the lock screen need the agent** on each
   computer. Without it, there's no clock, the Media page shows its controls and a hint, and
-  Calendar, Status and Code say the agent is missing. The macOS and Linux agents are
+  Calendar, Status, Code and Plex say the agent is missing. The macOS and Linux agents are
   untested on real machines so far.
 - **No Windows CPU temperature:** Windows only gives it to programs running as
   administrator with a hardware driver, so the Status page leaves it out there.
