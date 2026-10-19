@@ -6,6 +6,7 @@ the writable data partition. `../deploy.sh` copies it there.
 | File | What it does |
 |---|---|
 | `macropad.py` | The service: USB HID over FunctionFS, dial and button input, actions, settings, and the local web UI server |
+| `ics.py` | iCalendar reader for the Calendar page (repeats, exceptions, time zones), plain Python 3.7 |
 | `gadget.sh` | Rebuilds the USB gadget (`prepare`, `bind-hid`, `adb-only`) |
 | `start.sh` | Supervisor entry point. Always puts USB back to ADB-only when the service exits |
 | `hook.sh` | Installs/removes the boot hook on both A/B system slots (`install`, `uninstall`, `status`) |

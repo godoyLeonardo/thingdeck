@@ -15,14 +15,14 @@ ADB=${ADB:-adb}
 # Git Bash: adb.exe needs a Windows path (pwd -W); elsewhere plain pwd.
 SRC="$(cd "$(dirname "$0")/device" && { pwd -W 2>/dev/null || pwd; })"
 DEST=/var/macropad
-FILES="macropad.py gadget.sh start.sh hook.sh macropad.conf config.json web/index.html web/shim.html tools/cdp.py"
+FILES="macropad.py ics.py gadget.sh start.sh hook.sh macropad.conf config.json web/index.html web/shim.html tools/cdp.py"
 
 push_files() {
     "$ADB" shell "mkdir -p $DEST/web $DEST/tools"
     for f in $FILES; do
         "$ADB" push -q "$SRC/$f" "$DEST/$f"
     done
-    "$ADB" shell "cd $DEST && python3 -m py_compile macropad.py && rm -rf __pycache__ && python3 -c 'import json; json.load(open(\"config.json\"))'"
+    "$ADB" shell "cd $DEST && python3 -m py_compile macropad.py ics.py && rm -rf __pycache__ && python3 -c 'import json; json.load(open(\"config.json\"))'"
     echo "files pushed and checked"
 }
 
