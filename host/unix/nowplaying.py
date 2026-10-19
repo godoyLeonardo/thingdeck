@@ -28,6 +28,8 @@ import os
 import re
 import shutil
 import signal
+import socket
+import ssl
 import subprocess
 import sys
 import time
@@ -465,6 +467,179 @@ CALENDAR_FILE = os.environ.get('THINGDECK_CALENDARS') or os.path.expanduser(
 OPENABLE_URL = re.compile(
     r'^https://(meet\.google\.com|([a-z0-9-]+\.)?zoom\.us|teams\.microsoft\.com|teams\.live\.com|github\.com)/')
 
+# ------------------------------------------------------------------ Philips Hue
+
+# The Car Thing has no network, so the agent talks to the Hue Bridge (its local API v2) and
+# passes rooms, zones, lights and scenes on. The bridge's address and key are in hue.json
+# next to calendars.txt, written when you pair from the Car Thing's Lights page.
+HUE_FILE = os.path.join(os.path.dirname(CALENDAR_FILE), 'hue.json')
+
+
+class HueLink:
+    def __init__(self):
+        self.config = None             # {'bridge', 'key'}
+        self.pairing = None            # {'until', 'next', 'bridge'} while waiting for the button
+        self.lists, self.listed = None, 0.0
+        self.fetched, self.sent, self.sent_at = 0.0, None, 0.0
+        # The bridge's certificate comes from Philips' own authority, not a public one; this
+        # context is used only for requests to the bridge's own address.
+        self.tls = ssl.create_default_context()
+        self.tls.check_hostname = False
+        self.tls.verify_mode = ssl.CERT_NONE
+
+    def load(self):
+        try:
+            with open(HUE_FILE) as f:
+                config = json.load(f)
+            if config.get('bridge') and config.get('key'):
+                self.config = {'bridge': str(config['bridge']), 'key': str(config['key'])}
+        except (OSError, ValueError):
+            pass
+
+    def call(self, method, path, body=None, bridge=None, key=None):
+        bridge = bridge or self.config['bridge']
+        key = self.config['key'] if key is None else key
+        req = urllib.request.Request('https://%s%s' % (bridge, path), method=method,
+                                     data=json.dumps(body).encode('utf-8') if body is not None else None,
+                                     headers=dict({'Content-Type': 'application/json'}, **({'hue-application-key': key} if key else {})))
+        try:
+            with urllib.request.urlopen(req, timeout=5, context=self.tls) as r:
+                result = json.loads(r.read().decode('utf-8'))
+        except urllib.error.HTTPError as e:
+            result = json.loads(e.read().decode('utf-8') or '{}')
+        if isinstance(result, dict) and result.get('errors'):
+            raise OSError('Hue: ' + result['errors'][0].get('description', 'error'))
+        return result
+
+    def send(self, state):
+        send('hue', state)
+        self.sent, self.sent_at = json.dumps(state, sort_keys=True), time.monotonic()
+
+    def step_pairing(self):
+        p = self.pairing
+        if time.monotonic() < p['next']:
+            return
+        if time.monotonic() > p['until']:
+            self.pairing = None
+            self.send({'state': 'error', 'error': "The bridge's button wasn't pressed. Tap Pair, then press it within 30 seconds."})
+            return
+        p['next'] = time.monotonic() + 2
+        if not p['bridge']:
+            with urllib.request.urlopen('https://discovery.meethue.com/', timeout=10) as r:
+                found = [b for b in json.loads(r.read().decode('utf-8')) if b.get('internalipaddress')]
+            if not found:
+                raise OSError('No Hue Bridge found on the network')
+            p['bridge'] = found[0]['internalipaddress']
+        answer = self.call('POST', '/api', {'devicetype': 'thingdeck#' + socket.gethostname()[:19], 'generateclientkey': True},
+                           bridge=p['bridge'], key='')
+        success = answer[0].get('success') if isinstance(answer, list) and answer else None
+        if success and success.get('username'):
+            os.makedirs(os.path.dirname(HUE_FILE), exist_ok=True)
+            with open(HUE_FILE, 'w') as f:
+                json.dump({'bridge': p['bridge'], 'key': success['username']}, f)
+            os.chmod(HUE_FILE, 0o600)
+            log('hue: paired with the bridge at', p['bridge'])
+            self.pairing, self.fetched, self.listed = None, 0.0, 0.0
+            self.load()
+
+    def read(self):
+        """Rooms and zones with their lights and scenes; the structure every 30 s, levels every call."""
+        if self.lists is None or time.monotonic() - self.listed >= 30:
+            self.lists = {'rooms': self.call('GET', '/clip/v2/resource/room')['data'] + self.call('GET', '/clip/v2/resource/zone')['data'],
+                          'devices': self.call('GET', '/clip/v2/resource/device')['data'],
+                          'scenes': self.call('GET', '/clip/v2/resource/scene')['data']}
+            self.listed = time.monotonic()
+        lights = {l['id']: l for l in self.call('GET', '/clip/v2/resource/light')['data']}
+        groups = {g['id']: g for g in self.call('GET', '/clip/v2/resource/grouped_light')['data']}
+        device_lights = {d['id']: [s['rid'] for s in d.get('services', []) if s['rtype'] == 'light'] for d in self.lists['devices']}
+        rooms = []
+        for r in self.lists['rooms']:
+            group_id = next((s['rid'] for s in r.get('services', []) if s['rtype'] == 'grouped_light'), None)
+            ids = []
+            for c in r.get('children', []):
+                ids += [c['rid']] if c['rtype'] == 'light' else device_lights.get(c['rid'], []) if c['rtype'] == 'device' else []
+            group = groups.get(group_id) or {}
+            rooms.append({
+                'id': r['id'], 'kind': r['type'], 'name': r['metadata']['name'], 'archetype': r['metadata'].get('archetype'),
+                'group': group_id, 'on': bool(group.get('on', {}).get('on')),
+                'brightness': round(group['dimming']['brightness'], 1) if group.get('dimming') else None,
+                'lights': [{'id': l['id'], 'name': l['metadata']['name'], 'on': bool(l['on']['on']),
+                            'brightness': round(l['dimming']['brightness'], 1) if l.get('dimming') else None,
+                            'xy': [l['color']['xy']['x'], l['color']['xy']['y']] if l.get('color') else None,
+                            'mirek': l['color_temperature']['mirek'] if (l.get('color_temperature') or {}).get('mirek_valid') else None,
+                            'ct': bool(l.get('color_temperature'))}
+                           for l in (lights.get(i) for i in ids) if l],
+                'scenes': [{'id': s['id'], 'name': s['metadata']['name'],
+                            'active': s.get('status', {}).get('active', 'inactive') != 'inactive'}
+                           for s in self.lists['scenes'] if s.get('group', {}).get('rid') == r['id']]})
+        rooms.sort(key=lambda r: (r['kind'] != 'room', r['name']))
+        return {'state': 'ok', 'rooms': rooms}
+
+    def run(self, cmd):
+        op = cmd.get('op')
+        if op == 'pair':
+            self.pairing = {'until': time.monotonic() + 30, 'next': 0.0, 'bridge': None}
+            self.send({'state': 'pairing'})
+            return
+        if not self.config:
+            raise OSError('Pair the Hue Bridge first')
+        if op == 'scene':
+            self.call('PUT', '/clip/v2/resource/scene/%s' % cmd['id'], {'recall': {'action': 'active'}})
+        elif op == 'all_off':
+            for r in self.lists['rooms']:
+                group = next((s['rid'] for s in r.get('services', []) if s['rtype'] == 'grouped_light'), None)
+                if group and r['type'] == 'room':
+                    self.call('PUT', '/clip/v2/resource/grouped_light/%s' % group, {'on': {'on': False}})
+        elif op in ('group', 'light'):
+            body = {}
+            if cmd.get('on') is not None:
+                body['on'] = {'on': bool(cmd['on'])}
+            if cmd.get('brightness') is not None:
+                body['dimming'] = {'brightness': max(1.0, float(cmd['brightness']))}
+            if body:
+                self.call('PUT', '/clip/v2/resource/%s/%s' % ('grouped_light' if op == 'group' else 'light', cmd['id']), body)
+            if cmd.get('mirek') is not None:          # white temperature: per light, on the lights that have it
+                room = next((r for r in self.read()['rooms'] if r['group'] == cmd['id']), None)
+                for l in (room or {}).get('lights', []):
+                    if l['ct']:
+                        self.call('PUT', '/clip/v2/resource/light/%s' % l['id'], {'color_temperature': {'mirek': int(cmd['mirek'])}})
+        self.fetched = 0.0           # show the result right away
+
+    def update(self):
+        """Commands from the Car Thing, pairing, and the lights' state every 2 s."""
+        with urllib.request.urlopen('http://127.0.0.1:%d/api/commands' % PORT, timeout=5) as r:
+            commands = json.loads(r.read().decode('utf-8')).get('hue') or []
+        if not self.config and not self.pairing:
+            self.load()
+        for cmd in commands:
+            try:
+                self.run(cmd)
+            except (OSError, ValueError, KeyError) as e:
+                log('hue:', e)
+                self.send({'state': 'error', 'error': str(e)})
+        if self.pairing:
+            try:
+                self.step_pairing()
+            except (OSError, ValueError, KeyError) as e:
+                log('hue pairing:', e)
+                self.pairing = None
+                self.send({'state': 'error', 'error': str(e)})
+            return
+        if time.monotonic() - self.fetched < 2:
+            return
+        self.fetched = time.monotonic()
+        if not self.config:
+            state = {'state': 'none'}
+        else:
+            try:
+                state = self.read()
+            except (OSError, ValueError, KeyError) as e:
+                self.fetched = time.monotonic() + 28       # bridge unreachable: retry in 30 s
+                state = {'state': 'error', 'error': str(e)}
+        if json.dumps(state, sort_keys=True) != self.sent or time.monotonic() - self.sent_at >= 10:
+            self.send(state)
+
+
 # ------------------------------------------------------------------ GitHub
 
 # A repo's latest workflow runs and your open pull requests, through the gh CLI, which
@@ -622,6 +797,7 @@ def main():
     last_host, last_host_sent = None, 0.0
     last_stats, kill_result = 0.0, None
     audio = AudioLink()
+    hue = HueLink()
     calendars, calendars_fetched, fetched_hash, calendar_hash = None, None, None, None
     github, github_fetched, github_busy = GitHub(), None, False
     while True:
@@ -700,6 +876,7 @@ def main():
                     cover_sent_for = ''
                 last_signature, last_sent = signature, time.monotonic()
             audio.update()
+            hue.update()
         except (OSError, ValueError) as e:
             log('update failed:', e)
             tunnel = False
