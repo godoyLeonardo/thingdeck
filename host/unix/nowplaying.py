@@ -163,6 +163,11 @@ def mac_applescript_snapshot():
     }
 
 
+# The live panels on the Car Thing's screen ("lights", "monitor", "github", "plex", …), from its
+# command poll (HueLink.update). Those update often; the others slowly, which saves the work.
+visible = set()
+
+
 # ------------------------------------------------------------------ system stats
 
 def read_file(path):
@@ -190,6 +195,7 @@ class Stats:
         self.last_cpu = None    # (busy, total) jiffies
         self.last_net = None    # (monotonic, rx bytes, tx bytes)
         self.nvidia = shutil.which('nvidia-smi')
+        self.gpu_at, self.gpu_last = 0.0, {}       # the last nvidia-smi read
 
     def read(self):
         stats = {}
@@ -260,11 +266,15 @@ class Stats:
 
     def gpu(self, stats):
         if self.nvidia:
-            out = run([self.nvidia, '--query-gpu=utilization.gpu,temperature.gpu,memory.used,memory.total',
-                       '--format=csv,noheader,nounits'])
-            fields = [as_int(x) for x in (out or '').split('\n')[0].split(',')]
-            if len(fields) == 4 and None not in fields:
-                stats['gpu'], stats['gpu_temp'], stats['gpu_mem_used_mb'], stats['gpu_mem_total_mb'] = fields
+            # nvidia-smi is the costly part: every 2 s while Status is on screen, else every 30 s.
+            if 'monitor' in visible or time.monotonic() - self.gpu_at >= 30:
+                self.gpu_at = time.monotonic()
+                out = run([self.nvidia, '--query-gpu=utilization.gpu,temperature.gpu,memory.used,memory.total',
+                           '--format=csv,noheader,nounits'])
+                fields = [as_int(x) for x in (out or '').split('\n')[0].split(',')]
+                self.gpu_last = dict(zip(('gpu', 'gpu_temp', 'gpu_mem_used_mb', 'gpu_mem_total_mb'), fields)) \
+                    if len(fields) == 4 and None not in fields else {}
+            stats.update(self.gpu_last)
             return
         for card in sorted(glob.glob('/sys/class/drm/card[0-9]/device')):    # AMD
             busy = as_int(read_file(card + '/gpu_busy_percent'))
@@ -479,6 +489,7 @@ class HueLink:
     def __init__(self):
         self.config = None             # {'bridge', 'key'}
         self.github_refresh = False    # set from the command poll, cleared by the main loop
+        self.opened = set()            # panels that just came on screen, for the main loop
         self.pairing = None            # {'until', 'next', 'bridge'} while waiting for the button
         self.lists, self.listed = None, 0.0
         self.fetched, self.sent, self.sent_at = 0.0, None, 0.0
@@ -612,6 +623,10 @@ class HueLink:
             polled = json.loads(r.read().decode('utf-8'))
         commands = polled.get('hue') or []
         self.github_refresh = self.github_refresh or bool(polled.get('github_refresh'))   # the Code page's refresh button
+        now_visible = set(polled.get('visible') or [])
+        self.opened |= now_visible - visible             # just came on screen: the main loop reads them now
+        visible.clear()
+        visible.update(now_visible)
         if not self.config and not self.pairing:
             self.load()
         for cmd in commands:
@@ -628,7 +643,7 @@ class HueLink:
                 self.pairing = None
                 self.send({'state': 'error', 'error': str(e)})
             return
-        if time.monotonic() - self.fetched < 2:
+        if time.monotonic() - self.fetched < (2 if 'lights' in visible else 30):
             return
         self.fetched = time.monotonic()
         if not self.config:
@@ -892,7 +907,7 @@ class PlexLink:
     def update(self):
         if time.monotonic() < self.next:
             return
-        self.next = time.monotonic() + 3
+        self.next = time.monotonic() + (3 if 'plex' in visible else 30)
         try:
             state = self.read()
             if self.need:
@@ -1047,9 +1062,20 @@ def main():
                 if reply.get('need_calendar'):
                     calendar_hash = None
             # GitHub every minute, or every 15 s while a workflow runs.
+            # Panels that just came on screen: read their data now.
+            if 'lights' in hue.opened:
+                hue.fetched = 0.0
+            if 'plex' in hue.opened:
+                plex.next = 0.0
+            if 'monitor' in hue.opened:
+                stats.gpu_at = 0.0
+            if 'github' in hue.opened:
+                hue.github_refresh = True
+            hue.opened.clear()
             if hue.github_refresh:
                 github_fetched, hue.github_refresh = None, False
-            if github_fetched is None or time.monotonic() - github_fetched >= (15 if github_busy else 60):
+            if github_fetched is None or time.monotonic() - github_fetched >= (
+                    300 if 'github' not in visible else 15 if github_busy else 60):
                 github_fetched = time.monotonic()
                 status = github.read()
                 github_busy = any(r['status'] != 'completed' for r in status.get('runs', []))
