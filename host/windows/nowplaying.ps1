@@ -232,7 +232,7 @@ function Get-Calendars {
 
 function Send-Calendars($calendars) {
     $query = if (-not $calendars) { '?none=1' } elseif ($calendars.error) { '?error=' + [Uri]::EscapeDataString($calendars.error) } else { '' }
-    $body = if ($calendars) { [Text.Encoding]::UTF8.GetBytes($calendars.ics) } else { [byte[]]@() }
+    [byte[]]$body = if ($calendars) { [Text.Encoding]::UTF8.GetBytes($calendars.ics) } else { @() }   # typed: `if` would unroll it into a list
     [void](Invoke-RestMethod -Uri "http://127.0.0.1:$Port/api/calendar$query" -Method Post -TimeoutSec 60 `
         -ContentType 'text/calendar; charset=utf-8' -Body $body)
 }
