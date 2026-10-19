@@ -225,6 +225,22 @@
   .m-spark polyline { fill: none; stroke: var(--acc); stroke-width: 2; vector-effect: non-scaling-stroke; stroke-linejoin: round; }
   .m-spark polygon { fill: var(--acc-soft); }
   .m-spark polyline.tx { stroke: var(--muted); stroke-width: 1.5; }
+  .ev[data-ev].down { background: var(--tile-hi); }
+  /* event details: a card over the page; tap outside it or Close to dismiss */
+  #sheet { position: fixed; left: 0; top: 0; right: 0; bottom: 0; z-index: 3; display: none; align-items: center;
+    justify-content: center; background: rgba(0, 0, 0, .6); }
+  #sheet.show { display: flex; }
+  .sheet-card { width: 640px; max-height: 400px; display: flex; flex-direction: column; background: var(--tile);
+    border-radius: 18px; padding: 16px 22px 16px; box-shadow: 0 12px 40px rgba(0, 0, 0, .5); }
+  .sh-title { font-size: calc(24px * var(--ts)); font-weight: 700; line-height: 1.15; letter-spacing: -.01em; margin-top: 6px; }
+  .sh-when { font-size: calc(15px * var(--ts)); font-weight: 600; color: var(--acc); margin-top: 8px; }
+  .sh-where { font-size: calc(15px * var(--ts)); margin-top: 4px; }
+  .sh-notes { flex: 1; min-height: 0; overflow-y: auto; margin-top: 10px; font-size: calc(14px * var(--ts)); line-height: 1.45;
+    color: var(--muted); white-space: pre-wrap; word-break: break-word; }
+  .sh-notes::-webkit-scrollbar { display: none; }
+  .sh-actions { display: flex; justify-content: flex-end; margin-top: 12px; }
+  .sh-actions .btn { flex: none; min-width: 120px; padding: 0 18px; margin-left: 8px; }
+  .sh-actions .btn.primary { background: var(--acc); color: var(--on-acc); }
   /* page option "kill": the focused app and a guarded kill switch, like an aircraft's
      covered switch: tap the cover to lift it, then press the button under it */
   .killbar { flex: none; display: flex; align-items: center; height: 86px; margin-top: 8px; padding: 0 10px 0 16px;
@@ -447,6 +463,7 @@
     <div id="status"><i></i><span id="statustext">…</span></div>
   </div>
   <div id="toast"></div>
+  <div id="sheet" data-sheet-close="1"><div class="sheet-card" id="sheetcard" data-sheet-card="1"></div></div>
   <div id="lockscreen">
     <div class="bigclock"><span class="bc-time"></span><span class="bc-suffix"></span></div>
     <div class="bigdate"></div>
@@ -1047,11 +1064,47 @@ function eventHTML(e, isNext, cols) {
   var status = !isNext ? '' : e.start <= now ? '<b>Now</b>' : e.start - now < 12 * 3600000 ? '<b>In ' + untilText(e.start) + '</b>' : '';
   var sub = cols ? [status, esc(e.where)] : [status, e.all_day ? '' : 'until ' + fmtClock(e.end), esc(e.where)];
   sub = sub.filter(function (x) { return x; }).join(' · ');
-  return '<div class="ev' + (isNext ? ' next' : '') + '">' +
+  return '<div class="ev' + (isNext ? ' next' : '') + '" data-ev="' + esc(e.id) + '">' +
     (cols ? '' : '<div class="ev-time">' + (e.all_day ? '<small>All day</small>' : when) + '</div>') +
     '<div class="ev-main">' + (cols ? '<div class="ev-when">' + when + '</div>' : '') +
       '<div class="ev-title">' + esc(e.title) + '</div>' + (sub ? '<div class="ev-sub">' + sub + '</div>' : '') + '</div>' +
     (e.link ? '<div class="ev-join" data-join="' + esc(e.id) + '">' + icon('camera') + '</div>' : '') + '</div>';
+}
+// Event details: the list has the basics; the notes and calendar name come on request.
+var sheetOpen = false;
+function longDay(ms) {
+  var d = localParts(ms);
+  return DAYS[d.getUTCDay()] + ', ' + d.getUTCDate() + ' ' + MONTHS[d.getUTCMonth()];
+}
+function fmtLength(ms) {
+  var min = Math.round(ms / 60000), h = Math.floor(min / 60);
+  return h ? h + ' h' + (min % 60 ? ' ' + (min % 60) + ' min' : '') : min + ' min';
+}
+function openEvent(id) {
+  var e = (agenda.events || []).filter(function (x) { return x.id === id; })[0];
+  if (!e) return;
+  var when = e.all_day
+    ? longDay(e.start) + (e.end - e.start > 86400000 ? ' – ' + longDay(e.end - 1) : '') + ' · All day'
+    : longDay(e.start) + ' · ' + fmtClock(e.start) + ' – ' + fmtClock(e.end) + ' · ' + fmtLength(e.end - e.start);
+  var render = function (extra) {
+    $('sheetcard').innerHTML =
+      '<div class="m-label">' + esc(extra.calendar || 'Calendar') + '</div>' +
+      '<div class="sh-title">' + esc(e.title) + '</div>' +
+      '<div class="sh-when">' + when + '</div>' +
+      (e.where ? '<div class="sh-where">' + esc(e.where) + '</div>' : '') +
+      '<div class="sh-notes">' + (extra.notes ? esc(extra.notes) : '') + '</div>' +
+      '<div class="sh-actions">' + (e.link ? '<div class="btn primary" data-join="' + esc(e.id) + '">Join meeting</div>' : '') +
+      '<div class="btn" data-sheet-close="1">Close</div></div>';
+  };
+  render({});
+  $('sheet').className = 'show';
+  sheetOpen = true;
+  fetch('/api/calendar/event?id=' + encodeURIComponent(id)).then(function (r) { return r.json(); })
+    .then(function (d) { if (sheetOpen) render(d); }).catch(function () {});
+}
+function closeSheet() {
+  sheetOpen = false;
+  $('sheet').className = '';
 }
 function updateAgenda() {
   var box = $('agenda');
@@ -1247,7 +1300,7 @@ function updateLock() {
 var startX = 0, startY = 0, downEl = null;
 document.addEventListener('pointerdown', function (e) {
   startX = e.clientX; startY = e.clientY;
-  downEl = e.target.closest('.tile[data-i], .preset[data-i], #dial, .tab, #status, [data-set], [data-sys], [data-sec], [data-choice-slot], [data-media], [data-join], [data-guard], [data-kill]');
+  downEl = e.target.closest('.tile[data-i], .preset[data-i], #dial, .tab, #status, [data-set], [data-sys], [data-sec], [data-choice-slot], [data-media], [data-join], [data-guard], [data-kill], [data-ev], [data-sheet-close], [data-sheet-card]');
   if (downEl) downEl.classList.add('down');
 });
 document.addEventListener('pointercancel', function () { if (downEl) downEl.classList.remove('down'); downEl = null; });
@@ -1257,7 +1310,7 @@ document.addEventListener('pointerup', function (e) {
   var dx = e.clientX - startX, dy = e.clientY - startY, el = downEl;
   downEl = null;
   if (el) el.classList.remove('down');
-  if (!showSettings && Math.abs(dx) > 70 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+  if (!showSettings && !sheetOpen && Math.abs(dx) > 70 && Math.abs(dx) > Math.abs(dy) * 1.5) {
     var g = $('grid');
     g.className = dx < 0 ? 'swipe-l' : 'swipe-r';
     setTimeout(function () { g.className = ''; }, 140);
@@ -1266,9 +1319,12 @@ document.addEventListener('pointerup', function (e) {
   }
   if (!el || Math.abs(dx) > 25 || Math.abs(dy) > 25) return;
   var i = parseInt(el.getAttribute('data-i'), 10);
-  if (el.hasAttribute('data-guard')) openGuard();
+  if (el.hasAttribute('data-sheet-card')) return;                  // a tap inside the details card
+  if (el.hasAttribute('data-sheet-close')) closeSheet();
+  else if (el.hasAttribute('data-ev')) openEvent(el.getAttribute('data-ev'));
+  else if (el.hasAttribute('data-guard')) openGuard();
   else if (el.hasAttribute('data-kill')) pressKill();
-  else   if (el.hasAttribute('data-join')) { fire(el); post('/api/calendar/open', { id: el.getAttribute('data-join') }); }
+  else if (el.hasAttribute('data-join')) { fire(el); post('/api/calendar/open', { id: el.getAttribute('data-join') }); closeSheet(); }
   else   if (el.hasAttribute('data-media')) post('/api/run', { media: el.getAttribute('data-media') });
   else   if (el.hasAttribute('data-choice-slot')) {
     var choices = JSON.parse(JSON.stringify((st.settings || {}).page_choices || {}));
