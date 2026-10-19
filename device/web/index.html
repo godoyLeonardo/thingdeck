@@ -1434,6 +1434,17 @@ function updateAgenda() {
 }
 setInterval(updateAgenda, 20000);
 
+// Draw a widget's HTML only when it changed, and keep the scroll position of its lists.
+// Compare with what was drawn last, not innerHTML: the icons' <path/> reads back as
+// <path></path>, so innerHTML never matches and every redraw sent the lists to the top.
+function redraw(box, html) {
+  if (box._html === html) return false;
+  var tops = [].map.call(box.querySelectorAll('.ag-list'), function (l) { return l.scrollTop; });
+  box.innerHTML = box._html = html;
+  [].forEach.call(box.querySelectorAll('.ag-list'), function (l, i) { l.scrollTop = tops[i] || 0; });
+  return true;
+}
+
 // ---- GitHub (widget "github"): the agent reads the repo in github.txt with the gh CLI
 var github = { state: 'unknown' };
 function ago(iso) {
@@ -1487,12 +1498,7 @@ function updateGitHub() {
       '<div class="card gh-col"><h3>My pull requests</h3><div class="ag-list">' +
         (prs || (g.error ? '' : '<div class="ag-empty">No open pull requests</div>')) + '</div></div>';
   }
-  // Compare with what was drawn last, not innerHTML: the icons' <path/> reads back as
-  // <path></path>, so it never matched and every redraw sent both lists back to the top.
-  if (box._html === html) return;
-  var tops = [].map.call(box.querySelectorAll('.ag-list'), function (l) { return l.scrollTop; });
-  box.innerHTML = box._html = html;
-  [].forEach.call(box.querySelectorAll('.ag-list'), function (l, i) { l.scrollTop = tops[i] || 0; });
+  redraw(box, html);
 }
 setInterval(updateGitHub, 15000);       // the times ("3m") move on between updates
 
