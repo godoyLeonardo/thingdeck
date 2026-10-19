@@ -29,7 +29,6 @@ BRIGHTNESS_MIN = 5          # brightness levels run 5..255 (Settings slider)
 THEMES = ('dark', 'black', 'light', 'nord', 'dracula', 'catppuccin', 'gruvbox', 'tokyonight', 'solarized')
 ACCENTS = ('theme', 'green', 'blue', 'purple', 'orange', 'pink', 'red')   # palettes: web/index.html
 OS_MODES = ('auto', 'windows', 'mac', 'linux')
-OS_NAMES = ('windows', 'mac', 'linux')
 HTTP_PORT = 8765
 
 
@@ -415,7 +414,7 @@ class Pad:
         # None means "use config.json".
         self.settings = {'os_mode': 'auto', 'layout': None, 'dial_invert': None,
                          'brightness_auto': True, 'brightness': 180,
-                         'theme': 'dark', 'accent': 'theme'}
+                         'theme': 'dark', 'accent': 'theme', 'page_choices': {}}
         self._als_running = None    # stock light-sensor service state, as last set by us
         self._dimmed = False
         self._dim_timer = None
@@ -464,6 +463,7 @@ class Pad:
             'dial_invert': lambda v: v is None or isinstance(v, bool),
             'theme': lambda v: v in THEMES,
             'accent': lambda v: v in ACCENTS,
+            'page_choices': self._valid_page_choices,
             'brightness_auto': lambda v: isinstance(v, bool),
             'brightness': lambda v: isinstance(v, int) and BRIGHTNESS_MIN <= v <= 255,
         }
@@ -474,6 +474,13 @@ class Pad:
             self.apply_brightness()
         self.save()
         self.publish_state()
+
+    def _valid_page_choices(self, value):
+        """{slot id: choice name or None (= default)} for the config's choice slots."""
+        slots = {p.get('id'): [c.get('name') for c in p['choices']]
+                 for p in self.config.get('pages', []) if 'choices' in p}
+        return isinstance(value, dict) and all(
+            k in slots and (v is None or v in slots[k]) for k, v in value.items())
 
     def apply_brightness(self):
         """Apply the brightness setting (not while dimmed for standby)."""
@@ -584,18 +591,22 @@ class Pad:
         return True
 
     def pages(self):
-        """Pages for the current host OS. A page may carry per-OS replacements, e.g.
-        {"name": "Meetings", "tiles": [...], "windows": {"name": "Discord", "tiles": [...]}}:
-        the override's keys replace the page's (name, presets, tiles, grid)."""
-        host = self.host_os()
-        resolved = []
-        for page in self.config.get('pages', []):
-            override = page.get(host)
-            if isinstance(override, dict):
-                page = dict((k, v) for k, v in page.items() if k not in OS_NAMES)
-                page.update(override)
-            resolved.append(page)
-        return resolved
+        """The pages as shown: a slot with "choices" shows one of them (see page_choice)."""
+        return [self.page_choice(p)[1] if 'choices' in p else p for p in self.config.get('pages', [])]
+
+    def page_choice(self, slot):
+        """(name, page) a choice slot shows: the one picked in Settings, else its default
+        for the host OS. A slot looks like
+        {"id": "calls", "label": "Calls page", "default": {"windows": "Discord", "other": "Meetings"},
+         "choices": [{"name": "Meetings", ...}, {"name": "Discord", ...}]}"""
+        choices = {c.get('name'): c for c in slot.get('choices', [])}
+        name = self.settings['page_choices'].get(slot.get('id'))
+        if name not in choices:
+            default = slot.get('default')
+            if isinstance(default, dict):
+                default = default.get(self.host_os(), default.get('other'))
+            name = default if default in choices else next(iter(choices), None)
+        return name, choices.get(name, {'name': name or '?', 'tiles': []})
 
     def dials(self):
         return self.config.get('dial_modes', [])
