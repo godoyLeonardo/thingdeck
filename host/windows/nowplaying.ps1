@@ -417,6 +417,21 @@ function Update-Audio {
     }
 }
 $nvidiaSmi = (Get-Command nvidia-smi.exe -ErrorAction SilentlyContinue).Source
+$gpuAt = [DateTime]::MinValue; $gpu = $null
+
+# The live panels on the Car Thing's screen ("lights", "monitor", "github", "plex", …), from
+# its command poll. Those update often; the others slowly, which saves the computer the work.
+$visible = @()
+function Test-Visible([string]$widget) { $script:visible -contains $widget }
+# A panel just came on screen: read its data now instead of at its next turn.
+function Show-Panel([string]$widget) {
+    switch ($widget) {
+        'lights' { $script:hueFetched = [DateTime]::MinValue }
+        'github' { $script:gitHubFetched = [DateTime]::MinValue }
+        'plex' { $script:plexNext = [DateTime]::MinValue }
+        'monitor' { $script:gpuAt = [DateTime]::MinValue }
+    }
+}
 $lastNet = $null
 
 function Get-Stats {
@@ -427,15 +442,17 @@ function Get-Stats {
         mem_total_mb = [int64]($mem[0] / 1MB)
         mem_used_mb = [int64]($mem[1] / 1MB)
     }
-    if ($nvidiaSmi) {
+    # nvidia-smi is the costly part: every 2 s while Status is on screen, else every 30 s.
+    if ($nvidiaSmi -and ((Get-Date) - $script:gpuAt).TotalSeconds -ge $(if (Test-Visible 'monitor') { 0 } else { 30 })) {
+        $script:gpuAt = Get-Date
         $line = & $nvidiaSmi --query-gpu=utilization.gpu,temperature.gpu,memory.used,memory.total `
             --format=csv,noheader,nounits 2>$null
         $f = "$(@($line)[0])" -split ',\s*'     # first GPU
-        if ($LASTEXITCODE -eq 0 -and $f.Count -eq 4) {
-            $stats.gpu = [double]$f[0]; $stats.gpu_temp = [double]$f[1]
-            $stats.gpu_mem_used_mb = [int64]$f[2]; $stats.gpu_mem_total_mb = [int64]$f[3]
+        $script:gpu = if ($LASTEXITCODE -eq 0 -and $f.Count -eq 4) {
+            @{ gpu = [double]$f[0]; gpu_temp = [double]$f[1]; gpu_mem_used_mb = [int64]$f[2]; gpu_mem_total_mb = [int64]$f[3] }
         }
     }
+    if ($script:gpu) { foreach ($k in $script:gpu.Keys) { $stats[$k] = $script:gpu[$k] } }
     $rx = 0; $tx = 0
     foreach ($nic in [System.Net.NetworkInformation.NetworkInterface]::GetAllNetworkInterfaces()) {
         if ($nic.OperationalStatus -ne 'Up' -or $nic.GetIPProperties().GatewayAddresses.Count -eq 0) { continue }
@@ -663,7 +680,8 @@ function Send-HueState($state) {
 }
 
 # Rooms and zones with their lights and scenes. The structure (rooms, devices, scenes) is
-# read every 30 s; the light levels every 2 s, and right after a command.
+# read every 30 s; the light levels every 2 s while Lights is on screen (30 s otherwise),
+# and right after a command.
 function Read-Hue {
     if (-not $script:hueLists -or ((Get-Date) - $script:hueListed).TotalSeconds -ge 30) {
         $script:hueLists = @{
@@ -733,6 +751,9 @@ function Update-Hue {
     $polled = Invoke-RestMethod -Uri "http://127.0.0.1:$Port/api/commands" -TimeoutSec 5
     $commands = $polled.hue
     if ($polled.github_refresh) { $script:gitHubFetched = [DateTime]::MinValue }     # the refresh button on the Code page
+    $was = $script:visible
+    $script:visible = @($polled.visible | Where-Object { $_ })
+    foreach ($w in $script:visible) { if ($was -notcontains $w) { Show-Panel $w } }
     if (-not $script:hue -and -not $script:huePairing) { $script:hue = Read-HueConfig }
     foreach ($cmd in @($commands)) {
         if (-not $cmd) { continue }
@@ -746,7 +767,7 @@ function Update-Hue {
             Send-HueState @{ state = 'error'; error = $_.Exception.Message } }
         return
     }
-    if (((Get-Date) - $script:hueFetched).TotalSeconds -lt 2) { return }
+    if (((Get-Date) - $script:hueFetched).TotalSeconds -lt $(if (Test-Visible 'lights') { 2 } else { 30 })) { return }
     $script:hueFetched = Get-Date
     $state = if (-not $script:hue) { @{ state = 'none' } } else {
         try { Read-Hue } catch {
@@ -942,11 +963,12 @@ function Get-PlexPosters {
     $posters
 }
 
-# Every 3 s (called more often; it waits on its own). When the server doesn't answer, it
-# tries again in 30 s, so the other pages don't wait. Sends only changes, and at least every 10 s.
+# Every 3 s while Plex is on screen, else every 30 s (called more often; it waits on its own).
+# When the server doesn't answer, it tries again in 30 s, so the other pages don't wait.
+# Sends only changes, and at least every 10 s.
 function Update-Plex {
     if ((Get-Date) -lt $script:plexNext) { return }
-    $script:plexNext = (Get-Date).AddSeconds(3)
+    $script:plexNext = (Get-Date).AddSeconds($(if (Test-Visible 'plex') { 3 } else { 30 }))
     try {
         $state = Read-Plex
         if ($script:plexNeed.Count) { $state.posters = Get-PlexPosters }
@@ -1035,8 +1057,8 @@ while ($true) {
             }
             if ($reply.need_calendar) { $calendarHash = $null }
         }
-        # GitHub every minute, or every 15 s while a workflow runs.
-        if (((Get-Date) - $gitHubFetched).TotalSeconds -ge $(if ($gitHubBusy) { 15 } else { 60 })) {
+        # GitHub every minute (every 15 s while a workflow runs) while Code is on screen, else every 5 minutes.
+        if (((Get-Date) - $gitHubFetched).TotalSeconds -ge $(if (-not (Test-Visible 'github')) { 300 } elseif ($gitHubBusy) { 15 } else { 60 })) {
             $gitHubFetched = Get-Date
             $gitHub = Get-GitHub
             $gitHubBusy = [bool]($gitHub.runs | Where-Object { $_.status -ne 'completed' })
