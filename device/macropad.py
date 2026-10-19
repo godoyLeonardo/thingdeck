@@ -603,14 +603,14 @@ class Agenda:
     so repeats and time zones are handled once for every OS. Meeting links open on the
     computer: the agent picks them up in the reply to its next stats update."""
 
-    def __init__(self, ui, host):
+    def __init__(self, ui, host, opener):
         self.ui, self.host = ui, host
         self.calendar = None      # ics.Calendar
         self.state = 'unknown'    # unknown (no word from the agent) | none (no calendars.txt) | ok
         self.error = None
         self.links = {}           # event id -> meeting link
         self.details = {}         # event id -> {notes, calendar}, fetched when an event is opened
-        self.pending = None       # (link, monotonic time) to open on the computer
+        self.opener = opener
         self.built = None
         self.published = {'state': 'unknown', 'error': None, 'events': []}
 
@@ -669,12 +669,63 @@ class Agenda:
     def open(self, eid):
         link = self.links.get(eid)
         if link:
-            self.pending = (link, time.monotonic())
+            self.opener.queue(link)
         return bool(link)
 
-    def take_open(self):
+
+class LinkOpener:
+    """A link to open on the computer (a meeting, a GitHub page). It goes to the agent in
+    the reply to its next stats update; the agent opens only the kinds of link it knows."""
+
+    def __init__(self):
+        self.pending = None       # (link, monotonic time)
+
+    def queue(self, link):
+        self.pending = (link, time.monotonic())
+
+    def take(self):
         pending, self.pending = self.pending, None
         return pending[0] if pending and time.monotonic() - pending[1] < 15 else None
+
+
+GITHUB_FIELDS_RUN = ('workflow', 'status', 'conclusion', 'branch', 'title', 'event', 'created', 'updated')
+GITHUB_FIELDS_PR = ('repo', 'number', 'title', 'draft', 'checks', 'review', 'updated')
+
+
+class GitHubStatus:
+    """A repo's latest workflow runs and the user's open pull requests, which the agent
+    reads with the gh CLI (the repo is set in github.txt on the computer). Rows open on
+    the computer when tapped; their links stay here and the UI only gets ids."""
+
+    def __init__(self, ui, opener):
+        self.ui, self.opener = ui, opener
+        self.links = {}
+        self.published = {'state': 'unknown'}
+
+    def update(self, body):
+        if body.get('none'):
+            data = {'state': 'none'}
+        else:
+            runs, prs, links = [], [], {}
+            for i, run in enumerate(body.get('runs') or []):
+                if isinstance(run, dict):
+                    runs.append(dict({k: run.get(k) for k in GITHUB_FIELDS_RUN}, id='run%d' % i))
+                    links['run%d' % i] = str(run.get('url') or '')
+            for i, pr in enumerate(body.get('prs') or []):
+                if isinstance(pr, dict):
+                    prs.append(dict({k: pr.get(k) for k in GITHUB_FIELDS_PR}, id='pr%d' % i))
+                    links['pr%d' % i] = str(pr.get('url') or '')
+            self.links = links
+            data = {'state': 'ok', 'repo': str(body.get('repo') or ''), 'runs': runs, 'prs': prs,
+                    'error': str(body['error']) if body.get('error') else None, 'at': int(time.time() * 1000)}
+        self.published = data
+        self.ui.publish('github', data)
+
+    def open(self, row):
+        link = self.links.get(row)
+        if link:
+            self.opener.queue(link)
+        return bool(link)
 
 
 class Broadcaster:
@@ -721,7 +772,9 @@ class Pad:
         self.np = NowPlaying(self.ui)
         self.host = HostLink(lambda: self.publish_state())
         self.stats = HostStats(self.ui, self.toast)
-        self.agenda = Agenda(self.ui, self.host)
+        self.opener = LinkOpener()
+        self.agenda = Agenda(self.ui, self.host, self.opener)
+        self.github = GitHubStatus(self.ui, self.opener)
         self.audio = HostAudio(self.ui)
         self.hid = Hid(lambda status: self.on_usb_status(status))
         self.config = {}
@@ -1239,7 +1292,7 @@ class Handler(BaseHTTPRequestHandler):
         elif path == '/api/state':
             self._send(200, {'config': pad.config, 'state': pad.state(), 'presets': pad.presets(),
                              'nowplaying': pad.np.meta, 'stats': pad.stats.snapshot(), 'agenda': pad.agenda.published,
-                             'audio': pad.audio.state})
+                             'audio': pad.audio.state, 'github': pad.github.published})
         elif path == '/api/nowplaying':
             self._send(200, {'nowplaying': pad.np.meta})
         elif path == '/api/nowplaying/art':
@@ -1322,8 +1375,15 @@ class Handler(BaseHTTPRequestHandler):
             pad.host.update(body)
         elif path == '/api/stats':
             pad.stats.update(body)
-            return self._send(200, {'ok': True, 'open': pad.agenda.take_open(), 'kill': pad.stats.take_kill(),
+            return self._send(200, {'ok': True, 'open': pad.opener.take(), 'kill': pad.stats.take_kill(),
                                     'need_calendar': pad.agenda.needs_calendar()})
+        elif path == '/api/github':
+            pad.github.update(body)
+        elif path == '/api/github/open':
+            if not pad.stats.alive():
+                pad.toast('The computer agent is not running', 'warn')
+            elif pad.github.open(str(body.get('id'))):
+                pad.toast('Opening on the computer…')
         elif path == '/api/audio':
             return self._send(200, pad.audio.update(body))
         elif path == '/api/audio/set':
