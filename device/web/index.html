@@ -217,6 +217,8 @@
   .gh-col + .gh-col { margin-left: 8px; }
   .gh-row { display: flex; align-items: center; min-height: 56px; padding: 4px 8px; margin: 0 -8px; border-radius: 10px; }
   .gh-row.down { background: var(--tile-hi); }
+  .gh-row.wrap .ev-title { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    line-height: 1.2; }                                        /* pull request titles: up to 2 lines */
   .gh-st { flex: none; width: 32px; height: 32px; margin-right: 12px; border-radius: 50%; background: var(--tile-hi);
     display: flex; align-items: center; justify-content: center; line-height: 0; }
   .gh-st svg { width: 18px; height: 18px; }
@@ -1313,8 +1315,8 @@ function checksState(checks) {
   if (checks === 'PENDING' || checks === 'EXPECTED') return ['run', '<i class="spin"></i>'];
   return ['off', icon('pr')];                                       // no checks
 }
-function ghRow(id, state, title, sub, when) {
-  return '<div class="gh-row" data-gh="' + esc(id) + '"><div class="gh-st st-' + state[0] + '">' + state[1] + '</div>' +
+function ghRow(id, state, title, sub, when, wrap) {
+  return '<div class="gh-row' + (wrap ? ' wrap' : '') + '" data-gh="' + esc(id) + '"><div class="gh-st st-' + state[0] + '">' + state[1] + '</div>' +
     '<div class="ev-main"><div class="ev-title">' + esc(title) + '</div><div class="ev-sub">' + sub + '</div></div>' +
     '<div class="gh-when">' + when + '</div></div>';
 }
@@ -1337,7 +1339,7 @@ function updateGitHub() {
       var review = { APPROVED: '<span class="good">Approved</span>', CHANGES_REQUESTED: '<span class="bad">Changes requested</span>',
         REVIEW_REQUIRED: 'Review required' }[p.review];
       var sub = [esc((p.repo || '').split('/').pop() + '#' + p.number), p.draft ? 'Draft' : '', review || ''];
-      return ghRow(p.id, checksState(p.checks), p.title, sub.filter(function (x) { return x; }).join(' · '), ago(p.updated));
+      return ghRow(p.id, checksState(p.checks), p.title, sub.filter(function (x) { return x; }).join(' · '), ago(p.updated), true);
     }).join('');
     var error = g.error ? '<div class="ag-empty">' + esc(g.error) + '</div>' : '';
     html = '<div class="card gh-col"><h3>Actions · ' + esc(repoName) + '</h3><div class="ag-list">' +
