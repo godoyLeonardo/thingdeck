@@ -171,6 +171,8 @@
   .np-art .emoji { font-size: 72px; }
   .lkbtn .emoji { font-size: 26px; }
   .icon.sym svg { width: 26px; height: 26px; }
+  .tile:not(.mini) .icon.sym svg { width: 30px; height: 30px; }
+  .icon.sym.own { color: var(--accent) !important; }   /* a tile's own "color" (hang up) beats the icon color */
   .np-art svg { width: 84px; height: 84px; color: var(--faint); }
   .np-empty { justify-content: center; }
   .np-empty .np-title { margin-top: 0; }
@@ -697,16 +699,59 @@ function iconStyle() {
   var s = (st.settings || {}).icon_style || cfg.icon_style;
   return ICON_SETS[s] ? s : 'solid';
 }
+// Line icons for the other pages: one drawing for both styles (solid draws a heavier
+// stroke, outline a lighter one), plus the emoji used by the emoji style.
+var ICON_LINES = {
+  windows:    ['<rect x="3" y="7.5" width="13" height="10" rx="2"/><path d="M7.5 4.5H19a2 2 0 0 1 2 2V14"/>', '🪟'],
+  desktop:    ['<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8.5 20h7M12 16v4"/>', '🖥️'],
+  snip:       ['<circle cx="6" cy="6.5" r="2.5"/><circle cx="6" cy="17.5" r="2.5"/><path d="M8.2 8l11.3 10M8.2 16L19.5 6"/>', '✂️'],
+  clipboard:  ['<rect x="5" y="5" width="14" height="16" rx="2"/><rect x="9" y="3" width="6" height="4" rx="1"/>', '📋'],
+  folder:     ['<path d="M3 7.5a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>', '📁'],
+  smile:      ['<circle cx="12" cy="12" r="9"/><path d="M8.5 14.5c.9 1.3 2.1 2 3.5 2s2.6-.7 3.5-2M9 9.5h.01M15 9.5h.01"/>', '😀'],
+  activity:   ['<path d="M3 12h4l3-8 4 16 3-8h4"/>', '📈'],
+  lock:       ['<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>', '🔒'],
+  search:     ['<circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/>', '🔎'],
+  command:    ['<path d="M9 6a3 3 0 1 0-3 3h12a3 3 0 1 0-3-3v12a3 3 0 1 0 3-3H6a3 3 0 1 0 3 3z"/>', '🎛️'],
+  terminal:   ['<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9.5l3 2.5-3 2.5M13 15h4"/>', '⌨️'],
+  files:      ['<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/>', '🗂️'],
+  target:     ['<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/>', '🎯'],
+  pencil:     ['<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>', '✏️'],
+  format:     ['<path d="M4 6h16M4 10h10M4 14h16M4 18h10"/>', '🧹'],
+  sidebar:    ['<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/>', '📐'],
+  branch:     ['<circle cx="6" cy="5" r="2"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="7" r="2"/><path d="M6 7v10M18 9c0 5-6 4-12 8"/>', '🌿'],
+  download:   ['<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>', '⬇️'],
+  diff:       ['<path d="M12 4v7M8.5 7.5h7M8.5 16.5h7"/><rect x="4" y="2.5" width="16" height="19" rx="2"/>', '🔍'],
+  list:       ['<path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01"/>', '📜'],
+  flask:      ['<path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 1.8 3h10.4a2 2 0 0 0 1.8-3l-5-9V3M7.5 15h9"/>', '🧪'],
+  launch:     ['<circle cx="12" cy="12" r="9"/><path d="M10 8.5v7l5.5-3.5z"/>', '🚀'],
+  repeat:     ['<path d="M17 2.5l3 3-3 3M4 11.5v-2a4 4 0 0 1 4-4h12M7 21.5l-3-3 3-3M20 12.5v2a4 4 0 0 1-4 4H4"/>', '🔁'],
+  interrupt:  ['<path d="M8 3h8l5 5v8l-5 5H8l-5-5V8z"/><path d="M9.5 9.5l5 5m0-5l-5 5"/>', '🛑'],
+  mic:        ['<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/>', '🎙️'],
+  camera:     ['<rect x="3" y="7" width="13" height="10" rx="2"/><path d="M16 11l5-3v8l-5-3"/>', '📷'],
+  hand:       ['<path d="M8 13V5.5a1.5 1.5 0 0 1 3 0V11M11 10.5V4a1.5 1.5 0 0 1 3 0v6.5M14 10.5V5.5a1.5 1.5 0 0 1 3 0V13M17 12v-2a1.5 1.5 0 0 1 3 0v4a7 7 0 0 1-7 7h-1a6 6 0 0 1-5-2.7L4.3 15.2a1.5 1.5 0 0 1 2.5-1.7L8 15"/>', '✋'],
+  phone:      ['<path d="M5 4h3.5l2 5-2.5 1.5a11 11 0 0 0 5.5 5.5L15 13.5l5 2V19a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/>', '📞'],
+  hangup:     ['<path d="M2 14.5c5.5-5.6 14.5-5.6 20 0l-2.5 3-3.7-1.8v-3a12 12 0 0 0-7.6 0v3l-3.7 1.8z"/>', '⛔'],
+  headphones: ['<path d="M4 15v-3a8 8 0 0 1 16 0v3"/><rect x="3" y="14" width="4" height="7" rx="1.5"/><rect x="17" y="14" width="4" height="7" rx="1.5"/>', '🎧'],
+  speaker:    ['<path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5z"/><path d="M16 9a4.5 4.5 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11"/>', '🔊'],
+  inbox:      ['<path d="M3 13l3-8h12l3 8v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 13h5l1.5 2h5L16 13h5"/>', '📥'],
+  check:      ['<path d="M5 12.5l4.5 4.5L19 7"/>', '✅']
+};
 function icon(name) {
-  var style = iconStyle(), shape = ICON_SETS[style][name];
-  if (!shape) return '';
-  if (style === 'emoji') return '<span class="emoji">' + shape + '</span>';
+  var style = iconStyle(), shape = ICON_SETS[style][name], line = ICON_LINES[name];
+  if (!shape && !line) return '';
+  if (style === 'emoji') return '<span class="emoji">' + (shape || line[1]) + '</span>';
+  if (!shape) {
+    return '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="' +
+      (style === 'outline' ? 1.6 : 2.3) + '" stroke-linecap="round" stroke-linejoin="round">' + line[0] + '</svg>';
+  }
   return '<svg viewBox="0 0 24 24" aria-hidden="true" ' + (style === 'outline'
     ? 'fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'
     : 'fill="currentColor">') + shape + '</svg>';
 }
 function iconHTML(t) {
-  if (t.symbol && ICON_SETS.solid[t.symbol]) return '<div class="icon sym">' + icon(t.symbol) + '</div>';
+  if (t.symbol && (ICON_SETS.solid[t.symbol] || ICON_LINES[t.symbol])) {
+    return '<div class="icon sym' + (t.color ? ' own' : '') + '">' + icon(t.symbol) + '</div>';
+  }
   return t.icon ? '<div class="icon">' + esc(t.icon) + '</div>' : '<div class="dot"></div>';
 }
 

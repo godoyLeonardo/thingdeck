@@ -199,9 +199,15 @@ Top level:
 | `pages` | `[{"name", "presets"?, "grid"?, "nowplaying"?, "header"?, "tiles": [...]}]`, or a choice slot (below) |
 
 Tiles and presets are actions plus `label`, optional `icon` (an emoji) or `symbol`
-(a built-in icon: `play`, `pause`, `prev`, `next`, `stop`, `mute`, `note`, drawn in
-the current icon style), `hint` (small text; generated if missing) and `color`. In
-the media card's control row, `"wide": true` makes a tile double width.
+(a built-in icon drawn in the current icon style, or as an emoji in the emoji style),
+`hint` (small text; generated if missing) and `color`. In the media card's control
+row, `"wide": true` makes a tile double width. A tile's own `color` also colors its
+symbol whatever the icon color setting (the default config keeps red for hanging up).
+
+Symbols: `play pause prev next stop mute note` (media), `windows desktop snip
+clipboard folder smile activity lock search`, `command terminal files target pencil
+format sidebar`, `branch download diff list flask launch repeat interrupt`, and `mic
+camera hand phone hangup headphones speaker inbox check`.
 
 ### Actions
 
