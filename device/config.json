@@ -5,6 +5,8 @@
   "layout": "latam",
   "default_os": "windows",
   "other_os": "linux",
+  "icon_style": "solid",
+  "icon_color": "neutral",
 
   "hardware": {
     "dial_invert": false,
@@ -41,15 +43,11 @@
       "name": "Media",
       "nowplaying": true,
       "tiles": [
-        { "label": "Previous", "icon": "⏮️", "media": "prev" },
-        { "label": "Play / Pause", "icon": "⏯️", "media": "play_pause" },
-        { "label": "Next", "icon": "⏭️", "media": "next" },
-        { "label": "Stop", "icon": "⏹️", "media": "stop" },
-        { "label": "Volume down", "icon": "🔉", "media": "vol_down" },
-        { "label": "Mute", "icon": "🔇", "media": "mute" },
-        { "label": "Volume up", "icon": "🔊", "media": "vol_up" },
-        { "label": "Mic toggle", "icon": "🎙️", "key": "win+alt+k",
-          "mac": { "key": "cmd+shift+m", "hint": "Teams mute" }, "linux": { "mic_mute": true } }
+        { "label": "Stop", "symbol": "stop", "media": "stop" },
+        { "label": "Previous", "symbol": "prev", "media": "prev" },
+        { "label": "Play / Pause", "symbol": "play", "media": "play_pause", "wide": true },
+        { "label": "Next", "symbol": "next", "media": "next" },
+        { "label": "Mute", "symbol": "mute", "media": "mute" }
       ]
     },
     {

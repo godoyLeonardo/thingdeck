@@ -144,9 +144,29 @@
   .np-bar { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
   .np-bar i { display: block; height: 100%; width: 0; background: var(--acc); transition: width .5s linear; }
   .np-times { display: flex; justify-content: space-between; font: 500 12px GeistMono, monospace; color: var(--muted); margin-top: 6px; }
-  .np-controls { display: grid; grid-template-columns: repeat(8, 1fr); grid-gap: 8px; }
-  .tile.mini { height: 72px; padding: 8px 4px; align-items: center; justify-content: center; }
+  .np-controls { display: flex; }
+  .np-controls .tile + .tile { margin-left: 8px; }
+  .tile.mini { flex: 1; height: 76px; padding: 8px 4px; align-items: center; justify-content: center; }
   .tile.mini .icon { font-size: 22px; }
+  .tile.mini.wide { flex: 2; background: var(--acc); color: var(--on-acc); }
+  .tile.mini.wide .icon.sym { color: var(--on-acc); }
+  .tile.mini.wide .icon.sym svg { width: 34px; height: 34px; }
+  .tile.mini.wide .label { color: var(--on-acc); opacity: .8; }
+  .tile.mini.wide.down, .tile.mini.wide.fire { background: var(--acc); filter: brightness(1.15); }
+  .tile .icon.sym, .icon.sym { color: var(--text); line-height: 0; }   /* neutral, not the category color */
+  /* Settings → Appearance → Icon color (data-icon-color on <html>); the wide button keeps its own colors */
+  :root[data-icon-color="accent"] .tile:not(.wide) .icon.sym, :root[data-icon-color="accent"] .lkbtn:not(.wide) { color: var(--acc); }
+  :root[data-icon-color="category"] .tile:not(.wide) .icon.sym { color: var(--accent); }
+  :root[data-icon-color="category"] .lkbtn:not(.wide) { color: var(--media); }
+  .emoji { font-family: 'Noto Color Emoji', sans-serif; font-size: 24px; line-height: 1; }
+  .tile.mini.wide .emoji { font-size: 32px; }
+  .np-art .emoji { font-size: 72px; }
+  .lkbtn .emoji { font-size: 26px; }
+  .icon.sym svg { width: 26px; height: 26px; }
+  .np-art svg { width: 84px; height: 84px; color: var(--faint); }
+  .np-empty { justify-content: center; }
+  .np-empty .np-title { margin-top: 0; }
+  .np-empty .np-album { margin-top: 8px; white-space: normal; }
   .tile.mini .label { font-size: 11px; font-weight: 600; margin-top: 5px; max-width: 100%; text-align: center;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   #grid.swipe-l { transform: translateX(-24px); opacity: 0; }
@@ -181,12 +201,12 @@
   .theme i b { width: 26px; height: 10px; border-radius: 3px; margin-right: 6px; }
   .theme i u { width: 10px; height: 10px; border-radius: 50%; }
   .theme span { display: block; font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  #accents { display: grid; grid-template-columns: repeat(4, 1fr); grid-gap: 10px 8px; margin-top: 8px; }
+  #accents { display: grid; grid-template-columns: repeat(7, 1fr); grid-gap: 4px; margin-top: 8px; }
   .swatch { display: flex; flex-direction: column; align-items: center; padding: 6px 0; border-radius: 10px; }
-  .swatch i { width: 40px; height: 40px; border-radius: 50%; border: 3px solid transparent; background-clip: padding-box;
+  .swatch i { width: 32px; height: 32px; border-radius: 50%; border: 3px solid transparent; background-clip: padding-box;
     box-shadow: 0 0 0 2px var(--tile); }
   .swatch.on i { box-shadow: 0 0 0 2px var(--tile), 0 0 0 4px var(--text); }
-  .swatch span { font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .swatch span { font-size: 11px; color: var(--muted); margin-top: 6px; }
   .swatch.on span { color: var(--text); font-weight: 600; }
   .hint-text { margin-top: auto; font-size: 12px; color: var(--muted); }
   .action { display: flex; align-items: center; margin-top: 10px; }
@@ -278,6 +298,9 @@
     <div class="sec" id="sec-appearance">
       <div class="card"><h3>Theme</h3><div id="themes"></div></div>
       <div class="card"><h3>Accent</h3><div id="accents"></div>
+        <h3 style="margin-top:14px">Icons</h3>
+        <div class="row"><label>Style</label><div class="seg"><div data-set="icon_style" data-val="&quot;solid&quot;">Solid</div><div data-set="icon_style" data-val="&quot;outline&quot;">Outline</div><div data-set="icon_style" data-val="&quot;emoji&quot;">Emoji</div></div></div>
+        <div class="row"><label>Color</label><div class="seg"><div data-set="icon_color" data-val="&quot;neutral&quot;">Neutral</div><div data-set="icon_color" data-val="&quot;accent&quot;">Accent</div><div data-set="icon_color" data-val="&quot;category&quot;">Category</div></div></div>
         <div class="hint-text">“Theme” uses the color scheme’s own accent.</div></div>
     </div>
     <div class="sec" id="sec-device">
@@ -442,7 +465,7 @@ function render() {
   var page = pages[st.page] || { tiles: [] };
   var grid = page.grid || cfg.grid || [4, 2];
   var g = $('grid');
-  if (page.nowplaying && np) {
+  if (page.nowplaying) {
     renderNowPlaying(page, g);
   } else {
   g.removeAttribute('data-np');
@@ -454,7 +477,7 @@ function render() {
     var t = variant(tiles[i]);
     if (!t) { html += '<div class="tile blank"></div>'; continue; }
     html += '<div class="tile" data-i="' + i + '" style="--accent:' + kind(t) + '">' +
-      (t.icon ? '<div class="icon">' + esc(t.icon) + '</div>' : '<div class="dot"></div>') +
+      iconHTML(t) +
       '<div><div class="label">' + esc(t.label || '') + '</div><div class="hint">' + esc(hint(t)) + '</div></div></div>';
   }
   g.innerHTML = html;
@@ -527,11 +550,12 @@ function themeAccent(themeKey, accent) {
 }
 var appliedTheme = '';
 function applyTheme() {
-  var s = st.settings || {}, t = THEMES[s.theme] ? s.theme : 'dark', key = t + '/' + s.accent;
+  var s = st.settings || {}, t = THEMES[s.theme] ? s.theme : 'dark', key = t + '/' + s.accent + '/' + iconColor();
   if (key === appliedTheme) return;
   appliedTheme = key;
   var acc = themeAccent(t, s.accent), root = document.documentElement;
   root.setAttribute('data-theme', t);
+  root.setAttribute('data-icon-color', iconColor());
   root.style.setProperty('--acc', acc);
   root.style.setProperty('--acc-soft', rgba(acc, THEMES[t].light ? .14 : .18));
 }
@@ -559,7 +583,7 @@ function renderSettings() {
     $('sec-' + secs[j]).classList.toggle('on', secs[j] === settingsSec);
     $('snav').children[j].classList.toggle('on', secs[j] === settingsSec);
   }
-  var current = { clock_24h: s.clock_24h, brightness_auto: s.brightness_auto, os_mode: st.os_mode, layout: st.layout,
+  var current = { clock_24h: s.clock_24h, icon_style: iconStyle(), icon_color: iconColor(), brightness_auto: s.brightness_auto, os_mode: st.os_mode, layout: st.layout,
     dial_invert: st.dial_invert, theme: THEMES[s.theme] ? s.theme : 'dark', accent: ACCENTS[s.accent] ? s.accent : 'theme' };
   var opts = $('settings').querySelectorAll('[data-set]');
   for (var i = 0; i < opts.length; i++) {
@@ -625,8 +649,53 @@ function esc(s) {
   return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; });
 }
 
-// ---- feedback
-// ---- now playing: pushed by the host agent (host/ in the repo); Media page shows it
+// ---- icons: a tile picks one with "symbol": "play" ("icon" is still a literal emoji).
+// The style comes from Settings → Appearance, else config "icon_style": solid (filled,
+// follows the theme color), outline (line icons) or emoji (colored).
+var ICON_SETS = {
+  solid: {
+    play: '<path d="M8 5.5v13l10.5-6.5z"/>',
+    pause: '<rect x="6.5" y="5" width="4" height="14" rx="1"/><rect x="13.5" y="5" width="4" height="14" rx="1"/>',
+    prev: '<rect x="5" y="6" width="2.5" height="12" rx="1"/><path d="M19 6v12l-9.5-6z"/>',
+    next: '<rect x="16.5" y="6" width="2.5" height="12" rx="1"/><path d="M5 6v12l9.5-6z"/>',
+    stop: '<rect x="6" y="6" width="12" height="12" rx="2"/>',
+    mute: '<path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5z"/><path d="M15.5 9.5l5 5m0-5l-5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',
+    note: '<path d="M9 17.5V6l10-2v11.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="6.5" cy="17.5" r="2.5"/><circle cx="16.5" cy="15.5" r="2.5"/>'
+  },
+  outline: {
+    play: '<path d="M8.5 6v12l9.5-6z"/>',
+    pause: '<path d="M8 5.5v13M16 5.5v13"/>',
+    prev: '<path d="M6 6v12M18.5 6.5v11L10 12z"/>',
+    next: '<path d="M18 6v12M5.5 6.5v11L14 12z"/>',
+    stop: '<rect x="6.5" y="6.5" width="11" height="11" rx="2"/>',
+    mute: '<path d="M4.5 10v4h3l4.5 3.5v-11L7.5 10z"/><path d="M15.5 9.5l5 5m0-5l-5 5"/>',
+    note: '<path d="M9 17.5V6l10-2v11.5"/><circle cx="6.5" cy="17.5" r="2.5"/><circle cx="16.5" cy="15.5" r="2.5"/>'
+  },
+  emoji: { play: '▶️', pause: '⏸️', prev: '⏮️', next: '⏭️', stop: '⏹️', mute: '🔇', note: '🎵' }
+};
+function iconColor() {
+  var c = (st.settings || {}).icon_color || cfg.icon_color;
+  return c === 'accent' || c === 'category' ? c : 'neutral';
+}
+function iconStyle() {
+  var s = (st.settings || {}).icon_style || cfg.icon_style;
+  return ICON_SETS[s] ? s : 'solid';
+}
+function icon(name) {
+  var style = iconStyle(), shape = ICON_SETS[style][name];
+  if (!shape) return '';
+  if (style === 'emoji') return '<span class="emoji">' + shape + '</span>';
+  return '<svg viewBox="0 0 24 24" aria-hidden="true" ' + (style === 'outline'
+    ? 'fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'
+    : 'fill="currentColor">') + shape + '</svg>';
+}
+function iconHTML(t) {
+  if (t.symbol && ICON_SETS.solid[t.symbol]) return '<div class="icon sym">' + icon(t.symbol) + '</div>';
+  return t.icon ? '<div class="icon">' + esc(t.icon) + '</div>' : '<div class="dot"></div>';
+}
+
+// ---- now playing: pushed by the host agent (host/ in the repo); the media card shows it
+
 var np = null;       // metadata from the service, plus recv = when it arrived here
 function setNowPlaying(d) {
   np = d && d.title ? d : null;
@@ -642,45 +711,54 @@ function npPosition() {
   var pos = (np.position_ms || 0) + (np.playing ? Date.now() - np.recv : 0);
   return np.duration_ms ? Math.min(pos, np.duration_ms) : pos;
 }
-// Built once per track (and page), so the cover isn't refetched on every position update.
+// The media card (a page with "nowplaying": true): what's playing on top, its tiles as a
+// row of controls below. Built once per track, so the cover isn't refetched on every
+// position update. Without anything playing it shows a placeholder, same layout.
 function renderNowPlaying(page, g) {
-  var key = [np.art, np.title, np.artist, np.album, np.app, st.page, st.os].join('|');
-  if (g.getAttribute('data-np') !== key) {
-    g.setAttribute('data-np', key);
-    g.style.gridTemplateColumns = '1fr';
-    g.style.gridTemplateRows = '1fr auto';
-    var tiles = page.tiles || [];
-    g.innerHTML =
-      '<div class="np-top">' +
-        '<div class="np-art">' + (np.art ? '<img src="/api/nowplaying/art?k=' + encodeURIComponent(np.art) + '">' : '♪') + '</div>' +
-        '<div class="np-info">' +
-          '<div class="np-app"><span id="np-state"></span>' + (np.app ? ' · ' + esc(np.app) : '') + '</div>' +
-          '<div class="np-title">' + esc(np.title) + '</div>' +
-          (np.artist ? '<div class="np-artist">' + esc(np.artist) + '</div>' : '') +
-          (np.album ? '<div class="np-album">' + esc(np.album) + (np.track_number ? ' · #' + np.track_number : '') + '</div>' : '') +
-          '<div class="np-progress" id="np-progress"><div class="np-bar"><i id="np-fill"></i></div>' +
-            '<div class="np-times"><span id="np-pos"></span><span id="np-dur"></span></div></div>' +
-        '</div>' +
-      '</div>' +
-      '<div class="np-controls">' + tiles.map(function (t0, i) {
-        var t = variant(t0);
-        if (!t) return '<div></div>';
-        return '<div class="tile mini" data-i="' + i + '" style="--accent:' + kind(t) + '"' +
-          (t.media === 'play_pause' ? ' data-playpause="1"' : '') + '>' +
-          '<div class="icon">' + esc(t.icon || '•') + '</div><div class="label">' + esc(t.label || '') + '</div></div>';
-      }).join('') + '</div>';
+  var key = np ? [np.art, np.title, np.artist, np.album, np.app] : ['none', !!st.clock];
+  key = key.concat([st.page, st.os, iconStyle()]).join('|');
+  if (g.getAttribute('data-np') === key) return updateNowPlaying();
+  g.setAttribute('data-np', key);
+  g.style.gridTemplateColumns = '1fr';
+  g.style.gridTemplateRows = '1fr auto';
+  var top;
+  if (np) {
+    top = '<div class="np-art">' + (np.art ? '<img src="/api/nowplaying/art?k=' + encodeURIComponent(np.art) + '">' : icon('note')) + '</div>' +
+      '<div class="np-info">' +
+        '<div class="np-app"><span id="np-state"></span>' + (np.app ? ' · ' + esc(np.app) : '') + '</div>' +
+        '<div class="np-title">' + esc(np.title) + '</div>' +
+        (np.artist ? '<div class="np-artist">' + esc(np.artist) + '</div>' : '') +
+        (np.album ? '<div class="np-album">' + esc(np.album) + (np.track_number ? ' · #' + np.track_number : '') + '</div>' : '') +
+        '<div class="np-progress" id="np-progress"><div class="np-bar"><i id="np-fill"></i></div>' +
+          '<div class="np-times"><span id="np-pos"></span><span id="np-dur"></span></div></div>' +
+      '</div>';
+  } else {
+    // A clock means the computer agent is running; without it there's no track info at all.
+    top = '<div class="np-art">' + icon('note') + '</div><div class="np-info np-empty">' +
+      '<div class="np-title">Nothing playing</div><div class="np-album">' +
+      (st.clock ? 'Play something on the computer to see it here.'
+                : 'Install the computer agent to see what’s playing (see README).') + '</div></div>';
   }
+  g.innerHTML = '<div class="np-top">' + top + '</div><div class="np-controls">' +
+    (page.tiles || []).map(function (t0, i) {
+      var t = variant(t0);
+      if (!t) return '';
+      var pp = t.media === 'play_pause';
+      return '<div class="tile mini' + (t.wide ? ' wide' : '') + '" data-i="' + i + '" style="--accent:' + kind(t) + '"' +
+        (pp ? ' data-playpause="1"' : '') + '>' + iconHTML(t) + '<div class="label">' + esc(t.label || '') + '</div></div>';
+    }).join('') + '</div>';
   updateNowPlaying();
 }
 function updateNowPlaying() {
   if (lockShown) updateLock();
-  if (!np || !$('np-fill')) return;
-  $('np-state').textContent = np.playing ? '▶ Playing' : '❚❚ Paused';
   var pp = $('grid').querySelector('[data-playpause]');
   if (pp) {
-    pp.querySelector('.icon').textContent = np.playing ? '⏸️' : '▶️';
-    pp.querySelector('.label').textContent = np.playing ? 'Pause' : 'Play';
+    var playing = !!(np && np.playing);
+    pp.querySelector('.icon').innerHTML = playing ? icon('pause') : icon('play');
+    pp.querySelector('.label').textContent = playing ? 'Pause' : 'Play';
   }
+  if (!np || !$('np-fill')) return;
+  $('np-state').textContent = np.playing ? 'Playing' : 'Paused';
   var pos = npPosition(), dur = np.duration_ms;
   $('np-progress').style.visibility = dur ? 'visible' : 'hidden';
   if (dur) {
@@ -691,6 +769,7 @@ function updateNowPlaying() {
 }
 setInterval(updateNowPlaying, 500);
 
+// ---- feedback
 function fire(el) {
   if (!el) return;
   el.classList.add('fire');
