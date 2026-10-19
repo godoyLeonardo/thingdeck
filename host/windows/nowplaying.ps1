@@ -168,6 +168,81 @@ public static class StreamthingStats {
 }
 '@
 [void][StreamthingStats]::Cpu()
+
+# --- the focused app, for the Status page's kill switch. A Store app's window belongs to
+# ApplicationFrameHost; the app itself owns one of its child windows.
+Add-Type @'
+using System;
+using System.Runtime.InteropServices;
+using System.Text;
+public static class StreamthingFocus {
+    delegate bool EnumProc(IntPtr hWnd, IntPtr lParam);
+    [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint pid);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetWindowText(IntPtr hWnd, StringBuilder text, int count);
+    [DllImport("user32.dll")] static extern bool EnumChildWindows(IntPtr parent, EnumProc proc, IntPtr lParam);
+    public static string Title = "";
+    public static uint Pid() {
+        IntPtr window = GetForegroundWindow();
+        Title = "";
+        if (window == IntPtr.Zero) return 0;
+        uint pid;
+        GetWindowThreadProcessId(window, out pid);
+        var text = new StringBuilder(256);
+        GetWindowText(window, text, 256);
+        Title = text.ToString();
+        try {
+            if (System.Diagnostics.Process.GetProcessById((int)pid).ProcessName == "ApplicationFrameHost") {
+                uint host = pid;
+                EnumChildWindows(window, (child, l) => {
+                    uint p;
+                    GetWindowThreadProcessId(child, out p);
+                    if (p != host) { pid = p; return false; }
+                    return true;
+                }, IntPtr.Zero);
+            }
+        } catch (ArgumentException) { }
+        return pid;
+    }
+}
+'@
+# Never offered for killing: Windows itself, the shell (Explorer also draws the taskbar), and this agent.
+$ProtectedNames = @('explorer', 'dwm', 'csrss', 'winlogon', 'wininit', 'lsass', 'services', 'smss', 'svchost', 'system',
+    'idle', 'logonui', 'lockapp', 'sihost', 'shellexperiencehost', 'startmenuexperiencehost', 'searchhost',
+    'textinputhost', 'applicationframehost', 'streamthing-nowplaying')
+$SelfIds = @($PID, (Get-CimInstance Win32_Process -Filter "ProcessId = $PID").ParentProcessId)
+$focusApp = @{ pid = 0; app = '' }      # the last focused process's display name, looked up once per process
+
+function Get-Focus {
+    $id = [StreamthingFocus]::Pid()
+    $proc = if ($id) { Get-Process -Id $id -ErrorAction SilentlyContinue }
+    if (-not $proc) { return $null }
+    if ($script:focusApp.pid -ne $id) {
+        $description = try { $proc.Description } catch { $null }     # the file description: "Google Chrome"
+        $script:focusApp = @{ pid = $id; app = $(if ($description) { $description } else { $proc.ProcessName }) }
+    }
+    [ordered]@{
+        pid = [int]$id; name = $proc.ProcessName; app = $script:focusApp.app; title = [StreamthingFocus]::Title
+        protected = ($ProtectedNames -contains $proc.ProcessName.ToLower()) -or ($SelfIds -contains [int]$id)
+    }
+}
+
+# Kill what the Car Thing showed: the same process id and still the same program.
+function Stop-Focused($target) {
+    $proc = Get-Process -Id ([int]$target.pid) -ErrorAction SilentlyContinue
+    $result = @{ name = "$($target.app)"; ok = $false }
+    if (-not $proc -or $proc.ProcessName -ne $target.name) { $result.error = 'it is not running anymore'; return $result }
+    if ($ProtectedNames -contains $proc.ProcessName.ToLower() -or $SelfIds -contains $proc.Id) { $result.error = 'it is protected'; return $result }
+    try {
+        Stop-Process -Id $proc.Id -Force -ErrorAction Stop
+        Write-Log "killed $($proc.ProcessName) ($($proc.Id))"
+        $result.ok = $true
+    } catch {
+        $result.error = if ($_.Exception.InnerException.NativeErrorCode -eq 5) { 'access denied: it runs as administrator' } else { $_.Exception.Message }
+    }
+    $result
+}
+$killResult = $null
 $nvidiaSmi = (Get-Command nvidia-smi.exe -ErrorAction SilentlyContinue).Source
 $lastNet = $null
 
@@ -245,6 +320,7 @@ if ($Once) {
     if ($np) { $np.Remove('thumbnail'); $np | ConvertTo-Json } else { 'nothing playing' }
     Start-Sleep -Seconds 1
     Get-Stats | ConvertTo-Json
+    Get-Focus | ConvertTo-Json
     exit
 }
 
@@ -272,10 +348,15 @@ while ($true) {
             $tunnelUp = $true
             $lastSignature = $null; $coverSentFor = ''; $lastHost = $null; $calendarHash = $null
         }
-        # Stats every 2 s; the reply may ask to open a meeting link or to resend the calendars.
+        # Stats (and the focused app) every 2 s; the reply may ask to kill that app, open a
+        # meeting link or resend the calendars.
         if (((Get-Date) - $lastStatsSent).TotalSeconds -ge 2) {
             $lastStatsSent = Get-Date
-            $reply = Send-Json 'stats' (Get-Stats)
+            $stats = Get-Stats
+            $stats.focus = Get-Focus
+            if ($killResult) { $stats.kill_result = $killResult; $killResult = $null }
+            $reply = Send-Json 'stats' $stats
+            if ($reply.kill) { $killResult = Stop-Focused $reply.kill; $lastStatsSent = [DateTime]::MinValue }   # report it right away
             if ($reply.open -and $reply.open -match $MeetingUrl) {
                 Write-Log "opening $($reply.open -replace '\?.*', '')"
                 Start-Process $reply.open
