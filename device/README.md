@@ -172,7 +172,8 @@ as a compact row of controls below.
 `:root[data-theme=…]`. Settings saves `theme` and `accent` in `state.json`, and
 the page sets `data-theme` and the `--acc`/`--acc-soft` accent variables. Accent
 `theme` uses the color scheme's own accent; the fixed accents have a lighter and
-a darker shade for dark and light themes.
+a darker shade for dark and light themes. The hue slider stores `accent` as a
+number (0–359), drawn light on dark themes and dark on light ones.
 
 ### Brightness
 

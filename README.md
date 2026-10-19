@@ -20,7 +20,7 @@ as soon as you plug it in.
   direction, calls page (Discord or Meetings), themes, device info, and Reconnect / Restart / Reboot.
 - **Themes:** Dark, Black, Light, and the editor color schemes Nord, Dracula,
   Catppuccin, Gruvbox, Tokyo Night and Solarized, each with its own accent or
-  one of six accent colors. Icons come in three styles (solid, outline, emoji) and three colors (neutral,
+  one of six accent colors or any hue from a slider. Icons come in three styles (solid, outline, emoji) and three colors (neutral,
   accent, or a color per tile category).
 - **Computer agent (optional):** a small background agent on the computer adds a
   **now playing** view to the Media page (cover, title, artist, album, app, live

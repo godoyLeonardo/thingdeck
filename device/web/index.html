@@ -219,6 +219,10 @@
   .swatch.on i { box-shadow: 0 0 0 2px var(--tile), 0 0 0 4px var(--text); }
   .swatch span { font-size: calc(11px * var(--ts)); color: var(--muted); margin-top: 6px; }
   .swatch.on span { color: var(--text); font-weight: 600; }
+  #hue { flex: none; width: 100%; margin: 2px 0 0; }   /* custom accent: any hue */
+  #hue::-webkit-slider-runnable-track { height: 10px; border-radius: 5px; background: linear-gradient(to right,
+    hsl(0,85%,64%), hsl(60,85%,64%), hsl(120,85%,64%), hsl(180,85%,64%), hsl(240,85%,64%), hsl(300,85%,64%), hsl(360,85%,64%)); }
+  #hue::-webkit-slider-thumb { margin-top: -10px; border: 3px solid var(--tile); }
   .hint-text { margin-top: auto; font-size: calc(12px * var(--ts)); color: var(--muted); }
   .action { display: flex; align-items: center; margin-top: 10px; }
   .action .btn { flex: none; width: 150px; }
@@ -317,10 +321,11 @@
     <div class="sec" id="sec-appearance">
       <div class="card"><h3>Theme</h3><div id="themes"></div></div>
       <div class="card"><h3>Accent</h3><div id="accents"></div>
+        <input type="range" id="hue" min="0" max="359" step="1">
         <h3 style="margin-top:14px">Icons</h3>
         <div class="row"><label>Style</label><div class="seg"><div data-set="icon_style" data-val="&quot;solid&quot;">Solid</div><div data-set="icon_style" data-val="&quot;outline&quot;">Outline</div><div data-set="icon_style" data-val="&quot;emoji&quot;">Emoji</div></div></div>
         <div class="row"><label>Color</label><div class="seg"><div data-set="icon_color" data-val="&quot;neutral&quot;">Neutral</div><div data-set="icon_color" data-val="&quot;accent&quot;">Accent</div><div data-set="icon_color" data-val="&quot;category&quot;">Category</div></div></div>
-        <div class="hint-text">“Theme” uses the color scheme’s own accent.</div></div>
+        <div class="hint-text">“Theme” uses the color scheme’s own accent; the slider picks any hue.</div></div>
     </div>
     <div class="sec" id="sec-device">
       <div class="card"><h3>Device</h3><div class="kv" id="kv"></div></div>
@@ -563,8 +568,25 @@ function rgba(hex, a) {
   var n = parseInt(hex.slice(1), 16);
   return 'rgba(' + (n >> 16) + ',' + (n >> 8 & 255) + ',' + (n & 255) + ',' + a + ')';
 }
+// A custom accent is a hue (0-359), lighter on dark themes and darker on light ones.
+function hueHex(h, light) {
+  var s = light ? .72 : .85, l = light ? .42 : .64, a = s * Math.min(l, 1 - l);
+  function f(n) {
+    var k = (n + h / 30) % 12, c = l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1));
+    return ('0' + Math.round(c * 255).toString(16)).slice(-2);
+  }
+  return '#' + f(0) + f(8) + f(4);
+}
+function hexHue(hex) {
+  var n = parseInt(hex.slice(1), 16), r = (n >> 16) / 255, g = (n >> 8 & 255) / 255, b = (n & 255) / 255;
+  var max = Math.max(r, g, b), d = max - Math.min(r, g, b);
+  if (!d) return 0;
+  var h = max === r ? (g - b) / d : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return Math.round((h * 60 + 360) % 360);
+}
 function themeAccent(themeKey, accent) {
   var th = THEMES[themeKey] || THEMES.dark;
+  if (typeof accent === 'number') return hueHex(accent, th.light);
   return ACCENTS[accent] ? ACCENTS[accent][th.light ? 1 : 0] : th.acc;
 }
 var appliedTheme = '';
@@ -603,13 +625,17 @@ function renderSettings() {
     $('snav').children[j].classList.toggle('on', secs[j] === settingsSec);
   }
   var current = { clock_24h: s.clock_24h, icon_style: iconStyle(), icon_color: iconColor(), brightness_auto: s.brightness_auto, os_mode: st.os_mode, layout: st.layout,
-    dial_invert: st.dial_invert, theme: THEMES[s.theme] ? s.theme : 'dark', accent: ACCENTS[s.accent] ? s.accent : 'theme' };
+    dial_invert: st.dial_invert, theme: THEMES[s.theme] ? s.theme : 'dark',
+    accent: typeof s.accent === 'number' || ACCENTS[s.accent] ? s.accent : 'theme' };   // a hue matches no swatch
   var opts = $('settings').querySelectorAll('[data-set]');
   for (var i = 0; i < opts.length; i++) {
     var key = opts[i].getAttribute('data-set');
     opts[i].classList.toggle('on', JSON.stringify(current[key]) === opts[i].getAttribute('data-val'));
   }
   $('bslider').classList.toggle('dim', !!s.brightness_auto);
+  if (!draggingHue) {
+    $('hue').value = typeof s.accent === 'number' ? s.accent : hexHue(themeAccent(current.theme, current.accent));
+  }
   if (!dragging) {
     $('bright').value = s.brightness_auto && info ? info.brightness_now : s.brightness;
   }
@@ -648,6 +674,16 @@ $('bright').addEventListener('input', function () {
 $('bright').addEventListener('change', function () {
   dragging = false;
   post('/api/settings', { brightness_auto: false, brightness: parseInt(this.value, 10) });
+});
+var draggingHue = false, lastHueSent = 0;
+$('hue').addEventListener('pointerdown', function () { draggingHue = true; });
+$('hue').addEventListener('input', function () {
+  var now = Date.now();
+  if (now - lastHueSent > 120) { lastHueSent = now; post('/api/settings', { accent: parseInt(this.value, 10) }); }
+});
+$('hue').addEventListener('change', function () {
+  draggingHue = false;
+  post('/api/settings', { accent: parseInt(this.value, 10) });
 });
 var armed = null;
 function system(el) {
