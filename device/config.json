@@ -58,10 +58,11 @@
       "widgets": ["agenda"]
     },
     {
-      "_note": "CPU, memory, GPU and network of the computer (needs the computer agent).",
+      "_note": "CPU, memory, GPU and network of the computer, and a kill switch for the focused app (needs the computer agent).",
       "name": "Status",
       "header": "clock",
-      "widgets": ["monitor"]
+      "widgets": ["monitor"],
+      "kill": true
     },
     {
       "name": "Desktop",
