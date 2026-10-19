@@ -8,7 +8,7 @@ as soon as you plug it in.
 - **Touchscreen:** pages of large tiles (Desktop, Shell, and a calls page: Discord
   or Meetings), each sending a shortcut, a media key, typed text or a sequence of
   steps, plus live pages filled by the computer agent: Media, Lights (Philips Hue),
-  Calendar, Status, Code (GitHub) and Plex. Up to six tabs share the bottom bar; with more,
+  Calendar, Status, Code (GitHub) and Plex. Up to seven tabs share the bottom bar; with more,
   it shows four at a time and scrolls. Settings → Tabs sets their order and hides any
   you don't use. On live pages, the top bar also shows the song playing (tap it for Media).
 - **4 top buttons:** presets that change with the page. Tile pages show their
@@ -112,7 +112,7 @@ them.
 | Back button | Next page, wrapping from the last back to the first · hold: first page |
 | Menu button (M) | Next dial mode · hold: back to Volume |
 | Swipe left/right on the page | Change page |
-| Bottom bar | Tap a tab (with more than six, drag the bar or tap › / ‹ for the rest) |
+| Bottom bar | Tap a tab (with more than seven, drag the bar or tap › / ‹ for the rest) |
 | Song pill (top bar) | Go to Media |
 | Tap the status pill (bottom right) | Cycle host OS: Auto → Windows → macOS → Linux |
 
@@ -195,8 +195,8 @@ them to the Car Thing **over the USB cable** (`adb forward`; no network):
   running, queued, passed, failed or cancelled, with branch, commit and time) and
   your open pull requests on any repository, with their checks, review state and
   draft flag. Both lists scroll. Tap a row to open it in the browser on the computer.
-  It refreshes every minute, or every 15 seconds while a workflow runs (see
-  [Adding GitHub](#adding-github)).
+  It refreshes every minute, or every 15 seconds while a workflow runs, and the ↻ button
+  on the Actions card fetches it right away (see [Adding GitHub](#adding-github)).
 - **Plex:** the streams on your Plex Media Server. Each stream shows its poster, the
   user and player, the progress and the quality. A tag shows how the server sends it:
   direct play, direct stream, or transcode (HW for a hardware transcode). Next to the

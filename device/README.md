@@ -169,8 +169,8 @@ as the agent has set the time; the presets and dial still work. A page with
 
 ### Touch UI
 
-The bottom bar holds one tab per shown page plus ⚙ Settings. Up to six tabs share
-it evenly. With more, each tab is a quarter of the bar, so four show at a time; the
+The bottom bar holds one tab per shown page plus ⚙ Settings. Up to seven tabs share
+it evenly (seven with smaller text). With more, each tab is a quarter of the bar, so four show at a time; the
 bar scrolls sideways, snaps to whole tabs, and keeps the current page's tab in view.
 The arrow button at its end then points to the other tabs (› scrolls on, ‹ goes back
 to the start), and a drag that starts on the bar never switches pages. Details and
@@ -434,7 +434,8 @@ page, or `adb shell`).
 | POST | `/api/hue/select` | `{"id"}` | Make a room the target of the Lights dial mode |
 | POST | `/api/plex` | `{"state", "server"?, "sessions"?, "load"?, "net"?, "libraries"?, "activities"?, "posters"?, "error"?}` | From the host agent every 3 s. Replies `{"need_art": [keys]}` |
 | GET | `/api/plex/art?k=…` | | A stream's poster |
-| GET | `/api/commands` | | For the host agent: queued commands (`{"hue": [...]}`), emptied on read |
+| GET | `/api/commands` | | For the host agent: queued commands (`{"hue": [...], "github_refresh": bool}`), emptied on read |
+| POST | `/api/github/refresh` | | Ask the agent to read GitHub now (the ↻ button) |
 | POST | `/api/run` | any action | Run an action |
 | POST | `/api/system` | `{"do": "reconnect" \| "restart" \| "reboot"}` | Reconnect USB (software replug) / restart service / reboot |
 
