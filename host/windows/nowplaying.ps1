@@ -3,7 +3,8 @@ thingdeck agent for Windows.
 
 Sends the Car Thing the computer's time (for its clock) and lock state, system stats
 (CPU, memory, GPU, network), the focused app, the volume and audio devices, the
-calendars listed in calendars.txt next to the log, and what is playing in the system
+calendars listed in calendars.txt next to the log, the Plex server in plex.txt next to
+the log, and what is playing in the system
 media session (the same one Windows shows in its media flyout: Spotify, browsers,
 Media Player, ...), over USB through `adb forward`. It also opens meeting links,
 kills the focused app and switches audio devices when the Car Thing asks. Needs Windows PowerShell 5.1
@@ -755,8 +756,219 @@ function Update-Hue {
     if ($key -ne $script:hueSent -or ((Get-Date) - $script:hueSentAt).TotalSeconds -ge 10) { Send-HueState $state }
 }
 
+# --- Plex. A Plex Media Server on the local network: its streams, load, bandwidth and
+# libraries. The first line of plex.txt next to the log is the server's address
+# (192.168.1.20, or http://192.168.1.20:32400); a second line holds a Plex token, for a
+# server that asks for one on the local network.
+$PlexFile = Join-Path (Split-Path $LogFile) 'plex.txt'
+$PlexStep = 6           # seconds per sample in the server's own load and bandwidth history
+$Dot = " $([char]0x00B7) "; $Dash = " $([char]0x2014) "      # this file stays ASCII: Windows PowerShell reads it as ANSI
+# Plex items can have keys that differ only in case ("guid" and "Guid"), which ConvertFrom-Json
+# refuses in Windows PowerShell; this reader keeps them apart.
+Add-Type -AssemblyName System.Web.Extensions
+$PlexJson = New-Object System.Web.Script.Serialization.JavaScriptSerializer
+$PlexJson.MaxJsonLength = [int]::MaxValue
+$plex = @{ server = $null; token = $null }
+$plexNext = [DateTime]::MinValue                     # when to read the server next
+$plexCounted = [DateTime]::MinValue; $plexLibraries = @(); $plexUpdate = $null
+$plexThumbs = @{}; $plexNeed = @()                   # poster key -> @{ path; square }; keys the Car Thing asked for
+$plexSent = $null; $plexSentAt = [DateTime]::MinValue; $plexError = $null
+
+function Read-PlexConfig {
+    $lines = @()
+    if (Test-Path $PlexFile) { $lines = @(Get-Content $PlexFile | ForEach-Object { $_.Trim() } | Where-Object { $_ -and -not $_.StartsWith('#') }) }
+    $server = if ($lines.Count) { $lines[0].TrimEnd('/') } else { $null }
+    if ($server -and $server -notmatch '://') { $server = "http://$server" }
+    if ($server -and $server -notmatch ':\d+$') { $server += ':32400' }
+    if ($server -ne $script:plex.server) { $script:plexCounted = [DateTime]::MinValue; $script:plexLibraries = @() }
+    $script:plex = @{ server = $server; token = $(if ($lines.Count -gt 1) { $lines[1] } else { $null }) }
+}
+
+# One request to the server: its MediaContainer, or the bytes with -Raw. With -Optional, an
+# HTTP error (a Plex Pass part on a server without it) gives $null instead of an error.
+function Invoke-Plex([string]$path, [switch]$Raw, [switch]$Optional) {
+    $request = [System.Net.HttpWebRequest]::Create($script:plex.server + $path)
+    $request.Accept = 'application/json'
+    $request.Timeout = 4000
+    $request.ReadWriteTimeout = 4000
+    if ($script:plex.token) { $request.Headers.Add('X-Plex-Token', $script:plex.token) }
+    try { $response = $request.GetResponse() }
+    catch [System.Net.WebException] { if ($_.Exception.Response) { $response = $_.Exception.Response } else { throw } }
+    try {
+        $status = [int]$response.StatusCode
+        if ($status -ge 400) {
+            if ($Optional) { return $null }
+            if ($status -eq 401 -or $status -eq 403) { throw 'The server asks for a Plex token: put it on the second line of plex.txt' }
+            throw "HTTP $status for $path"
+        }
+        $memory = New-Object System.IO.MemoryStream
+        $response.GetResponseStream().CopyTo($memory)
+    } finally { $response.Close() }
+    if ($Raw) { return ,$memory.ToArray() }
+    $container = $script:PlexJson.DeserializeObject([Text.Encoding]::UTF8.GetString($memory.ToArray()))['MediaContainer']
+    if ($container) { $container } else { @{} }
+}
+
+# One stream from /status/sessions, as the Car Thing shows it, plus its poster's path.
+function Get-PlexSession($s) {
+    $kind = $s.type; $player = $s.Player; $session = $s.Session; $transcode = $s.TranscodeSession
+    $media = if ($s.Media) { @($s.Media)[0] } else { $null }
+    if ($kind -eq 'episode') {
+        $number = if ($null -ne $s.parentIndex -and $null -ne $s.index) { "S$($s.parentIndex)$($Dot)E$($s.index)" } else { '' }
+        $title = $s.grandparentTitle; $sub = (@($number, $s.title) | Where-Object { $_ }) -join $Dot
+        $thumb = if ($s.grandparentThumb) { $s.grandparentThumb } else { $s.thumb }
+    } elseif ($kind -eq 'track') {
+        $title = $s.title; $sub = (@($s.grandparentTitle, $s.parentTitle) | Where-Object { $_ }) -join $Dash
+        $thumb = if ($s.parentThumb) { $s.parentThumb } else { $s.thumb }
+    } else {
+        $title = $s.title; $sub = if ($s.year) { "$($s.year)" } else { '' }; $thumb = $s.thumb
+    }
+    $decision = if (-not $transcode) { 'direct play' }
+        elseif ($transcode.videoDecision -eq 'transcode' -or ($kind -eq 'track' -and $transcode.audioDecision -eq 'transcode')) { 'transcode' }
+        else { 'direct stream' }       # the video is copied; only the audio or the container changes
+    $resolution = "$($media.videoResolution)"
+    $quality = if ($resolution -eq '4k') { '4K' } elseif ($resolution -eq 'sd') { 'SD' } elseif ($resolution -match '^\d+$') { "${resolution}p" }
+        elseif ($resolution) { $resolution } else { "$($media.audioCodec)".ToUpper() }
+    [ordered]@{
+        id = "$(if ($session.id) { $session.id } else { $s.sessionKey })"; kind = $kind; title = $title; sub = $sub
+        user = $s.User.title; player = $(if ($player.title) { $player.title } else { $player.product }); state = $player.state
+        position_ms = $s.viewOffset; duration_ms = $s.duration; decision = $decision
+        hw = [bool]($transcode -and ($transcode.transcodeHwEncoding -or $transcode.transcodeHwFullPipeline))
+        quality = $quality; kbps = $session.bandwidth
+        local = $(if ($session.location) { $session.location -ne 'wan' } else { $player.local -ne $false }); thumb = $thumb
+    }
+}
+
+function Get-PlexCount($key, [int]$type = 0) {
+    $query = $(if ($type) { "type=$type&" } else { '' }) + 'X-Plex-Container-Start=0&X-Plex-Container-Size=0'
+    (Invoke-Plex "/library/sections/$key/all?$query").totalSize
+}
+
+# Every 5 minutes: the library counts and the update check.
+function Update-PlexLibraries {
+    $script:plexLibraries = @(foreach ($d in (Invoke-Plex '/library/sections').Directory) {
+        $library = [ordered]@{ title = $d.title; kind = $d.type; count = (Get-PlexCount $d.key) }
+        if ($d.type -eq 'show') { $library.episodes = Get-PlexCount $d.key 4 }
+        elseif ($d.type -eq 'artist') { $library.albums = Get-PlexCount $d.key 9; $library.tracks = Get-PlexCount $d.key 10 }
+        $library
+    })
+    $updater = Invoke-Plex '/updater/status' -Optional
+    $script:plexUpdate = $null
+    if ($updater) { foreach ($r in $updater.Release) { if ($r.version) { $script:plexUpdate = $r.version; break } } }
+    $script:plexCounted = Get-Date
+}
+
+# The server's own load and bandwidth history, for the graphs (needs Plex Pass).
+function Get-PlexHistory {
+    $resources = Invoke-Plex "/statistics/resources?timespan=$PlexStep" -Optional
+    $rows = @()
+    if ($resources -and $resources.StatisticsResources) { $rows = @($resources.StatisticsResources | Sort-Object { $_.at } | Select-Object -Last 60) }
+    $load = $null
+    if ($rows.Count) {
+        $load = [ordered]@{
+            cpu = @($rows | ForEach-Object { [Math]::Round([double]$_.hostCpuUtilization, 1) })
+            mem = @($rows | ForEach-Object { [Math]::Round([double]$_.hostMemoryUtilization, 1) })
+            plex_cpu = $rows[-1].processCpuUtilization; plex_mem = $rows[-1].processMemoryUtilization
+        }
+    }
+    $bandwidth = Invoke-Plex "/statistics/bandwidth?timespan=$PlexStep" -Optional
+    if ($null -eq $bandwidth) { return @{ load = $load; net = $null } }
+    # One row per device and sample, at uneven times: add them up per 6 s, LAN and WAN apart.
+    $buckets = @{}
+    foreach ($r in $bandwidth.StatisticsBandwidth) {
+        $k = [long][Math]::Floor([double]$r.at / $PlexStep)
+        if (-not $buckets.ContainsKey($k)) { $buckets[$k] = @(0, 0) }
+        $buckets[$k][$(if ($r.lan) { 0 } else { 1 })] += [long]$r.bytes
+    }
+    $end = [long][Math]::Floor([DateTimeOffset]::UtcNow.ToUnixTimeSeconds() / $PlexStep)
+    $start = $end
+    foreach ($k in $buckets.Keys) { if ($k -gt $end) { $end = $k } }
+    foreach ($k in $buckets.Keys) { if ($k -lt $start) { $start = $k } }
+    $start = [Math]::Max($start, $end - 59)
+    $lan = @(); $wan = @()
+    for ($k = $start; $k -le $end; $k++) {
+        $b = $buckets[[long]$k]
+        $lan += $(if ($b) { [long][Math]::Floor($b[0] / $PlexStep) } else { 0 })
+        $wan += $(if ($b) { [long][Math]::Floor($b[1] / $PlexStep) } else { 0 })
+    }
+    @{ load = $load; net = [ordered]@{ lan = $lan; wan = $wan } }
+}
+
+function Read-Plex {
+    Read-PlexConfig
+    if (-not $script:plex.server) { return @{ state = 'none' } }
+    if (((Get-Date) - $script:plexCounted).TotalMinutes -ge 5) { Update-PlexLibraries }
+    $root = Invoke-Plex '/'
+    $thumbs = @{}
+    $sessions = @(foreach ($s in (Invoke-Plex '/status/sessions').Metadata) {
+        $session = Get-PlexSession $s
+        if ($session.thumb) {
+            $session.art = (Get-Hash $session.thumb).Substring(0, 16)
+            $thumbs[$session.art] = @{ path = $session.thumb; square = ($session.kind -eq 'track') }
+        }
+        $session.Remove('thumb')
+        $session
+    })
+    $script:plexThumbs = $thumbs
+    $history = Get-PlexHistory
+    $activities = @(foreach ($a in (Invoke-Plex '/activities').Activity) {
+        if ($a.title) { [ordered]@{ title = $a.title; sub = $a.subtitle; progress = $a.progress } }
+    })
+    $version = "$($root.version)"
+    [ordered]@{
+        state = 'ok'; sessions = $sessions; load = $history.load; net = $history.net
+        libraries = $script:plexLibraries; activities = $activities
+        server = [ordered]@{
+            name = $root.friendlyName; version = $version
+            update = $(if ($script:plexUpdate -and $script:plexUpdate -ne $version) { $script:plexUpdate } else { $null })
+            transcodes = $(if ($root.transcoderActiveVideoSessions) { $root.transcoderActiveVideoSessions } else { 0 })
+        }
+    }
+}
+
+# The posters the Car Thing asked for, small (it shows them 44 px wide).
+function Get-PlexPosters {
+    $posters = @{}
+    foreach ($key in $script:plexNeed) {
+        $thumb = $script:plexThumbs[$key]
+        if (-not $thumb) { continue }
+        $width = if ($thumb.square) { 144 } else { 96 }
+        $path = "/photo/:/transcode?width=$width&height=144&minSize=1&upscale=1&url=" + [Uri]::EscapeDataString($thumb.path)
+        try { $bytes = Invoke-Plex $path -Raw } catch { Write-Log "plex poster: $($_.Exception.Message)"; continue }
+        if ($bytes -and $bytes.Length -le 3MB) { $posters[$key] = [Convert]::ToBase64String($bytes) }
+    }
+    $posters
+}
+
+# Every 3 s (called more often; it waits on its own). When the server doesn't answer, it
+# tries again in 30 s, so the other pages don't wait. Sends only changes, and at least every 10 s.
+function Update-Plex {
+    if ((Get-Date) -lt $script:plexNext) { return }
+    $script:plexNext = (Get-Date).AddSeconds(3)
+    try {
+        $state = Read-Plex
+        if ($script:plexNeed.Count) { $state.posters = Get-PlexPosters }
+    } catch {
+        $script:plexNext = (Get-Date).AddSeconds(30)
+        # A .NET call's error comes wrapped ("Exception calling GetResponse ..."): show the cause.
+        $message = if ($_.Exception.InnerException) { $_.Exception.InnerException.Message } else { $_.Exception.Message }
+        if ($message -notmatch 'Plex token') { $message = "$($script:plex.server): $message" }
+        $state = @{ state = 'error'; error = $message }
+    }
+    if ($state.error -ne $script:plexError) {
+        $script:plexError = $state.error
+        if ($state.error) { Write-Log "plex: $($state.error)" }
+    }
+    $key = $state | ConvertTo-Json -Compress -Depth 6
+    if ($key -eq $script:plexSent -and ((Get-Date) - $script:plexSentAt).TotalSeconds -lt 10) { return }
+    $reply = Send-Json 'plex' $state 6
+    $script:plexSent = $key
+    $script:plexSentAt = Get-Date
+    $script:plexNeed = @($reply.need_art | Where-Object { $_ })
+}
+
 # Links the Car Thing asks to open: https links of known meeting services, and GitHub.
-$OpenableUrl = '^https://(meet\.google\.com|([a-z0-9-]+\.)?zoom\.us|teams\.microsoft\.com|teams\.live\.com|github\.com)/'
+$OpenableUrl ='^https://(meet\.google\.com|([a-z0-9-]+\.)?zoom\.us|teams\.microsoft\.com|teams\.live\.com|github\.com)/'
 
 if ($Once) {
     $np = Get-NowPlaying
@@ -766,6 +978,7 @@ if ($Once) {
     Get-Focus | ConvertTo-Json
     Read-Audio | ConvertTo-Json
     $audioLists | ConvertTo-Json -Depth 4
+    try { Read-Plex | ConvertTo-Json -Depth 6 } catch { "plex: $($_.Exception.Message)" }
     exit
 }
 
@@ -891,7 +1104,7 @@ while ($true) {
     # The volume four times a second between rounds, so the Car Thing's volume bar follows the dial.
     for ($tick = 0; $tick -lt 4; $tick++) {
         if ($tunnelUp) {
-            try { Update-Audio; Update-Hue } catch { Write-Log "update failed: $($_.Exception.Message)"; $tunnelUp = $false }
+            try { Update-Audio; Update-Hue; Update-Plex } catch { Write-Log "update failed: $($_.Exception.Message)"; $tunnelUp = $false }
         }
         Start-Sleep -Milliseconds 250
     }
