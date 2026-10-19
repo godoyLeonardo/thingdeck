@@ -220,7 +220,7 @@ the media card's control row, `"wide": true` makes a tile double width.
 
 **Per-OS overrides:** any action can carry `windows`, `mac` and/or `linux`
 objects. When the host matches, the override replaces the action, keeping
-`label`/`icon`/`color` unless it sets them. This works inside sequences too:
+`label`/`icon`/`symbol`/`color` unless it sets them. This works inside sequences too:
 
 ```json
 { "label": "Task view", "key": "win+tab",

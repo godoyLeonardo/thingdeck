@@ -676,7 +676,7 @@ class Pad:
         override = a.get(self.host_os()) if isinstance(a, dict) else None
         if not isinstance(override, dict):
             return a
-        merged = {k: a[k] for k in ('label', 'icon', 'color') if k in a}
+        merged = {k: a[k] for k in ('label', 'icon', 'symbol', 'color') if k in a}
         merged.update(override)
         return merged
 

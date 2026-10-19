@@ -431,7 +431,7 @@ function variant(a) {
   var o = a && a[st.os];
   if (!o || typeof o !== 'object') return a;
   var r = {};
-  ['label', 'icon', 'color'].forEach(function (k) { if (a[k] !== undefined) r[k] = a[k]; });
+  ['label', 'icon', 'symbol', 'color'].forEach(function (k) { if (a[k] !== undefined) r[k] = a[k]; });
   for (var k in o) r[k] = o[k];
   return r;
 }
