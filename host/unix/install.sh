@@ -29,6 +29,10 @@ Linux)
     cat > "$UNIT" <<EOF
 [Unit]
 Description=thingdeck agent: send the Car Thing the time, what is playing, stats, calendars and GitHub status over adb
+# Start after the desktop has exported WAYLAND_DISPLAY, DISPLAY and XDG_CURRENT_DESKTOP:
+# the focused app and xdg-open need them, and default.target is reached before that.
+PartOf=graphical-session.target
+After=graphical-session.target
 
 [Service]
 ExecStart=$(command -v python3) $DIR/nowplaying.py
@@ -37,7 +41,7 @@ Restart=always
 RestartSec=5
 
 [Install]
-WantedBy=default.target
+WantedBy=graphical-session.target
 EOF
     systemctl --user daemon-reload
     systemctl --user enable --now "$NAME"
