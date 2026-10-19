@@ -283,6 +283,37 @@
   .gh-when { flex: none; margin-left: 10px; font: 500 calc(12px * var(--ts)) GeistMono, monospace; color: var(--muted); }
   .ev-sub .good { color: var(--good); font-weight: 600; }
   .ev-sub .bad { color: var(--bad); font-weight: 600; }
+  /* widget "plex": a Plex server's streams, load, bandwidth and libraries */
+  .plex { flex: 1; min-width: 0; display: flex; }
+  .plex > * + * { margin-left: 8px; }
+  .px-streams { flex: 1.15; min-width: 0; min-height: 0; padding: 10px 6px 4px 14px; }
+  .px-streams h3 { display: flex; }
+  .px-streams h3 span { margin-left: auto; padding-right: 8px; }
+  .px-side { flex: 1; }
+  .px-side .mcard { grid-column: 1; }
+  .px-side .px-libs { grid-column: 2; grid-row: 1 / -1; padding-bottom: 6px; }
+  .px-row { display: flex; align-items: center; padding: 6px 0; }
+  .px-art { flex: none; width: 44px; height: 66px; margin-right: 12px; border-radius: 6px; color: var(--muted);
+    background: var(--tile-hi) center / cover no-repeat; display: flex; align-items: center; justify-content: center; }
+  .px-art svg { width: 20px; height: 20px; }
+  .px-art.sq { height: 44px; }                  /* album covers are square */
+  .px-row .np-bar { height: 4px; margin-top: 7px; }
+  .px-row .np-bar i { transition: none; }       /* set in place every 3 s, see updatePlex() */
+  .px-info { flex: none; width: 124px; display: flex; flex-direction: column; align-items: flex-end; margin-left: 10px; }
+  .px-tag { font: 600 calc(10.5px * var(--ts)) GeistMono, monospace; letter-spacing: .04em; text-transform: uppercase;
+    padding: 3px 7px; border-radius: 6px; background: var(--tile-hi); white-space: nowrap; }
+  .px-tag.dp { color: var(--good); }
+  .px-tag.ds { color: var(--acc); }
+  .px-tag.tc { color: var(--warn); }
+  .px-q { margin-top: 6px; font: 500 calc(11.5px * var(--ts)) GeistMono, monospace; color: var(--muted); white-space: nowrap; }
+  .px-st { margin-top: 6px; height: 18px; color: var(--muted); }
+  .px-st svg { width: 16px; height: 16px; }
+  .px-st .spin { width: 12px; height: 12px; }
+  .px-lib { display: flex; align-items: center; padding: 6px 0; }
+  .px-lib .ev-title { font-size: calc(14.5px * var(--ts)); }
+  .px-lib .ev-sub { font-size: calc(11.5px * var(--ts)); }
+  .px-num { flex: none; margin-left: 8px; font: 600 calc(15px * var(--ts)) GeistMono, monospace; font-variant-numeric: tabular-nums; }
+  .px-lib .np-bar { height: 4px; margin-top: 5px; }
   .monitor { flex: 1; min-width: 0; display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: minmax(0, 1fr); grid-gap: 8px; }
   .monitor.half { grid-template-columns: 1fr 1fr; grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); }
   .mcard { background: var(--tile); border-radius: 16px; padding: 10px 12px 0; display: flex; flex-direction: column;
@@ -644,6 +675,7 @@ function load() {
     audio = j.audio || null;
     github = j.github || github;
     hue = j.hue || hue;
+    plex = j.plex || plex;
     render();
   });
 }
@@ -1187,6 +1219,7 @@ function renderWidgets(page, g) {
       if (w === 'monitor') return '<div class="monitor' + (page.widgets.length > 1 ? ' half' : '') + '" id="monitor"></div>';
       if (w === 'github') return '<div class="gh" id="github"></div>';
       if (w === 'lights') return '<div class="lights" id="lights"></div>';
+      if (w === 'plex') return '<div class="plex" id="plex"></div>';
       return '';
     }).join('') + '</div>' + (page.kill ? KILL_HTML : '') + '</div>';
   }
@@ -1195,6 +1228,7 @@ function renderWidgets(page, g) {
   updateFocus();
   updateGitHub();
   updateLights();
+  updatePlex();
 }
 // The kill switch: lifting the cover is the confirmation, and it locks the target in:
 // the service only kills that process id if it still has focus.
@@ -1647,12 +1681,12 @@ function fmtRate(b) {
   return (b >= 1e3 ? Math.round(b / 1e3) : 0) + '<small>KB/s</small>';
 }
 function fmtGB(mb) { return (mb / 1024).toFixed(mb >= 10240 ? 0 : 1); }
-// A graph of the last 2 minutes (60 samples), right-aligned; gaps repeat the previous value.
-function spark(values, max, cls, area) {
-  var pts = [], last = 0, n = values ? values.length : 0;
+// A graph of the last 2 minutes (60 samples, or `slots`), right-aligned; gaps repeat the previous value.
+function spark(values, max, cls, area, slots) {
+  var pts = [], last = 0, n = values ? values.length : 0, w = slots || 60;
   for (var i = 0; i < n; i++) {
     if (values[i] != null) last = values[i];
-    pts.push(((60 - n + i) / 59 * 100).toFixed(1) + ',' + (30 - Math.min(1, last / max) * 28).toFixed(1));
+    pts.push(((w - n + i) / (w - 1) * 100).toFixed(1) + ',' + (30 - Math.min(1, last / max) * 28).toFixed(1));
   }
   if (pts.length < 2) return '';
   return (area ? '<polygon points="' + pts[0].split(',')[0] + ',30 ' + pts.join(' ') + ' 100,30"/>' : '') +
@@ -1686,6 +1720,88 @@ function updateMonitor() {
   html += mcard('Network ↓', fmtRate(s.net_rx), '↑ ' + fmtRate(s.net_tx).replace(/<\/?small>/g, ' ').trim(),
     spark(h.net_rx, netMax, 'v', true) + spark(h.net_tx, netMax, 'tx', false), s.gpu == null);
   box.innerHTML = html;
+}
+
+// ---- Plex (widget "plex"): the agent reads the server in plex.txt on the local network
+var plex = { state: 'unknown' };
+function fmtCount(v) { return v == null ? '–' : String(v).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+function plexRow(s) {
+  var tag = s.decision === 'transcode' ? ['tc', 'Transcode' + (s.hw ? ' · HW' : '')]
+    : s.decision === 'direct stream' ? ['ds', 'Direct stream'] : ['dp', 'Direct play'];
+  var state = s.state === 'paused' ? icon('pause') : s.state === 'buffering' ? '<i class="spin"></i>' : icon('play');
+  var rate = s.kbps ? (s.kbps >= 1000 ? (s.kbps / 1000).toFixed(1) + ' Mbps' : s.kbps + ' kbps') : '';
+  var who = [s.user, s.player].filter(function (x) { return x; }).map(esc).join(' · ');
+  return '<div class="px-row"><div class="px-art' + (s.kind === 'track' ? ' sq' : '') + '"' + (s.poster
+      ? ' style="background-image:url(/api/plex/art?k=' + encodeURIComponent(s.art) + ')">'
+      : '>' + icon(s.kind === 'track' ? 'note' : 'play')) + '</div>' +
+    '<div class="ev-main"><div class="ev-title">' + esc(s.title || '') + '</div><div class="ev-sub">' + esc(s.sub || '') + '</div>' +
+    '<div class="ev-sub">' + who + (s.local === false ? ' · <b>Remote</b>' : '') + '</div><div class="np-bar"><i></i></div></div>' +
+    '<div class="px-info"><div class="px-tag ' + tag[0] + '">' + tag[1] + '</div>' +
+    '<div class="px-q">' + esc([s.quality, rate].filter(function (x) { return x; }).join(' · ')) + '</div>' +
+    '<div class="px-st">' + state + '</div></div></div>';
+}
+function plexLibrary(l) {
+  var sub = l.kind === 'show' ? fmtCount(l.episodes) + ' episodes'
+    : l.kind === 'artist' ? fmtCount(l.tracks) + ' tracks'
+    : { movie: 'movies', photo: 'photos' }[l.kind] || 'items';
+  return '<div class="px-lib"><div class="ev-main"><div class="ev-title">' + esc(l.title || '') + '</div>' +
+    '<div class="ev-sub">' + esc(sub) + '</div></div><div class="px-num">' + fmtCount(l.count) + '</div></div>';
+}
+function plexActivity(a) {       // a library scan or another server task, with its progress
+  return '<div class="px-lib"><div class="ev-main"><div class="ev-title">' + esc(a.title || '') + '</div>' +
+    '<div class="ev-sub">' + esc(a.sub || '') + '</div>' +
+    '<div class="np-bar"><i style="width:' + Math.max(0, Math.min(100, a.progress || 0)) + '%"></i></div></div></div>';
+}
+// Two parts redraw on their own: the streams card when a stream starts, stops or changes,
+// the side cards (graphs) on every update. The progress bars change in place.
+function updatePlex() {
+  var box = $('plex');
+  if (!box) return;
+  var p = plex;
+  if (p.state !== 'ok') {
+    var title, text;
+    if (p.state === 'none') { title = 'Add your Plex server'; text = 'Put its address in plex.txt on the computer, next to calendars.txt (see README).'; }
+    else if (p.state === 'error') { title = 'Plex isn’t answering'; text = p.error || 'Unknown error'; }
+    else { title = st.clock ? 'Waiting for Plex…' : 'No computer agent'; text = st.clock ? '' : 'Install it to see your Plex server here (see README).'; }
+    box.className = 'plex msg';
+    redraw(box, '<div class="card hue-msg"><div class="m-label">Plex</div><div class="ag-empty"><b>' + esc(title) + '</b>' + esc(text) + '</div></div>');
+    return;
+  }
+  if (!$('pxs')) {
+    box.className = 'plex';
+    box.innerHTML = '<div class="card px-streams" id="pxs"></div><div class="monitor half px-side" id="pxside"></div>';
+    box._html = null;
+  }
+  var server = p.server || {}, sessions = p.sessions || [], load = p.load, net = p.net;
+  var version = (server.version || '').split('.').slice(0, 3).join('.');
+  var last = function (a) { return a && a.length ? a[a.length - 1] : null; };
+  var plain = function (html) { return html.replace(/<\/?small>/g, ' ').trim(); };
+  redraw($('pxs'), '<h3>' + esc(server.name || 'Plex') + ' · ' +
+    (sessions.length ? sessions.length + (sessions.length === 1 ? ' stream' : ' streams') : 'idle') +
+    (server.transcodes ? ' · ' + server.transcodes + ' transcoding' : '') +
+    '<span>' + esc(server.update ? 'Update ' + server.update : version) + '</span></h3><div class="ag-list">' +
+    (sessions.length ? sessions.map(plexRow).join('')
+      : '<div class="ag-empty"><b>Nothing streaming</b>' + (server.update ? esc('Plex ' + server.update + ' is out') : '') + '</div>') +
+    '</div>');
+  var bars = $('pxs').querySelectorAll('.px-row .np-bar i');
+  sessions.forEach(function (s, i) {
+    if (bars[i]) bars[i].style.width = (s.duration_ms ? Math.min(100, (s.position_ms || 0) / s.duration_ms * 100) : 0) + '%';
+  });
+  var cpu = mcard('Server CPU', '–', 'Needs Plex Pass', ''), bw = mcard('Bandwidth', '–', 'Needs Plex Pass', '');
+  if (load) {
+    cpu = mcard('Server CPU', last(load.cpu) == null ? '–' : Math.round(last(load.cpu)) + '<small>%</small>',
+      [load.plex_cpu != null ? 'Plex ' + Math.round(load.plex_cpu) + '%' : '', last(load.mem) != null ? 'RAM ' + Math.round(last(load.mem)) + '%' : '']
+        .filter(function (x) { return x; }).join(' · '), spark(load.cpu, 100, 'v', true, (load.cpu || []).length));
+  }
+  if (net) {      // the total, with the part that leaves the local network (WAN) as the second line
+    var total = (net.lan || []).map(function (v, i) { return v + ((net.wan || [])[i] || 0); });
+    var max = Math.max.apply(null, [64e3].concat(total));
+    bw = mcard('Bandwidth', fmtRate(last(total)), 'WAN ' + plain(fmtRate(last(net.wan))),
+      spark(total, max, 'v', true, total.length) + spark(net.wan, max, 'tx', false, total.length));
+  }
+  var libs = (p.activities || []).map(plexActivity).join('') + (p.libraries || []).map(plexLibrary).join('');
+  redraw($('pxside'), cpu + bw + '<div class="mcard px-libs"><div class="m-label">Libraries</div><div class="ag-list">' +
+    (libs || '<div class="ag-empty">Counting…</div>') + '</div></div>');
 }
 
 // ---- feedback
@@ -1918,6 +2034,9 @@ function connect() {
     } else if (m.type === 'github') {
       github = d;
       updateGitHub();
+    } else if (m.type === 'plex') {
+      plex = d;
+      updatePlex();
     } else if (m.type === 'audio') {
       setAudio(d);
     } else if (m.type === 'agenda') {

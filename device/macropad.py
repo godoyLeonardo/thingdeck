@@ -834,6 +834,59 @@ class GitHubStatus:
         return bool(link)
 
 
+PLEX_TTL = 30           # seconds without an update before the Plex data counts as gone
+PLEX_POSTERS = 16       # posters kept for the streams list
+PLEX_FIELDS = ('server', 'sessions', 'load', 'net', 'libraries', 'activities')
+
+
+class HostPlex:
+    """A Plex Media Server on the local network, through the host agent (the Car Thing has
+    no network): its streams, load, bandwidth and libraries, sent every 3 s. Posters come
+    once per key, when the reply asks for them, and are served separately like the
+    now-playing cover, so the updates stay small."""
+
+    def __init__(self, ui):
+        self.ui = ui
+        self.lock = threading.Lock()
+        self.published = {'state': 'unknown'}
+        self.posters = collections.OrderedDict()     # key -> (content type, bytes), oldest first
+        self.updated = None
+
+    def update(self, body):
+        """Store an update from the agent. Returns the poster keys it should send."""
+        posters = body.get('posters') if isinstance(body.get('posters'), dict) else {}
+        data = {k: body[k] for k in PLEX_FIELDS if k in body}
+        data['state'] = str(body.get('state') or 'error')
+        data['error'] = str(body['error']) if body.get('error') else None
+        data['sessions'] = [s for s in body.get('sessions') or [] if isinstance(s, dict)]
+        with self.lock:
+            for key, art in posters.items():
+                try:
+                    raw = base64.b64decode(art)
+                except (ValueError, TypeError) as e:
+                    log('plex: bad poster data:', e)
+                    continue
+                self.posters[str(key)] = ('image/png' if raw[:4] == b'\x89PNG' else 'image/jpeg', raw)
+                while len(self.posters) > PLEX_POSTERS:
+                    self.posters.popitem(last=False)
+            need = sorted(set(str(s['art']) for s in data['sessions'] if s.get('art') and str(s['art']) not in self.posters))
+            for s in data['sessions']:        # the UI shows a poster only once it is here
+                s['poster'] = bool(s.get('art')) and str(s['art']) in self.posters
+            self.published, self.updated = data, time.monotonic()
+        self.ui.publish('plex', data)
+        return need
+
+    def poster(self, key):
+        with self.lock:
+            return self.posters.get(key)
+
+    def expire(self):
+        if self.updated is not None and time.monotonic() - self.updated > PLEX_TTL:
+            self.updated = None
+            self.published = {'state': 'unknown'}
+            self.ui.publish('plex', self.published)
+
+
 class Broadcaster:
     def __init__(self):
         self.lock = threading.Lock()
@@ -883,6 +936,7 @@ class Pad:
         self.github = GitHubStatus(self.ui, self.opener)
         self.audio = HostAudio(self.ui)
         self.hue = HostHue(self.ui)
+        self.plex = HostPlex(self.ui)
         self.hid = Hid(lambda status: self.on_usb_status(status))
         self.config = {}
         self.config_mtime = 0
@@ -1389,12 +1443,11 @@ class Handler(BaseHTTPRequestHandler):
             body = json.dumps(body)
         if isinstance(body, str):
             body = body.encode()
+        headers = {'Content-Type': ctype, 'Content-Length': str(len(body)), 'Cache-Control': 'no-store',
+                   'Access-Control-Allow-Origin': '*'}    # web/shim.html pings from file://
+        headers.update(extra or {})                       # extra headers replace these defaults
         self.send_response(code)
-        self.send_header('Content-Type', ctype)
-        self.send_header('Content-Length', str(len(body)))
-        self.send_header('Cache-Control', 'no-store')
-        self.send_header('Access-Control-Allow-Origin', '*')   # web/shim.html pings from file://
-        for k, v in (extra or {}).items():
+        for k, v in headers.items():
             self.send_header(k, v)
         self.end_headers()
         self.wfile.write(body)
@@ -1421,7 +1474,7 @@ class Handler(BaseHTTPRequestHandler):
             self._send(200, {'config': pad.config, 'state': pad.state(), 'presets': pad.presets(),
                              'nowplaying': pad.np.meta, 'stats': pad.stats.snapshot(), 'agenda': pad.agenda.published,
                              'audio': pad.audio.state, 'github': pad.github.published,
-                             'hue': pad.hue.snapshot()})
+                             'hue': pad.hue.snapshot(), 'plex': pad.plex.published})
         elif path == '/api/nowplaying':
             self._send(200, {'nowplaying': pad.np.meta})
         elif path == '/api/nowplaying/art':
@@ -1430,6 +1483,13 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(200, art[2], art[1])
             else:
                 self._send(404, {'error': 'no cover'})
+        elif path == '/api/plex/art':
+            key = (urllib.parse.parse_qs(self.path.partition('?')[2]).get('k') or [''])[0]
+            poster = pad.plex.poster(key)
+            if poster:      # a key always names the same image, so redrawn rows don't load it again
+                self._send(200, poster[1], poster[0], {'Cache-Control': 'max-age=86400'})
+            else:
+                self._send(404, {'error': 'no poster'})
         elif path == '/api/calendar/event':
             eid = (urllib.parse.parse_qs(self.path.partition('?')[2]).get('id') or [''])[0]
             self._send(200, pad.agenda.details.get(eid) or {'notes': '', 'calendar': ''})
@@ -1517,6 +1577,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(400, {'error': str(e)})
         elif path == '/api/hue/select':
             pad.hue.select(str(body.get('id')))
+        elif path == '/api/plex':
+            return self._send(200, {'ok': True, 'need_art': pad.plex.update(body)})
         elif path == '/api/github':
             pad.github.update(body)
         elif path == '/api/github/open':
@@ -1740,6 +1802,7 @@ def main():
             pad.host.expire()
             pad.stats.expire()
             pad.audio.expire()
+            pad.plex.expire()
             pad.agenda.refresh()
     finally:
         pad.hid.close()
