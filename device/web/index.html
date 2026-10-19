@@ -270,12 +270,16 @@
   .gh { flex: 1; min-width: 0; display: flex; }
   .gh-col { flex: 1; min-width: 0; min-height: 0; padding: 10px 6px 4px 14px; }
   .gh-col + .gh-col { margin-left: 8px; }
-  .gh-head { display: flex; align-items: center; }
-  .gh-refresh { margin-left: auto; margin-right: 6px; width: 44px; height: 32px; border-radius: 10px; background: var(--tile-hi);
-    display: flex; align-items: center; justify-content: center; color: var(--text); }
-  .gh-refresh svg { width: 18px; height: 18px; }
-  .gh-refresh .spin { width: 14px; height: 14px; color: var(--acc); }
-  .gh-refresh.down { filter: brightness(1.3); }
+  /* pull down to refresh: the pill that slides in over the GitHub lists */
+  .gh-wrap { flex: 1; min-width: 0; position: relative; display: flex; }
+  .gh-pull { position: absolute; left: 50%; top: 0; z-index: 2; display: flex; align-items: center; height: 40px;
+    padding: 0 18px; margin-left: -110px; width: 220px; justify-content: center; border-radius: 20px; background: var(--toast);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, .45); font-size: calc(14px * var(--ts)); font-weight: 600; pointer-events: none;
+    opacity: 0; transform: translateY(-50px); transition: transform .2s, opacity .2s; }
+  .gh-pull.dragging { transition: none; }
+  .gh-pull svg { width: 18px; height: 18px; margin-right: 8px; transition: transform .15s; }
+  .gh-pull.ready svg { transform: rotate(180deg); color: var(--acc); }
+  .gh-pull .spin { width: 14px; height: 14px; margin-right: 10px; color: var(--acc); }
   .gh-row { display: flex; align-items: center; min-height: 56px; padding: 4px 8px; margin: 0 -8px; border-radius: 10px; }
   .gh-row.down { background: var(--tile-hi); }
   .gh-row.wrap .ev-title { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
@@ -1247,7 +1251,7 @@ function renderWidgets(page, g) {
       if (w === 'agenda' && page.widgets.length === 1) return '<div class="agenda cols" id="agenda"></div>';   // a column per day
       if (w === 'agenda') return '<div class="card agenda"><h3>Agenda</h3><div class="ag-list" id="agenda"></div></div>';
       if (w === 'monitor') return '<div class="monitor' + (page.widgets.length > 1 ? ' half' : '') + '" id="monitor"></div>';
-      if (w === 'github') return '<div class="gh" id="github"></div>';
+      if (w === 'github') return '<div class="gh-wrap"><div class="gh-pull" id="ghpull"></div><div class="gh" id="github"></div></div>';
       if (w === 'lights') return '<div class="lights" id="lights"></div>';
       if (w === 'plex') return '<div class="plex" id="plex"></div>';
       return '';
@@ -1524,6 +1528,45 @@ function redraw(box, html) {
 
 // ---- GitHub (widget "github"): the agent reads the repo in github.txt with the gh CLI
 var github = { state: 'unknown' }, ghRefreshing = false;     // ghRefreshing: until the agent's next update
+// Pull down to refresh: drag down on either list while it's at the top. Touch events, not
+// pointer events: the browser cancels those once it starts scrolling the list.
+var GH_PULL = 80, ghTouch = null;
+function ghPull(distance, dragging) {
+  var pill = $('ghpull');
+  if (!pill) return;
+  var ready = distance >= GH_PULL;
+  pill.className = 'gh-pull' + (dragging ? ' dragging' : '') + (ready ? ' ready' : '');
+  if (ghRefreshing) {
+    pill.innerHTML = '<i class="spin"></i>Refreshing…';
+    pill.style.opacity = 1;
+    pill.style.transform = 'translateY(12px)';
+    return;
+  }
+  pill.innerHTML = CHEVRON + ARROW.down + '</svg>' + (ready ? 'Release to refresh' : 'Pull to refresh');
+  pill.style.opacity = Math.min(1, distance / 40);
+  pill.style.transform = 'translateY(' + (Math.min(distance, GH_PULL + 20) * 0.5 - 30) + 'px)';
+}
+document.addEventListener('touchstart', function (e) {
+  var list = e.target.closest && e.target.closest('#github .ag-list');
+  ghTouch = list && list.scrollTop <= 0 ? { y: e.touches[0].clientY, list: list, distance: 0 } : null;
+}, { passive: true });
+document.addEventListener('touchmove', function (e) {
+  if (!ghTouch || ghRefreshing) return;
+  if (ghTouch.list.scrollTop > 0) { ghTouch = null; ghPull(0, false); return; }   // it scrolled instead
+  ghTouch.distance = Math.max(0, e.touches[0].clientY - ghTouch.y);
+  ghPull(ghTouch.distance, true);
+}, { passive: true });
+document.addEventListener('touchend', function () {
+  if (!ghTouch) return;
+  var go = ghTouch.distance >= GH_PULL;
+  ghTouch = null;
+  if (go) {
+    ghRefreshing = true;
+    post('/api/github/refresh');
+    setTimeout(function () { if (ghRefreshing) { ghRefreshing = false; ghPull(0, false); } }, 30000);   // no answer: give up
+  }
+  ghPull(0, false);
+}, { passive: true });
 function ago(iso) {
   var s = Math.max(0, (Date.now() - Date.parse(iso)) / 1000);
   return s < 60 ? 'now' : s < 3600 ? Math.floor(s / 60) + 'm' : s < 86400 ? Math.floor(s / 3600) + 'h' : Math.floor(s / 86400) + 'd';
@@ -1569,8 +1612,7 @@ function updateGitHub() {
       return ghRow(p.id, checksState(p.checks), p.title, sub.filter(function (x) { return x; }).join(' · '), ago(p.updated), true);
     }).join('');
     var error = g.error ? '<div class="ag-empty">' + esc(g.error) + '</div>' : '';
-    html = '<div class="card gh-col"><h3 class="gh-head">Actions · ' + esc(repoName) +
-        '<span class="gh-refresh" data-gh-refresh="1">' + (ghRefreshing ? '<i class="spin"></i>' : icon('repeat')) + '</span></h3><div class="ag-list">' +
+    html = '<div class="card gh-col"><h3>Actions · ' + esc(repoName) + '</h3><div class="ag-list">' +
         (runs || (g.error ? '' : '<div class="ag-empty">No workflow runs yet</div>')) + error + '</div></div>' +
       '<div class="card gh-col"><h3>My pull requests</h3><div class="ag-list">' +
         (prs || (g.error ? '' : '<div class="ag-empty">No open pull requests</div>')) + '</div></div>';
@@ -1965,7 +2007,7 @@ document.addEventListener('pointerdown', function (e) {
   startX = e.clientX; startY = e.clientY;
   startInBar = !!e.target.closest('#bar');
   startOnSlider = !!e.target.closest('[data-hue-bar], [data-hue-lbar]');   // dragging a light's brightness, not swiping
-  downEl = e.target.closest('.tile[data-i], .preset[data-i], #dial, .tab, #status, [data-set], [data-sys], [data-sec], [data-choice-slot], [data-media], [data-join], [data-guard], [data-kill], [data-ev], [data-sheet-close], [data-sheet-card], [data-audio], [data-audio-dev], [data-gh], #tabmore, [data-hue-room], [data-hue-toggle], [data-hue-ltoggle], [data-hue-scene], [data-hue-alloff], [data-hue-pair], [data-hue-bar], [data-hue-lbar], [data-tab-move], [data-tabs-reset], [data-tab-hide], [data-goto-media], [data-gh-refresh]');
+  downEl = e.target.closest('.tile[data-i], .preset[data-i], #dial, .tab, #status, [data-set], [data-sys], [data-sec], [data-choice-slot], [data-media], [data-join], [data-guard], [data-kill], [data-ev], [data-sheet-close], [data-sheet-card], [data-audio], [data-audio-dev], [data-gh], #tabmore, [data-hue-room], [data-hue-toggle], [data-hue-ltoggle], [data-hue-scene], [data-hue-alloff], [data-hue-pair], [data-hue-bar], [data-hue-lbar], [data-tab-move], [data-tabs-reset], [data-tab-hide], [data-goto-media]');
   if (downEl) downEl.classList.add('down');
 });
 document.addEventListener('pointercancel', function () { if (downEl) downEl.classList.remove('down'); downEl = null; });
@@ -1994,7 +2036,6 @@ document.addEventListener('pointerup', function (e) {
   else if (el.hasAttribute('data-tabs-reset')) post('/api/settings', { page_order: [], page_hidden: [] });
   else if (el.hasAttribute('data-tab-hide')) toggleTab(el.getAttribute('data-tab-hide'));
   else if (el.hasAttribute('data-goto-media')) gotoMedia();
-  else if (el.hasAttribute('data-gh-refresh')) { ghRefreshing = true; post('/api/github/refresh'); updateGitHub(); }
   else if (el.hasAttribute('data-hue-bar') || el.hasAttribute('data-hue-lbar')) { }       // handled by the drag code
   else if (el.hasAttribute('data-hue-toggle')) hueToggle(el.getAttribute('data-hue-toggle'), false);
   else if (el.hasAttribute('data-hue-ltoggle')) hueToggle(el.getAttribute('data-hue-ltoggle'), true);
@@ -2072,6 +2113,7 @@ function connect() {
       showLightHud(d.room);
     } else if (m.type === 'github') {
       ghRefreshing = false;
+      ghPull(0, false);
       github = d;
       updateGitHub();
     } else if (m.type === 'plex') {
