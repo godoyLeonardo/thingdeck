@@ -490,6 +490,10 @@ function Send-Calendars($calendars) {
 $GitHubFile = Join-Path (Split-Path $LogFile) 'github.txt'
 $ghExe = $null
 $ghRepo = @{ name = ''; full = '' }        # the github.txt line and what it resolved to
+$ghWorkflows = @{}                         # workflow id (as text: Int32 and Int64 keys differ) -> name
+$ghWorkflowsAt = [DateTime]::MinValue
+# One request for the last 100 runs (gh run list makes a second one for the workflow names).
+$RunFields = '[.workflow_runs[] | {workflow_id, name, display_title, status, conclusion, head_branch, event, created_at, updated_at, html_url}]'
 $PrQuery = '{"query":"query { viewer { pullRequests(states: OPEN, first: 20, orderBy: {field: UPDATED_AT, direction: DESC}) { nodes { number title url isDraft updatedAt reviewDecision repository { nameWithOwner } commits(last: 1) { nodes { commit { statusCheckRollup { state } } } } } } } }"}'
 
 # Run gh and read its output as UTF-8 (PowerShell 5.1 would decode it with the console code page).
@@ -512,6 +516,21 @@ function Invoke-Gh([string[]]$arguments, [string]$stdin) {
     $out.Result
 }
 
+# A run's own "name" is its run-name, which a workflow can set per run, so the names come
+# from the workflow list: read once an hour, or when a run has a workflow not seen yet (each
+# new id is looked up only once; a deleted workflow keeps its run's name).
+function Update-WorkflowNames($runs) {
+    $unknown = @($runs | Where-Object { -not $script:ghWorkflows.ContainsKey([string]$_.workflow_id) })
+    if (-not $unknown -and ((Get-Date) - $script:ghWorkflowsAt).TotalHours -lt 1) { return }
+    $script:ghWorkflows = @{}
+    $list = Invoke-Gh @('api', "repos/$($script:ghRepo.full)/actions/workflows?per_page=100", '--jq', '[.workflows[] | {id, name}]') | ConvertFrom-Json
+    foreach ($w in $list) { $script:ghWorkflows[[string]$w.id] = $w.name }
+    $script:ghWorkflowsAt = Get-Date
+    foreach ($run in $runs) {
+        if (-not $script:ghWorkflows.ContainsKey([string]$run.workflow_id)) { $script:ghWorkflows[[string]$run.workflow_id] = $run.name }
+    }
+}
+
 function Get-GitHub {
     $name = if (Test-Path $GitHubFile) {
         Get-Content $GitHubFile | ForEach-Object { $_.Trim() } | Where-Object { $_ -and -not $_.StartsWith('#') } | Select-Object -First 1
@@ -524,16 +543,20 @@ function Get-GitHub {
         if ($script:ghRepo.name -ne $name) {       # "name" alone: one of the signed-in account's repos
             $full = if ($name -match '/') { $name } else { (Invoke-Gh @('repo', 'view', $name, '--json', 'nameWithOwner', '-q', '.nameWithOwner')).Trim() }
             $script:ghRepo = @{ name = $name; full = $full }
+            $script:ghWorkflows = @{}
+            $script:ghWorkflowsAt = [DateTime]::MinValue
         }
         $result.repo = $script:ghRepo.full
-        $runs = Invoke-Gh @('run', 'list', '-R', $script:ghRepo.full, '-L', '100', '--json',
-            'workflowName,displayTitle,status,conclusion,headBranch,event,createdAt,updatedAt,url') | ConvertFrom-Json
+        $runs = Invoke-Gh @('api', "repos/$($script:ghRepo.full)/actions/runs?per_page=100&exclude_pull_requests=true",
+            '--jq', $RunFields) | ConvertFrom-Json
+        Update-WorkflowNames $runs
         $seen = @{}         # the newest run of each workflow
         $latest = foreach ($run in $runs) {
-            if ($seen.ContainsKey($run.workflowName)) { continue }
-            $seen[$run.workflowName] = $true
-            [ordered]@{ workflow = $run.workflowName; status = $run.status; conclusion = $run.conclusion; branch = $run.headBranch
-                title = $run.displayTitle; event = $run.event; created = $run.createdAt; updated = $run.updatedAt; url = $run.url }
+            $id = [string]$run.workflow_id
+            if ($seen.ContainsKey($id)) { continue }
+            $seen[$id] = $true
+            [ordered]@{ workflow = $script:ghWorkflows[$id]; status = $run.status; conclusion = "$($run.conclusion)"; branch = $run.head_branch
+                title = $run.display_title; event = $run.event; created = $run.created_at; updated = $run.updated_at; url = $run.html_url }
         }
         $result.runs = @($latest | Select-Object -First 20)
         $prs = (Invoke-Gh @('api', 'graphql', '--input', '-') $PrQuery | ConvertFrom-Json).data.viewer.pullRequests.nodes

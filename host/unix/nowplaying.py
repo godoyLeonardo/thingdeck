@@ -649,6 +649,9 @@ GITHUB_FILE = os.path.join(os.path.dirname(CALENDAR_FILE), 'github.txt')
 PR_QUERY = ('query { viewer { pullRequests(states: OPEN, first: 20, orderBy: {field: UPDATED_AT, direction: DESC}) '
             '{ nodes { number title url isDraft updatedAt reviewDecision repository { nameWithOwner } '
             'commits(last: 1) { nodes { commit { statusCheckRollup { state } } } } } } } }')
+# One request for the last 100 runs (gh run list makes a second one for the workflow names).
+RUN_FIELDS = ('[.workflow_runs[] | {workflow_id, name, display_title, status, conclusion, head_branch, event, '
+              'created_at, updated_at, html_url}]')
 
 
 def gh(*args, stdin=None):
@@ -662,6 +665,20 @@ def gh(*args, stdin=None):
 class GitHub:
     def __init__(self):
         self.name, self.full = '', ''      # the github.txt line and what it resolved to
+        self.workflows, self.workflows_at = {}, None     # workflow id -> name
+
+    def workflow_names(self, runs):
+        """A run's own "name" is its run-name, which a workflow can set per run, so the names
+        come from the workflow list: read once an hour, or when a run has a workflow not seen
+        yet (each new id is looked up only once; a deleted workflow keeps its run's name)."""
+        unknown = any(r['workflow_id'] not in self.workflows for r in runs)
+        if unknown or self.workflows_at is None or time.monotonic() - self.workflows_at >= 3600:
+            self.workflows = {w['id']: w['name'] for w in json.loads(gh(
+                'api', 'repos/%s/actions/workflows?per_page=100' % self.full, '--jq', '[.workflows[] | {id, name}]'))}
+            self.workflows_at = time.monotonic()
+            for r in runs:
+                self.workflows.setdefault(r['workflow_id'], r['name'])
+        return self.workflows
 
     def read(self):
         try:
@@ -679,16 +696,19 @@ class GitHub:
             if self.name != name:              # "name" alone: one of the signed-in account's repos
                 full = name if '/' in name else gh('repo', 'view', name, '--json', 'nameWithOwner', '-q', '.nameWithOwner').strip()
                 self.name, self.full = name, full
+                self.workflows, self.workflows_at = {}, None
             result['repo'] = self.full
-            seen = set()
-            for run in json.loads(gh('run', 'list', '-R', self.full, '-L', '100', '--json',
-                                     'workflowName,displayTitle,status,conclusion,headBranch,event,createdAt,updatedAt,url')):
-                if run['workflowName'] in seen or len(result['runs']) == 20:    # the newest run of each workflow
+            runs = json.loads(gh('api', 'repos/%s/actions/runs?per_page=100&exclude_pull_requests=true' % self.full,
+                                 '--jq', RUN_FIELDS))
+            names, seen = self.workflow_names(runs), set()
+            for run in runs:
+                if run['workflow_id'] in seen or len(result['runs']) == 20:     # the newest run of each workflow
                     continue
-                seen.add(run['workflowName'])
-                result['runs'].append({'workflow': run['workflowName'], 'status': run['status'], 'conclusion': run['conclusion'],
-                                       'branch': run['headBranch'], 'title': run['displayTitle'], 'event': run['event'],
-                                       'created': run['createdAt'], 'updated': run['updatedAt'], 'url': run['url']})
+                seen.add(run['workflow_id'])
+                result['runs'].append({'workflow': names[run['workflow_id']], 'status': run['status'],
+                                       'conclusion': run['conclusion'] or '', 'branch': run['head_branch'],
+                                       'title': run['display_title'], 'event': run['event'], 'created': run['created_at'],
+                                       'updated': run['updated_at'], 'url': run['html_url']})
             prs = json.loads(gh('api', 'graphql', '--input', '-', stdin=json.dumps({'query': PR_QUERY})))
             for pr in prs['data']['viewer']['pullRequests']['nodes']:
                 commits = pr['commits']['nodes']
