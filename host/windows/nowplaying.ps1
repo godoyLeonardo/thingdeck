@@ -526,7 +526,7 @@ function Get-GitHub {
             $script:ghRepo = @{ name = $name; full = $full }
         }
         $result.repo = $script:ghRepo.full
-        $runs = Invoke-Gh @('run', 'list', '-R', $script:ghRepo.full, '-L', '40', '--json',
+        $runs = Invoke-Gh @('run', 'list', '-R', $script:ghRepo.full, '-L', '100', '--json',
             'workflowName,displayTitle,status,conclusion,headBranch,event,createdAt,updatedAt,url') | ConvertFrom-Json
         $seen = @{}         # the newest run of each workflow
         $latest = foreach ($run in $runs) {
@@ -535,7 +535,7 @@ function Get-GitHub {
             [ordered]@{ workflow = $run.workflowName; status = $run.status; conclusion = $run.conclusion; branch = $run.headBranch
                 title = $run.displayTitle; event = $run.event; created = $run.createdAt; updated = $run.updatedAt; url = $run.url }
         }
-        $result.runs = @($latest | Select-Object -First 5)
+        $result.runs = @($latest | Select-Object -First 20)
         $prs = (Invoke-Gh @('api', 'graphql', '--input', '-') $PrQuery | ConvertFrom-Json).data.viewer.pullRequests.nodes
         $result.prs = @(foreach ($pr in $prs) {
             [ordered]@{ repo = $pr.repository.nameWithOwner; number = $pr.number; title = $pr.title; draft = $pr.isDraft

@@ -190,11 +190,12 @@ them to the Car Thing **over the USB cable** (`adb forward`; no network):
   the target of the dial's **Lights** mode (turn: brightness, press: on/off, with a
   bar on screen like the volume one). "All off" turns every room off. See
   [Connecting Philips Hue](#connecting-philips-hue).
-- **Code (GitHub):** the latest run of each workflow in one repository (up to 5:
+- **Code (GitHub):** the latest run of each workflow in one repository (up to 20:
   running, queued, passed, failed or cancelled, with branch, commit and time) and
   your open pull requests on any repository, with their checks, review state and
-  draft flag. Tap a row to open it in the browser on the computer. It refreshes every
-  minute, or every 15 seconds while a workflow runs (see [Adding GitHub](#adding-github)).
+  draft flag. Both lists scroll. Tap a row to open it in the browser on the computer.
+  It refreshes every minute, or every 15 seconds while a workflow runs (see
+  [Adding GitHub](#adding-github)).
 - **Volume and audio devices:** when the volume or mute changes (the dial, the Mute
   tile, your keyboard), a volume bar shows at the top for a moment. The Media page
   header shows the current output; tap it to pick the output and input devices.

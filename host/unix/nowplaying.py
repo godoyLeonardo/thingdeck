@@ -681,9 +681,9 @@ class GitHub:
                 self.name, self.full = name, full
             result['repo'] = self.full
             seen = set()
-            for run in json.loads(gh('run', 'list', '-R', self.full, '-L', '40', '--json',
+            for run in json.loads(gh('run', 'list', '-R', self.full, '-L', '100', '--json',
                                      'workflowName,displayTitle,status,conclusion,headBranch,event,createdAt,updatedAt,url')):
-                if run['workflowName'] in seen or len(result['runs']) == 5:     # the newest run of each workflow
+                if run['workflowName'] in seen or len(result['runs']) == 20:    # the newest run of each workflow
                     continue
                 seen.add(run['workflowName'])
                 result['runs'].append({'workflow': run['workflowName'], 'status': run['status'], 'conclusion': run['conclusion'],
