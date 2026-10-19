@@ -52,6 +52,18 @@
       ]
     },
     {
+      "_note": "Upcoming events from calendars.txt on the computer (needs the computer agent).",
+      "name": "Calendar",
+      "header": "clock",
+      "widgets": ["agenda"]
+    },
+    {
+      "_note": "CPU, memory, GPU and network of the computer (needs the computer agent).",
+      "name": "Status",
+      "header": "clock",
+      "widgets": ["monitor"]
+    },
+    {
       "name": "Desktop",
       "presets": [
         { "label": "◀ Desktop", "key": "ctrl+win+left", "mac": { "key": "ctrl+left" }, "linux": { "key": "win+pageup" } },

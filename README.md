@@ -24,8 +24,10 @@ as soon as you plug it in.
   accent, or a color per tile category).
 - **Computer agent (optional):** a small background agent on the computer adds a
   **now playing** view to the Media page (cover, title, artist, album, app, live
-  progress), a **clock**, and a **lock screen** with media controls (see
-  [Now playing, clock and lock screen](#now-playing-clock-and-lock-screen)).
+  progress), a **Calendar** page with your Google Calendar for the coming days and
+  Join buttons for meetings, a **Status** page with CPU, memory, GPU and network,
+  a **clock**, and a **lock screen** with media controls (see
+  [Computer agent](#computer-agent)).
 - **Standby screen** while the computer sleeps; the pad reconnects by itself
   when it wakes up.
 
@@ -122,7 +124,7 @@ layout:
 
 Shortcuts made of letters, digits and named keys work with any layout.
 
-## Now playing, clock and lock screen
+## Computer agent
 
 The pad itself is just a USB keyboard, and computers never send track info, the
 time or their lock state to a keyboard. An optional agent on the computer sends
@@ -131,6 +133,14 @@ them to the Car Thing **over the USB cable** (`adb forward`; no network):
 - **Now playing:** the Media page shows the cover, title, artist, album, the app it plays in,
 playing/paused and a live progress bar, with the media controls in a row below.
   When nothing is playing, or the agent isn't running, it's the normal tile page.
+- **Calendar:** the Calendar page shows today, tomorrow and the rest of the week
+  from your calendars (see [Adding your calendar](#adding-your-calendar)): repeating
+  events, moved or cancelled occurrences and time zones included, meetings you
+  declined left out. The next event is highlighted with a countdown. Events with a
+  Google Meet, Zoom or Teams link get a Join button that opens the link on the computer.
+- **Status:** the Status page shows CPU, memory, GPU and network speed, each with
+  a graph of the last two minutes. The GPU needs an NVIDIA card (`nvidia-smi`), or
+  an AMD one on Linux; CPU temperature shows on Linux.
 - **Clock:** the agent sets the Car Thing's clock and time zone (DST included).
   The time shows in the bottom bar, large with the date at the top of the Media
   page and on the standby screen; 24h/12h is under Settings → General → Clock.
@@ -158,6 +168,27 @@ login, survives unplugging and sleep, and needs `adb` (see [Requirements](#requi
 
 Uninstall with `install.ps1 -Uninstall` or `install.sh --uninstall`. To check what
 the agent sees without installing: `nowplaying.ps1 -Once` or `nowplaying.py --once`.
+
+### Adding your calendar
+
+The agent reads calendars from their private iCal address, so it needs no sign-in:
+
+1. In Google Calendar on the web, open Settings, pick your calendar under
+   "Settings for my calendars", and copy **Secret address in iCal format** from
+   "Integrate calendar".
+2. Put it on its own line in `calendars.txt` (create the file):
+   - Windows: `%USERPROFILE%\.streamthing\calendars.txt`
+   - Linux: `~/.config/streamthing/calendars.txt`
+   - macOS: `~/Library/Application Support/streamthing/calendars.txt`
+
+   Add one line per calendar. Any iCal address works (Outlook's published calendars
+   too); lines starting with `#` are ignored.
+3. The agent downloads the calendars every 5 minutes, so they show up within 5
+   minutes; no restart needed.
+
+The secret address lets anyone who has it read that calendar, so keep the file to
+yourself; if it leaks, reset it on the same Google Calendar settings page. Work
+accounts may have it turned off by an administrator.
 
 ## When the computer sleeps
 
@@ -204,6 +235,9 @@ switching, per-OS overrides) is in [device/README.md](device/README.md#configjso
   desktop shortcuts need adjusting.
 - **macOS F11:** the "Step into" preset sends F11, which macOS uses for Show
   Desktop unless you turn that shortcut off.
-- **Now playing, the clock and the lock screen need the agent** on each computer;
-  without it, there's no clock and the Media page is the plain tile grid. The macOS and Linux agents are untested on real
-  machines so far.
+- **Now playing, the calendar, stats, the clock and the lock screen need the agent**
+  on each computer; without it, there's no clock, the Media page is the plain tile
+  grid, and Calendar and Status say the agent is missing. The macOS and Linux agents
+  are untested on real machines so far.
+- **No Windows CPU temperature:** Windows only gives it to programs running as
+  administrator with a hardware driver, so the Status page leaves it out there.
