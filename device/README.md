@@ -257,6 +257,16 @@ row ids; a tap posts `POST /api/github/open {id}`, and the link goes to the agen
 through the same `LinkOpener` as meeting links (the agent opens `https://github.com/`
 links and meeting links only).
 
+### What updates when
+
+The command poll's reply carries `visible`, the widgets of the page on screen
+(`Pad.visible_widgets()`; none on the standby or lock screen). The agent reads those
+often and the rest slowly:
+Hue 2 s / 30 s, Plex 3 s / 30 s, GitHub 1 min (15 s while a workflow runs) / 5 min, and
+the GPU part of the stats 2 s / 30 s (the rest of the stats, the song, audio, the host
+heartbeat and the calendars keep their pace). A widget that comes on screen is read at
+once. `PLEX_TTL` is 75 s so slow Plex updates don't expire.
+
 ### Philips Hue
 
 The Car Thing has no network, so the agent talks to the Hue Bridge (local API v2,
@@ -434,8 +444,8 @@ page, or `adb shell`).
 | POST | `/api/hue/select` | `{"id"}` | Make a room the target of the Lights dial mode |
 | POST | `/api/plex` | `{"state", "server"?, "sessions"?, "load"?, "net"?, "libraries"?, "activities"?, "posters"?, "error"?}` | From the host agent every 3 s. Replies `{"need_art": [keys]}` |
 | GET | `/api/plex/art?k=…` | | A stream's poster |
-| GET | `/api/commands` | | For the host agent: queued commands (`{"hue": [...], "github_refresh": bool}`), emptied on read |
-| POST | `/api/github/refresh` | | Ask the agent to read GitHub now (the ↻ button) |
+| GET | `/api/commands` | | For the host agent: queued commands (`{"hue": [...], "github_refresh": bool}`, emptied on read) and the panels on screen (`"visible"`) |
+| POST | `/api/github/refresh` | | Ask the agent to read GitHub now (pull down on the Code page) |
 | POST | `/api/run` | any action | Run an action |
 | POST | `/api/system` | `{"do": "reconnect" \| "restart" \| "reboot"}` | Reconnect USB (software replug) / restart service / reboot |
 

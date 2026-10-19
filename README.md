@@ -195,8 +195,8 @@ them to the Car Thing **over the USB cable** (`adb forward`; no network):
   running, queued, passed, failed or cancelled, with branch, commit and time) and
   your open pull requests on any repository, with their checks, review state and
   draft flag. Both lists scroll. Tap a row to open it in the browser on the computer.
-  It refreshes every minute, or every 15 seconds while a workflow runs, and the ↻ button
-  on the Actions card fetches it right away (see [Adding GitHub](#adding-github)).
+  It refreshes every minute, or every 15 seconds while a workflow runs; pull down on either
+  list to fetch it right away (see [Adding GitHub](#adding-github)).
 - **Plex:** the streams on your Plex Media Server. Each stream shows its poster, the
   user and player, the progress and the quality. A tag shows how the server sends it:
   direct play, direct stream, or transcode (HW for a hardware transcode). Next to the
@@ -218,6 +218,11 @@ them to the Car Thing **over the USB cable** (`adb forward`; no network):
   "🔒 Computer locked", the cover and what's playing, and media buttons. Tiles,
   presets and dial modes that press keys are blocked while locked, so nothing gets
   typed into the password box; media keys, volume and the wheel still work.
+
+The agent works hardest for the page on screen: Lights, Status (its GPU reading), Code
+and Plex update every few seconds while you look at them and slowly otherwise (every
+30 seconds; GitHub every 5 minutes), and opening one of them fetches its data right away.
+What the other screens need (the song, volume, lock state, calendar) keeps its usual pace.
 
 Install it once per computer (and once per OS on a dual-boot PC). It starts at
 login, survives unplugging and sleep, and needs `adb` (see [Requirements](#requirements)):
