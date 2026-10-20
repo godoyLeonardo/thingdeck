@@ -2093,7 +2093,7 @@ function updateNas() {
     (pools.map(nasPool).join('') || '<div class="ag-empty">No pools</div>') + '</div>');
   var hot = disks.filter(function (d) { return d.temp != null; });
   var temps = hot.map(function (d) {
-    var cls = d.temp >= 55 ? ' bad' : d.temp >= 45 ? ' warn' : '';
+    var nvme = /^nvme/.test(d.name), cls = d.temp >= (nvme ? 70 : 55) ? ' bad' : d.temp >= (nvme ? 60 : 45) ? ' warn' : '';  // SSDs run warmer
     return '<div class="px-lib"><div class="ev-main"><div class="ev-title">' + esc(d.name) + '</div></div>' +
       '<div class="px-num' + cls + '">' + Math.round(d.temp) + '°</div></div>';
   }).join('');
