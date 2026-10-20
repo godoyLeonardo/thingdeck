@@ -204,7 +204,8 @@ them to the Car Thing **over the USB cable** (`adb forward`; no network):
 - **Code (GitHub):** the latest run of each workflow in one repository (up to 20:
   running, queued, passed, failed or cancelled, with branch, commit and time) and
   your open pull requests on any repository, with their checks, review state and
-  draft flag. Both lists scroll. Tap a row to open it in the browser on the computer.
+  draft flag. Both lists scroll. Tap a row for its details and its link, and **Open on
+  computer** to open it in the browser there.
   It refreshes every minute, or every 15 seconds while a workflow runs; pull down on either
   list to fetch it right away (see [Adding GitHub](#adding-github)).
 - **Plex:** the streams on your Plex Media Server. Each stream shows its poster, the
