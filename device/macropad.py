@@ -1160,8 +1160,18 @@ class Pad:
         with self.lock:
             self.config = cfg
             self.config_mtime = mtime
+            # Forget tab settings of pages config.json no longer has (not for a config
+            # without pages, which is more likely a slip than a choice).
+            known = set(page_key(p) for p in cfg.get('pages', []))
+            stale = False
+            for key in ('page_order', 'page_hidden', 'page_shown') if known else ():
+                kept = [k for k in self.settings.get(key) or [] if k in known]
+                stale = stale or kept != (self.settings.get(key) or [])
+                self.settings[key] = kept
             self.page = min(self.page, max(0, len(self.pages()) - 1))
             self.dial = min(self.dial, max(0, len(self.dials()) - 1))
+        if stale:
+            self.save()
         log('config loaded: %d pages, %d dial modes' % (len(self.pages()), len(self.dials())))
         return True
 
