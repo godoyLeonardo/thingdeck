@@ -391,6 +391,8 @@
   .np-bar.bad i { background: var(--bad); }
   .nas-pool .ev-sub { font-size: calc(13.5px * var(--ts)); }
   .nas-scan { color: var(--acc); margin-left: 6px; }
+  .nas-sys { flex: none; padding: 8px 0 10px; border-top: 1px solid var(--line); font: 500 calc(12.5px * var(--ts)) GeistMono, monospace;
+    color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .px-num.warn, .m-value.warn { color: var(--warn); }
   .px-num.bad, .m-value.bad { color: var(--bad); }
   .m-value.good { color: var(--good); }
@@ -2097,7 +2099,11 @@ function updateNas() {
   var sys = n.system || {}, pools = n.pools || [], disks = n.disks || [], alerts = n.alerts || [], apps = n.apps || [];
   redraw($('nasp'), '<h3>' + esc(sys.host || 'TrueNAS') + ' · ' + pools.length + (pools.length === 1 ? ' pool' : ' pools') +
     (sys.uptime ? '<span>up ' + fmtUptime(sys.uptime) + '</span>' : '') + '</h3><div class="ag-list">' +
-    (pools.map(nasPool).join('') || '<div class="ag-empty">No pools</div>') + '</div>');
+    (pools.map(nasPool).join('') || '<div class="ag-empty">No pools</div>') + '</div>' +
+    '<div class="nas-sys">' + [sys.version ? 'TrueNAS ' + esc(String(sys.version).replace(/^TrueNAS-/, '')) : '',
+      sys.cores ? sys.cores + ' cores' : '', sys.memory ? fmtBytes(sys.memory) + ' RAM' : '',
+      sys.load && sys.load.length ? 'load ' + sys.load.map(function (v) { return Number(v).toFixed(1); }).join(' ') : '']
+      .filter(function (x) { return x; }).join(' · ') + '</div>');
   var hot = disks.filter(function (d) { return d.temp != null; });
   var temps = hot.map(function (d) {
     var nvme = /^nvme/.test(d.name), cls = d.temp >= (nvme ? 70 : 55) ? ' bad' : d.temp >= (nvme ? 60 : 45) ? ' warn' : '';  // SSDs run warmer
