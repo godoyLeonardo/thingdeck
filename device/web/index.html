@@ -638,6 +638,9 @@
   .stepper .btn { flex: none; width: 48px; font-size: calc(20px * var(--ts)); }
   .stepper .btn.off { opacity: .35; }
   .stepper .btn.down { background: var(--acc-soft); color: var(--acc); }
+  .stepper.small .btn { width: 36px; font-size: calc(17px * var(--ts)); }
+  .stepper.small b { min-width: 58px; }
+  .stepper > span { margin: 0 6px; color: var(--muted); }
   .stepper b { min-width: 96px; text-align: center; font: 500 calc(14px * var(--ts)) GeistMono, monospace; }
   .slider span { font-size: calc(16px * var(--ts)); width: 26px; text-align: center; }
   input[type=range] { -webkit-appearance: none; flex: 1; height: 40px; background: transparent; margin: 0 8px; }
@@ -777,6 +780,11 @@
       <h3 style="margin-top:10px">Clock</h3>
       <div class="row"><label>Format<small>time comes from the computer</small></label>
         <div class="seg"><div data-set="clock_24h" data-val="true">24h</div><div data-set="clock_24h" data-val="false">12h</div></div></div>
+      <div class="row"><label>Darker at night<small id="nnow">light stops</small></label>
+        <div class="stepper"><div class="btn" data-set="night_stops" id="ndown">−</div><b id="nstopsv"></b><div class="btn" data-set="night_stops" id="nup">+</div></div></div>
+      <div class="row" id="nhours"><label>Hours</label>
+        <div class="stepper small"><div class="btn" data-set="night_from" id="nfromd">−</div><b id="nfrom"></b><div class="btn" data-set="night_from" id="nfromu">+</div>
+          <span>to</span><div class="btn" data-set="night_to" id="ntod">−</div><b id="nto"></b><div class="btn" data-set="night_to" id="ntou">+</div></div></div>
     </div>
     </div>
   </div>
@@ -1087,6 +1095,14 @@ function buildAppearance() {
 
 // ---- settings tab
 var showSettings = false, settingsSec = 'general', info = null, dragging = false, infoTimer = null, builtFor = '';
+function fmtStops(n) {
+  return (n > 0 ? '+' : n < 0 ? '−' : '') + Math.abs(n) + (Math.abs(n) === 1 ? ' stop' : ' stops');
+}
+function fmtMinutes(m) {      // a time of day, in the clock format picked
+  var h = Math.floor(m / 60), mm = (m % 60 < 10 ? '0' : '') + m % 60;
+  if (st.settings && st.settings.clock_24h === false) return ((h + 11) % 12 + 1) + (m % 60 ? ':' + mm : '') + ' ' + (h < 12 ? 'AM' : 'PM');
+  return (h < 10 ? '0' : '') + h + ':' + mm;
+}
 function renderSettings() {
   var s = st.settings || {};
   if (builtFor !== s.theme) { builtFor = s.theme; buildAppearance(); }   // swatches show the theme's tints
@@ -1111,7 +1127,21 @@ function renderSettings() {
   $('bup').setAttribute('data-val', JSON.stringify(Math.min(STOPS, stops + 0.5)));
   $('bdown').classList.toggle('off', stops <= -STOPS);
   $('bup').classList.toggle('off', stops >= STOPS);
-  $('bstopsv').textContent = (stops > 0 ? '+' : stops < 0 ? '−' : '') + Math.abs(stops) + (Math.abs(stops) === 1 ? ' stop' : ' stops');
+  $('bstopsv').textContent = fmtStops(stops);
+  // Darker at night: 0 (off) to -3 stops, and its hours, one hour per tap.
+  var night = s.night_stops || 0, from = s.night_from == null ? 22 * 60 : s.night_from, to = s.night_to == null ? 7 * 60 : s.night_to;
+  $('ndown').setAttribute('data-val', JSON.stringify(Math.max(-STOPS, night - 0.5)));
+  $('nup').setAttribute('data-val', JSON.stringify(Math.min(0, night + 0.5)));
+  $('ndown').classList.toggle('off', night <= -STOPS);
+  $('nup').classList.toggle('off', night >= 0);
+  $('nstopsv').textContent = night ? fmtStops(night) : 'Off';
+  $('nnow').textContent = !night ? 'light stops' : st.night ? 'on now' : 'off until ' + fmtMinutes(from);
+  $('nhours').style.display = night ? '' : 'none';
+  [['nfromd', from, -60], ['nfromu', from, 60], ['ntod', to, -60], ['ntou', to, 60]].forEach(function (b) {
+    $(b[0]).setAttribute('data-val', JSON.stringify((b[1] + b[2] + 1440) % 1440));
+  });
+  $('nfrom').textContent = fmtMinutes(from);
+  $('nto').textContent = fmtMinutes(to);
   if (!draggingHue) {
     $('hue').value = typeof s.accent === 'number' ? s.accent : hexHue(themeAccent(current.theme, current.accent));
   }
@@ -1120,8 +1150,8 @@ function renderSettings() {
   }
   $('osdet').textContent = { windows: 'detected: Windows', other: 'detected: Linux or macOS' }[st.os_detected] || 'not detected yet';
   renderTabOrder(s);
-  $('bnow').textContent = s.brightness_auto ? 'light sensor' + (info ? ' · ' + Math.round(info.brightness_now / 2.55) + '%' : '')
-    : Math.round((s.brightness || 0) / 2.55) + '%';
+  $('bnow').textContent = (s.brightness_auto ? 'light sensor' + (info ? ' · ' + Math.round(info.brightness_now / 2.55) + '%' : '')
+    : Math.round((s.brightness || 0) / 2.55) + '%') + (st.night ? ' · night' : '');
   if (info) {
     var up = Math.floor(info.uptime), h = Math.floor(up / 3600), m = Math.floor(up % 3600 / 60);
     $('kv').innerHTML =

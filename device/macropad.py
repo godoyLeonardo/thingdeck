@@ -1083,7 +1083,7 @@ class Pad:
         # None means "use config.json".
         self.settings = {'os_mode': 'auto', 'layout': None, 'dial_invert': None,
                          'brightness_auto': True, 'brightness': 180, 'brightness_stops': 0, 'calendar': None,
-                         'calendar_weeks': {},
+                         'calendar_weeks': {}, 'night_stops': 0, 'night_from': 22 * 60, 'night_to': 7 * 60,
                          'theme': 'dark', 'accent': 'theme',
                          'clock_24h': True, 'icon_style': None,
                          'icon_color': None, 'page_order': [], 'page_hidden': [], 'page_shown': []}
@@ -1145,6 +1145,10 @@ class Pad:
             'brightness_auto': lambda v: isinstance(v, bool),
             'brightness': lambda v: isinstance(v, int) and BRIGHTNESS_MIN <= v <= 255,
             'brightness_stops': lambda v: type(v) in (int, float) and abs(v) <= BRIGHTNESS_STOPS and v * 2 == int(v * 2),
+            # Darker at night: 0 (off) to -3 stops, from night_from to night_to (minutes of the day).
+            'night_stops': lambda v: type(v) in (int, float) and -BRIGHTNESS_STOPS <= v <= 0 and v * 2 == int(v * 2),
+            'night_from': lambda v: type(v) is int and 0 <= v < 1440,
+            'night_to': lambda v: type(v) is int and 0 <= v < 1440,
             'calendar': lambda v: v is None or (isinstance(v, str) and len(v) <= 200),     # the Calendar page's tab; None: all
             # Weeks the Calendar page shows, per tab: a calendar's name, or '' for All.
             'calendar_weeks': lambda v: isinstance(v, dict) and len(v) <= 64 and all(
@@ -1158,7 +1162,7 @@ class Pad:
             keys = [page_key(p) for p in self.ordered_pages()]
             self.page = keys.index(current) if current in keys else 0
         self.settings[key] = value
-        if key.startswith('brightness'):
+        if key.startswith(('brightness', 'night')):
             self.apply_brightness()
         self.save()
         self.publish_state()
@@ -1171,7 +1175,23 @@ class Pad:
         self._stop_stock_sensor()
         self._auto_level = None
         if not self.settings['brightness_auto']:
-            write_backlight(self.settings['brightness'])
+            write_backlight(self.manual_level())
+
+    def night_active(self):
+        """Whether it is night now (Settings → General), by the computer's clock: never before
+        the agent has set the time."""
+        start, end = self.settings['night_from'], self.settings['night_to']
+        if not self.settings['night_stops'] or start == end or self.host.utc_offset is None or time.time() < VALID_TIME:
+            return False
+        minute = int((time.time() + self.host.utc_offset) // 60 % 1440)
+        return start <= minute < end if start < end else minute >= start or minute < end
+
+    def night_stops(self):
+        return self.settings['night_stops'] if self.night_active() else 0
+
+    def manual_level(self):
+        """The slider's level, darker at night."""
+        return max(BRIGHTNESS_MIN, round(self.settings['brightness'] * 2 ** self.night_stops()))
 
     def _stop_stock_sensor(self):
         # The stock sp-als-backlight service drives the backlight from the light sensor, but
@@ -1191,28 +1211,35 @@ class Pad:
                 log('could not start the stock light-sensor service')
 
     def follow_sensor(self):
-        """Auto brightness: the stock service's level for the light sensor, times 2 for each
-        stop of the offset. Every 0.5 s it moves a fifth of the way there, so it fades the
-        way the stock service did and a passing shadow doesn't flicker it."""
+        """The backlight, every 0.5 s. Auto: the stock service's level for the light sensor,
+        times 2 for each stop of the offset and of the night; it moves a fifth of the way there
+        on each reading, so it fades the way the stock service did and a passing shadow
+        doesn't flicker it. Manual: the slider's level, darker at night."""
         paths = glob.glob(LIGHT_SENSOR)
         if not paths:
             log('no light sensor: auto brightness stays where it is')
-            return
-        written = None
+        written, night = None, None
         while True:
             time.sleep(0.5)
-            if self._dimmed or not self._stock_stopped or not self.settings['brightness_auto']:
+            if self.night_active() != night:
+                night = self.night_active()
+                self.publish_state()             # Settings shows when it is night
+            if self._dimmed or not self._stock_stopped:
                 written = None
                 continue
-            try:
-                with open(paths[0]) as f:
-                    raw = int(f.read())
-            except (OSError, ValueError):
-                continue
-            target = max(BRIGHTNESS_MIN, min(255.0, sensor_level(raw) * 2 ** self.settings['brightness_stops']))
-            level = target if self._auto_level is None else self._auto_level + (target - self._auto_level) / 5
-            self._auto_level = level
-            if round(level) != written and not self._dimmed and self.settings['brightness_auto']:
+            if not self.settings['brightness_auto']:
+                level = self.manual_level()
+            else:
+                try:
+                    with open(paths[0]) as f:
+                        raw = int(f.read())
+                except (IndexError, OSError, ValueError):
+                    continue
+                stops = self.settings['brightness_stops'] + self.night_stops()
+                target = max(BRIGHTNESS_MIN, min(255.0, sensor_level(raw) * 2 ** stops))
+                level = target if self._auto_level is None else self._auto_level + (target - self._auto_level) / 5
+                self._auto_level = level
+            if round(level) != written and not self._dimmed and self._stock_stopped:
                 written = round(level)
                 write_backlight(written)
 
@@ -1370,7 +1397,8 @@ class Pad:
                 'os': self.host_os(), 'os_mode': self.settings['os_mode'], 'os_detected': self.os_detected,
                 'settings': self.settings, 'layout': self.layout_name(), 'dial_invert': self.dial_invert(),
                 'locked': self.host.locked, 'clock': self.host.clock(), 'agent': self.agent_status(),
-                'hidden': sorted(self.hidden_keys()), 'unconfigured': sorted(self.auto_hidden)}
+                'hidden': sorted(self.hidden_keys()), 'unconfigured': sorted(self.auto_hidden),
+                'night': self.night_active()}
 
     def agent_status(self):
         """The agent's version against the repo's (agents.json, written by deploy.sh):
