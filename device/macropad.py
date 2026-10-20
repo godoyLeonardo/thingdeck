@@ -893,6 +893,33 @@ class HostPlex:
             self.ui.publish('plex', self.published)
 
 
+TRUENAS_TTL = 150       # seconds without an update before the TrueNAS data counts as gone (off screen: every 60 s)
+TRUENAS_FIELDS = ('system', 'pools', 'disks', 'alerts', 'apps')
+
+
+class HostTrueNAS:
+    """A TrueNAS server on the local network, through the host agent: pools, disk
+    temperatures, alerts and apps, every 10 s while its page is on screen."""
+
+    def __init__(self, ui):
+        self.ui = ui
+        self.published = {'state': 'unknown'}
+        self.updated = None
+
+    def update(self, body):
+        data = {k: body[k] for k in TRUENAS_FIELDS if k in body}
+        data['state'] = str(body.get('state') or 'error')
+        data['error'] = str(body['error']) if body.get('error') else None
+        self.published, self.updated = data, time.monotonic()
+        self.ui.publish('truenas', data)
+
+    def expire(self):
+        if self.updated is not None and time.monotonic() - self.updated > TRUENAS_TTL:
+            self.updated = None
+            self.published = {'state': 'unknown'}
+            self.ui.publish('truenas', self.published)
+
+
 class Broadcaster:
     def __init__(self):
         self.lock = threading.Lock()
@@ -943,6 +970,7 @@ class Pad:
         self.audio = HostAudio(self.ui)
         self.hue = HostHue(self.ui)
         self.plex = HostPlex(self.ui)
+        self.truenas = HostTrueNAS(self.ui)
         self.hid = Hid(lambda status: self.on_usb_status(status))
         self.config = {}
         self.config_mtime = 0
@@ -1501,7 +1529,7 @@ class Handler(BaseHTTPRequestHandler):
             self._send(200, {'config': pad.config, 'state': pad.state(), 'presets': pad.presets(),
                              'nowplaying': pad.np.meta, 'stats': pad.stats.snapshot(), 'agenda': pad.agenda.published,
                              'audio': pad.audio.state, 'github': pad.github.published,
-                             'hue': pad.hue.snapshot(), 'plex': pad.plex.published})
+                             'hue': pad.hue.snapshot(), 'plex': pad.plex.published, 'truenas': pad.truenas.published})
         elif path == '/api/nowplaying':
             self._send(200, {'nowplaying': pad.np.meta})
         elif path == '/api/nowplaying/art':
@@ -1608,6 +1636,8 @@ class Handler(BaseHTTPRequestHandler):
             pad.hue.select(str(body.get('id')))
         elif path == '/api/plex':
             return self._send(200, {'ok': True, 'need_art': pad.plex.update(body)})
+        elif path == '/api/truenas':
+            pad.truenas.update(body)
         elif path == '/api/github':
             pad.github.update(body)
         elif path == '/api/github/refresh':
@@ -1834,6 +1864,7 @@ def main():
             pad.stats.expire()
             pad.audio.expire()
             pad.plex.expire()
+            pad.truenas.expire()
             pad.agenda.refresh()
     finally:
         pad.hid.close()
