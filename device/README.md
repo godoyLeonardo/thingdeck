@@ -211,7 +211,9 @@ twice). With two names or more, the page shows tabs above the agenda: All and ea
 The tab is the setting `calendar` (a name, or `null` for All) in `state.json`. A name
 that is not in `calendars` shows All. On the left of the bar, − and + set how many weeks
 the page shows, 1 to 4 (2 when none is saved), for each tab: the setting `calendar_weeks`,
-`{"<name>" or "" for All: weeks}`. The page filters the 4 weeks the device sends. The tabs filter only the page: reminders come from
+`{"<name>" or "" for All: weeks}`. The page filters the 4 weeks the device sends.
+Each calendar has a color by its index (`CAL_COLORS`, the theme's own colors): a dot on
+its tab, and before the title of its events in All. The tabs filter only the page: reminders come from
 every calendar.
 
 **Join:** the UI posts `POST /api/calendar/open` with an event id; only events with

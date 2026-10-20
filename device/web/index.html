@@ -232,6 +232,7 @@
     font-size: calc(14.5px * var(--ts)); font-weight: 600; color: var(--muted); white-space: nowrap; }
   .cal-tab + .cal-tab { margin-left: 6px; }
   .cal-tab.on { background: var(--acc-soft); color: var(--acc); }
+  .ev-cal { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin: 0 7px 2px 0; vertical-align: middle; }
   .cal-tab.down { filter: brightness(1.3); }
   .cal-weeks { flex: none; display: flex; align-items: center; margin-right: 10px; }
   .cal-weeks b { min-width: 84px; text-align: center; font-size: calc(14.5px * var(--ts)); font-weight: 600; }
@@ -1538,7 +1539,8 @@ function untilText(ms) {
 }
 // One event. In the list the time is its own column; in a day column (cols) it goes
 // above the title, which leaves the narrow column's width to the title.
-function eventHTML(e, isNext, cols) {
+// dot: the calendar's dot before the title (in All, with two calendars or more), or ''.
+function eventHTML(e, isNext, cols, dot) {
   var now = Date.now(), when = e.all_day ? 'All day' : fmtClock(e.start) + (cols ? ' – ' + fmtClock(e.end) : '');
   var status = !isNext ? '' : e.start <= now ? '<b><i class="live"></i>Now</b>' : e.start - now < 12 * 3600000 ? '<b>In ' + untilText(e.start) + '</b>' : '';
   var sub = cols ? [status, esc(e.where)] : [status, e.all_day ? '' : 'until ' + fmtClock(e.end), esc(e.where)];
@@ -1546,7 +1548,7 @@ function eventHTML(e, isNext, cols) {
   return '<div class="ev' + (isNext ? ' next' : '') + '" data-ev="' + esc(e.id) + '">' +
     (cols ? '' : '<div class="ev-time">' + (e.all_day ? '<small>All day</small>' : when) + '</div>') +
     '<div class="ev-main">' + (cols ? '<div class="ev-when">' + when + '</div>' : '') +
-      '<div class="ev-title">' + esc(e.title) + '</div>' + (sub ? '<div class="ev-sub">' + sub + '</div>' : '') + '</div>' +
+      '<div class="ev-title">' + (dot || '') + esc(e.title) + '</div>' + (sub ? '<div class="ev-sub">' + sub + '</div>' : '') + '</div>' +
     (e.link ? '<div class="ev-join" data-join="' + esc(e.id) + '">' + icon('camera') + '</div>' : '') + '</div>';
 }
 // Event details: the list has the basics; the notes and calendar name come on request.
@@ -1675,6 +1677,9 @@ function pickedCalendar() {
 // How many weeks the agenda shows, 1 to 4, per tab (setting "calendar_weeks", by the calendar's
 // name or '' for All); 2 when none is saved. The device sends 4 weeks of events.
 var CAL_WEEKS = 4, WEEK_WORDS = ['', 'one', 'two', 'three', 'four'];
+// A color per calendar, by its index, from the theme: a dot on its tab, and on its events in All.
+var CAL_COLORS = ['var(--key)', 'var(--media)', 'var(--nav)', 'var(--type)', 'var(--mouse)', 'var(--warn)', 'var(--bad)'];
+function calDot(i) { return '<i class="ev-cal" style="background:' + CAL_COLORS[i % CAL_COLORS.length] + '"></i>'; }
 var CAL_BAR = '<div class="cal-bar" id="calbar"><div class="cal-weeks" id="calweeks"></div><div class="cal-tabs" id="caltabs"></div></div>';
 function calendarWeeks(picked) {
   var n = ((st.settings && st.settings.calendar_weeks) || {})[picked || ''];
@@ -1698,7 +1703,7 @@ function updateCalBar() {
   tabs.style.display = names.length > 1 ? '' : 'none';
   if (names.length > 1) {
     var html = '<div class="cal-tab' + (picked == null ? ' on' : '') + '" data-cal="-1">All</div>' + names.map(function (n, i) {
-      return '<div class="cal-tab' + (n === picked ? ' on' : '') + '" data-cal="' + i + '">' + esc(n) + '</div>';
+      return '<div class="cal-tab' + (n === picked ? ' on' : '') + '" data-cal="' + i + '">' + calDot(i) + esc(n) + '</div>';
     }).join('');
     if (redraw(tabs, html)) {
       var on = tabs.querySelector('.on');
@@ -1723,7 +1728,7 @@ function updateAgenda() {
   var now = Date.now(), today = dayNumber(now), events = (agenda.events || []).filter(function (e) {
     return e.end > now && (picked == null || names[e.cal] === picked) && dayNumber(Math.max(e.start, now)) - today < weeks * 7;
   });
-  var html = '', day = null, next = null;
+  var html = '', day = null, next = null, dots = picked == null && names.length > 1;
   for (var i = 0; i < events.length && !next; i++) if (!events[i].all_day) next = events[i];
   if (cols && events.length) {
     // Today | Tomorrow | the rest of the weeks shown, each a card that scrolls on its own.
@@ -1731,7 +1736,7 @@ function updateAgenda() {
     events.forEach(function (e) {
       var d = dayNumber(Math.max(e.start, now)), c = Math.min(2, d - today);
       if (c === 2 && d !== laterDay) { laterDay = d; parts[2] += '<div class="ag-day">' + dayLabel(Math.max(e.start, now)) + '</div>'; }
-      parts[c] += eventHTML(e, e === next, true);
+      parts[c] += eventHTML(e, e === next, true, dots ? calDot(e.cal) : '');
     });
     var titles = ['Today', 'Tomorrow', weeks === 1 ? 'Later this week' : 'Next ' + WEEK_WORDS[weeks] + ' weeks'];
     html = parts.map(function (p, c) {
@@ -1742,7 +1747,7 @@ function updateAgenda() {
   if (!cols) events.forEach(function (e) {
     var d = dayNumber(Math.max(e.start, now));
     if (d !== day) { day = d; html += '<div class="ag-day">' + dayLabel(Math.max(e.start, now)) + '</div>'; }
-    html += eventHTML(e, e === next, false);
+    html += eventHTML(e, e === next, false, dots ? calDot(e.cal) : '');
   });
   if (!events.length) {
     if (agenda.state === 'none') html = stateCard('Calendar', 'No calendar yet', 'Put your Google Calendar’s secret iCal address in calendars.txt on the computer (see README).');
