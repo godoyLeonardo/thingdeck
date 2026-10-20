@@ -227,6 +227,13 @@
   .cols .ev { min-height: 58px; }
   .ev-when { font-size: calc(13px * var(--ts)); font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; }
   .ev.next .ev-when { color: var(--acc); }
+  /* the Calendar page reads from across the desk: its rows a step above the shared sizes */
+  .agenda .ag-day { font-size: calc(12.5px * var(--ts)); }
+  .agenda .ev { min-height: 58px; }
+  .agenda .ev-time { width: 76px; font-size: calc(17px * var(--ts)); }
+  .agenda .ev-title { font-size: calc(18.5px * var(--ts)); }
+  .agenda .ev-sub { font-size: calc(14px * var(--ts)); }
+  .agenda .ev-when { font-size: calc(14.5px * var(--ts)); }
   .ag-empty { color: var(--muted); font-size: calc(14px * var(--ts)); line-height: 1.4; margin-top: 6px; }
   .ag-empty b { display: block; color: var(--text); font-size: calc(17px * var(--ts)); margin-bottom: 4px; }
   /* widget "github": a repo's latest workflow runs and your open pull requests */
