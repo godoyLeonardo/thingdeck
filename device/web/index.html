@@ -132,6 +132,12 @@
     --media: #a7c080; --key: #7fbbb3; --type: #dbbc7f; --nav: #d699b6; --mouse: #83c092; --bad: #e67e80; --warn: #e69875;
     --on-acc: #2d353b;
   }
+  :root[data-theme="kanagawa"] {
+    --bg: #1f1f28; --panel: #2a2a37; --tile: #2a2a37; --tile-hi: #363646; --line: #54546d; --edge: #2a2a37;
+    --text: #dcd7ba; --muted: #938aa9; --faint: #54546d; --toast: #363646; --veil: rgba(31,31,40,.92); --standby: #16161d;
+    --media: #98bb6c; --key: #7e9cd8; --type: #e6c384; --nav: #957fb8; --mouse: #7aa89f; --bad: #e46876; --warn: #ffa066;
+    --on-acc: #1f1f28;
+  }
   * { box-sizing: border-box; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); overflow: hidden;
     font-family: Geist, 'Circular Sp UI v3 T', 'Noto Sans', sans-serif; touch-action: none; cursor: none; }
@@ -1070,7 +1076,8 @@ var THEMES = {
   onedark:    { name: 'One Dark',    bg: '#282c34', tile: '#2c313a', text: '#abb2bf', acc: '#61afef' },
   monokai:    { name: 'Monokai',     bg: '#272822', tile: '#3e3d32', text: '#f8f8f2', acc: '#a6e22e' },
   rosepine:   { name: 'Rosé Pine',   bg: '#191724', tile: '#1f1d2e', text: '#e0def4', acc: '#ebbcba' },
-  everforest: { name: 'Everforest',  bg: '#2d353b', tile: '#343f44', text: '#d3c6aa', acc: '#a7c080' }
+  everforest: { name: 'Everforest',  bg: '#2d353b', tile: '#343f44', text: '#d3c6aa', acc: '#a7c080' },
+  kanagawa:   { name: 'Kanagawa',    bg: '#1f1f28', tile: '#2a2a37', text: '#dcd7ba', acc: '#7e9cd8' }
 };
 var ACCENTS = {   // [on dark themes, on light themes]
   green: ['#1ed760', '#12a150'], blue: ['#5b9cff', '#2f6fe0'], purple: ['#a78bfa', '#7c5cdb'],
