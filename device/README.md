@@ -283,8 +283,9 @@ in the last 100 runs (20 at most) and the user's open pull requests (one GraphQL
 query, any repository, with the check rollup and review decision). Both lists scroll,
 and a redraw keeps their scroll position. The agent posts it to `POST /api/github`
 every minute, or every 15 s while a run is queued or running; `{"none": true}` means
-there is no `github.txt`. `GitHubStatus` keeps each row's link and gives the UI only
-row ids; a tap posts `POST /api/github/open {id}`, and the link goes to the agent
+there is no `github.txt`. `GitHubStatus` keeps each row's link and opens a row by its
+id; the UI gets the link only to show it. A tap opens a card with the details and the link;
+its **Open on computer** button posts `POST /api/github/open {id}`, which sends the link to the agent
 through the same `LinkOpener` as meeting links (the agent opens `https://github.com/`
 links and meeting links only).
 
