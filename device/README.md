@@ -344,8 +344,9 @@ The agent reads the TrueNAS server in `truenas.txt` (address, then an API key)
 through its JSON-RPC 2.0 API over a WebSocket, `wss://<address>/api/current`
 (TrueNAS 25.04+; the REST API is deprecated there). Each read opens one connection,
 calls `auth.login_with_api_key`, then `system.info`, `pool.query` (only the fields it
-shows, through `select`), `disk.temperatures`, `alert.list` and `app.query`, and
-closes it. Replies are matched by `id`, so notifications in between are skipped. A
+shows, through `select`), `disk.temperatures`, `alert.list`, `app.query` and
+`core.get_jobs` (the `RUNNING` jobs; without `select`, because TrueNAS fails on it for
+jobs), and closes it. Replies are matched by `id`, so notifications in between are skipped. A
 failing call other than `system.info` only leaves its part empty.
 
 It is always TLS: TrueNAS revokes an API key that arrives over plain HTTP. The
@@ -355,12 +356,14 @@ Windows uses .NET's `ClientWebSocket`; Python has no WebSocket client, so
 `nowplaying.py` has a small one (masked text frames, ping/pong, fragments).
 
 Every 10 s while the NAS page is on screen, 60 s otherwise and after an error, the
-agent posts `POST /api/truenas` with `{state, system, pools, disks, alerts, apps}`.
+agent posts `POST /api/truenas` with `{state, system, pools, disks, alerts, apps, jobs}`.
+A job is `{method, target, percent, text, started}`. The page names it from the method
+(`pool.scrub.scrub` is "Scrub" plus the pool), so the names exist once for both agents.
 It sends only changes, plus one at least every 30 s. Alerts leave out dismissed and
 INFO ones. A call waits at most 5 s, because the Windows agent's main loop waits on it.
 `HostTrueNAS` keeps the last update and clears it after 150 s without one. The widget
 `"truenas"` shows pools as tanks (80% yellow, 90% red), disk temperatures (45/55 °C,
-NVMe 60/70 °C), alerts and apps.
+NVMe 60/70 °C), alerts, apps and running jobs.
 
 ### Tab order
 
@@ -482,7 +485,7 @@ page, or `adb shell`).
 | POST | `/api/hue/select` | `{"id"}` | Make a room the target of the Lights dial mode |
 | POST | `/api/plex` | `{"state", "server"?, "sessions"?, "load"?, "net"?, "libraries"?, "activities"?, "posters"?, "error"?}` | From the host agent every 3 s. Replies `{"need_art": [keys]}` |
 | GET | `/api/plex/art?k=…` | | A stream's poster |
-| POST | `/api/truenas` | `{"state", "system"?, "pools"?, "disks"?, "alerts"?, "apps"?, "error"?}` | From the host agent every 10 s on screen, 60 s otherwise |
+| POST | `/api/truenas` | `{"state", "system"?, "pools"?, "disks"?, "alerts"?, "apps"?, "jobs"?, "error"?}` | From the host agent every 10 s on screen, 60 s otherwise |
 | GET | `/api/commands` | | For the host agent: queued commands (`{"hue": [...], "github_refresh": bool}`, emptied on read) and the panels on screen (`"visible"`) |
 | POST | `/api/github/refresh` | | Ask the agent to read GitHub now (pull down on the Code page) |
 | POST | `/api/run` | any action | Run an action |

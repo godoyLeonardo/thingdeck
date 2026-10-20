@@ -1026,7 +1026,7 @@ class PlexLink:
 
 # ------------------------------------------------------------------ TrueNAS
 
-# A TrueNAS server on the local network: pools, disk temperatures, alerts and apps, through
+# A TrueNAS server on the local network: pools, disk temperatures, alerts, apps and running jobs, through
 # its JSON-RPC API over a WebSocket (wss://server/api/current). truenas.txt next to
 # calendars.txt holds the address on the first line and an API key on the second. Always
 # over TLS: TrueNAS revokes a key that is ever sent over plain http.
@@ -1037,7 +1037,16 @@ TRUENAS_CALLS = [
     ('disk.temperatures', [[]]),
     ('alert.list', []),
     ('app.query', [[], {'select': ['name', 'state', 'upgrade_available']}]),
+    ('core.get_jobs', [[['state', '=', 'RUNNING']]]),      # no 'select': TrueNAS fails on it for jobs
 ]
+
+
+def truenas_job(j):
+    """A running job: its method (the Car Thing names it), the pool or app it works on, and its progress."""
+    args, progress = j.get('arguments') or [], j.get('progress') or {}
+    target = args[0] if args and isinstance(args[0], str) and len(args[0]) <= 64 else None
+    return {'method': j.get('method'), 'target': target, 'percent': progress.get('percent'),
+            'text': progress.get('description') or None, 'started': (j.get('time_started') or {}).get('$date')}
 
 
 class WebSocket:
@@ -1183,6 +1192,7 @@ class TrueNasLink:
                        for a in r.get('alert.list') or [] if not a.get('dismissed') and a.get('level') != 'INFO'],
             'apps': [{'name': a.get('name'), 'state': a.get('state'), 'update': bool(a.get('upgrade_available'))}
                      for a in r.get('app.query') or []],
+            'jobs': [truenas_job(j) for j in r.get('core.get_jobs') or []],
         }
 
     def update(self):

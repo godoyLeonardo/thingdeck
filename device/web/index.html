@@ -417,6 +417,11 @@
   .nas-alert { font-size: calc(13px * var(--ts)); color: var(--muted); line-height: 1.3; margin-bottom: 10px;
     display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
   .nas .mcard .m-detail { margin-bottom: 10px; }
+  .nas .monitor.px-side { grid-template-rows: repeat(3, minmax(0, 1fr)); }     /* Alerts, Apps and Jobs next to the disks */
+  .nas .m-value { font-size: calc(24px * var(--ts)); }
+  .nas .nas-alert { -webkit-line-clamp: 2; line-height: 1.25; margin-bottom: 4px; }
+  .nas .mcard .nas-job { margin-bottom: 0; }
+  .nas-jobs .np-bar { height: 4px; margin: 5px 0 10px; flex: none; }
   .px-jobs .ag-day { margin-top: 12px; }
   .px-jobs .ag-empty { margin-top: 2px; }
   .monitor { flex: 1; min-width: 0; display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: minmax(0, 1fr); grid-gap: 8px; }
@@ -2096,6 +2101,20 @@ function nasPool(p) {
     '<div class="nas-free">' + (p.scan ? '<span class="nas-scan">' + esc((p.scan.kind || 'scan').toLowerCase()) + ' ' + Math.round(p.scan.percent || 0) + '%</span>'
       : fmtBytes(p.free) + ' free') + '</div></div>';
 }
+// TrueNAS job methods by name. The scrub and app jobs add their pool or app; others show the method.
+var NAS_JOBS = {
+  'pool.scrub.run': 'Scrub', 'pool.scrub.scrub': 'Scrub', 'pool.snapshottask.run': 'Snapshot task',
+  'replication.run': 'Replication', 'cloudsync.sync': 'Cloud sync', 'cloud_backup.sync': 'Cloud backup',
+  'rsynctask.run': 'Rsync task', 'cronjob.run': 'Cron job', 'app.upgrade': 'Update', 'app.update': 'Update',
+  'app.create': 'Install', 'app.delete': 'Remove', 'app.start': 'Start', 'app.stop': 'Stop', 'app.redeploy': 'Redeploy',
+  'app.pull_images': 'Pull images:', 'catalog.sync': 'Sync app catalog', 'update.download': 'Download update',
+  'update.update': 'Install update', 'certificate.renew_certs': 'Renew certificates'
+};
+function nasJobName(j) {
+  var method = String(j.method || 'job'), name = NAS_JOBS[method];
+  if (!name) return method.replace(/[._]/g, ' ');
+  return name + (j.target && /^(pool\.scrub|app)\./.test(method) ? ' ' + j.target : '');
+}
 function updateNas() {
   var box = $('nas');
   if (!box) return;
@@ -2112,7 +2131,7 @@ function updateNas() {
     box.innerHTML = '<div class="card nas-pools" id="nasp"></div><div class="monitor half px-side" id="nasside"></div>';
     box._html = null;
   }
-  var sys = n.system || {}, pools = n.pools || [], disks = n.disks || [], alerts = n.alerts || [], apps = n.apps || [];
+  var sys = n.system || {}, pools = n.pools || [], disks = n.disks || [], alerts = n.alerts || [], apps = n.apps || [], jobs = n.jobs || [];
   var line = function (parts) { parts = parts.filter(function (x) { return x; }); return parts.length ? '<div>' + parts.join(' · ') + '</div>' : ''; };
   redraw($('nasp'), '<h3>' + esc(sys.host || 'TrueNAS') + '</h3><div class="nas-cols">' +
     (pools.map(nasPool).join('') || '<div class="ag-empty">No pools</div>') + '</div>' +
@@ -2134,8 +2153,12 @@ function updateNas() {
   var appCard = '<div class="mcard"><div class="m-label">Apps</div><div class="m-value">' + running + '<small>/ ' + apps.length + ' up</small></div>' +
     '<div class="m-detail">' + (stopped.length ? esc(stopped[0].name) + ' ' + esc(String(stopped[0].state).toLowerCase())
       : updates ? updates + (updates === 1 ? ' update' : ' updates') : 'Up to date') + '</div></div>';
+  var job = jobs[0], pct = job && job.percent != null ? Math.max(0, Math.min(100, job.percent)) : null;
+  var jobCard = '<div class="mcard nas-jobs"><div class="m-label">Jobs</div><div class="m-value">' + jobs.length + '<small> running</small></div>' +
+    (job ? '<div class="m-detail nas-job">' + esc(nasJobName(job)) + (pct != null ? ' · ' + Math.round(pct) + '%' : '') + '</div>' +
+      '<div class="np-bar"><i style="width:' + (pct || 0) + '%"></i></div>' : '<div class="m-detail">None now</div>') + '</div>';
   redraw($('nasside'), '<div class="mcard px-libs"><div class="m-label">Disks</div><div class="ag-list">' +
-    (temps || '<div class="ag-empty">No temperatures</div>') + '</div></div>' + alertCard + appCard);
+    (temps || '<div class="ag-empty">No temperatures</div>') + '</div></div>' + alertCard + appCard + jobCard);
 }
 
 // ---- feedback

@@ -36,7 +36,7 @@ as soon as you plug it in.
   playing with its cover, Philips Hue lights, your calendar with Join buttons,
   CPU/memory/GPU/network graphs, a kill switch for the app in focus, GitHub Actions
   runs and pull requests, the streams and load of your Plex server, your TrueNAS
-  pools, disks, alerts and apps, a volume bar,
+  pools, disks, alerts, apps and running jobs, a volume bar,
   an audio device picker, a clock and a lock screen (see [Computer agent](#computer-agent)).
 - **Standby screen** while the computer sleeps; the pad reconnects by itself
   when it wakes up.
@@ -61,8 +61,8 @@ The Car Thing's screen is 800×480. These use made-up demo data; to retake them,
 | **Volume bar:** shows when the volume changes | **Lock screen:** while the computer is locked |
 | ![Lights page: Philips Hue rooms and zones tinted with their light color, with switches and brightness bars](docs/screenshots/lights.png) | ![A room card: brightness, warm-to-cool white, scenes and its lights](docs/screenshots/room.png) |
 | **Lights:** Philips Hue rooms and zones, with the song playing in the top bar | **A room:** brightness, white, scenes, each light |
-| ![Plex page: two streams with posters and transcode tags, a running job, the server's CPU and bandwidth graphs, and the libraries](docs/screenshots/plex.png) | ![NAS page: TrueNAS pools as tanks that fill up, disk temperatures, alerts and apps](docs/screenshots/nas.png) |
-| **Plex:** streams and how each is sent, running jobs, server load, libraries | **NAS:** TrueNAS pools, disks, alerts and apps |
+| ![Plex page: two streams with posters and transcode tags, a running job, the server's CPU and bandwidth graphs, and the libraries](docs/screenshots/plex.png) | ![NAS page: TrueNAS pools as tanks that fill up, disk temperatures, alerts, apps and running jobs](docs/screenshots/nas.png) |
+| **Plex:** streams and how each is sent, running jobs, server load, libraries | **NAS:** TrueNAS pools, disks, alerts, apps and jobs |
 | ![Settings, General: brightness, host OS, keyboard layout, dial direction and clock format](docs/screenshots/general.png) | ![Settings, Appearance: themes, accent colors, the hue slider and icon options](docs/screenshots/settings.png) |
 | **Settings → General:** brightness, host OS, layout | **Settings → Appearance** |
 | ![Settings, Tabs: the pages in order with up and down arrows](docs/screenshots/tabs.png) | ![A meeting reminder over the Media page: a countdown with Join meeting and Dismiss](docs/screenshots/reminder.png) |
@@ -212,10 +212,11 @@ them to the Car Thing **over the USB cable** (`adb forward`; no network):
   [Connecting Plex](#connecting-plex)).
 - **NAS (TrueNAS):** each pool as a tank that fills up (yellow from 80%, red from 90%)
   with its health and free space, the temperature of every disk (NVMe drives have
-  their own, higher limits), the server's alerts, and how many apps run and how many
-  have updates. Below the pools: the TrueNAS version, uptime, cores, memory and load.
-  It refreshes every 10 seconds while on screen, every minute otherwise (see
-  [Connecting TrueNAS](#connecting-truenas)).
+  their own, higher limits), the server's alerts, how many apps run and how many
+  have updates, and the jobs that run now (a scrub, a snapshot, replication or cloud
+  sync task, an app update), with the first one's progress. Below the pools: the
+  TrueNAS version, uptime, cores, memory and load. It refreshes every 10 seconds
+  while on screen, every minute otherwise (see [Connecting TrueNAS](#connecting-truenas)).
 - **Volume and audio devices:** when the volume or mute changes (the dial, the Mute
   tile, your keyboard), a volume bar shows at the top for a moment. The Media page
   header shows the current output; tap it to pick the output and input devices.
@@ -362,7 +363,7 @@ API key. It needs TrueNAS 25.04 or later (the WebSocket API).
 The NAS page shows up within a minute; no restart needed. The agent always connects
 over HTTPS: TrueNAS revokes a key that is ever sent over plain HTTP. It accepts the
 server's self-signed certificate for that address only. The agent only reads (system
-info, pools, disk temperatures, alerts, apps). The key carries the rights of the user
+info, pools, disk temperatures, alerts, apps, running jobs). The key carries the rights of the user
 who made it, so for read-only access, make it as a user in the read-only
 administrators group. Keep `truenas.txt` to yourself.
 
