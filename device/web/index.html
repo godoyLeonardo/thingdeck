@@ -390,7 +390,7 @@
   .plex .m-detail { font-size: calc(13.5px * var(--ts)); }
   .plex .m-value { font-size: calc(34px * var(--ts)); }
   /* the NAS page: a narrow card of pools as vertical tanks, then disks, alerts and apps */
-  .nas-pools { flex: none; min-width: 200px; max-width: 52%; padding: 10px 14px 0; }
+  .nas-pools { flex: none; min-width: 200px; max-width: 52%; padding: 10px 14px 10px; }
   .nas-cols { flex: 1; min-height: 0; display: flex; overflow-x: auto; }
   .nas-cols::-webkit-scrollbar { display: none; }
   .nas-col { flex: 1; min-width: 100px; display: flex; flex-direction: column; align-items: center; padding-top: 4px; }
@@ -408,7 +408,7 @@
   .nas-free { max-width: 100%; margin-top: 4px; font: 500 calc(12px * var(--ts)) GeistMono, monospace; color: var(--muted);
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .nas-scan { color: var(--acc); }
-  .nas-sys { flex: none; margin-top: 10px; padding: 8px 0 10px; border-top: 1px solid var(--line); font: 500 calc(12.5px * var(--ts)) GeistMono, monospace;
+  .nas-sys { flex: none; margin-top: 6px; padding: 8px 0 4px; border-top: 1px solid var(--line); font: 500 calc(12.5px * var(--ts)) GeistMono, monospace;
     color: var(--muted); line-height: 1.5; }
   .nas-sys div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .px-num.warn, .m-value.warn { color: var(--warn); }
@@ -2137,10 +2137,11 @@ function updateNas() {
   var line = function (parts) { parts = parts.filter(function (x) { return x; }); return parts.length ? '<div>' + parts.join(' · ') + '</div>' : ''; };
   redraw($('nasp'), '<h3>' + esc(sys.host || 'TrueNAS') + '</h3><div class="nas-cols">' +
     (pools.map(function (p) { return nasPool(p, pools.some(function (q) { return q.scan; })); }).join('') ||
-      '<div class="ag-empty">No pools</div>') + '</div>' +
-    '<div class="nas-sys">' + line([sys.version ? 'TrueNAS ' + esc(String(sys.version).replace(/^TrueNAS-/, '')) : '']) +
-      line([sys.uptime ? 'up ' + fmtUptime(sys.uptime) : '', sys.cores ? sys.cores + ' cores' : '']) +
-      line([sys.memory ? fmtBytes(sys.memory) + ' RAM' : '', sys.load && sys.load.length ? 'load ' + Number(sys.load[0]).toFixed(1) : '']) + '</div>');
+      '<div class="ag-empty">No pools</div>') + '</div>');
+  // The server under the disks: version, uptime, cores, memory and load.
+  var sysInfo = '<div class="nas-sys">' + line([sys.version ? 'TrueNAS ' + esc(String(sys.version).replace(/^TrueNAS-/, '')) : '']) +
+    line([sys.uptime ? 'up ' + fmtUptime(sys.uptime) : '', sys.load && sys.load.length ? 'load ' + Number(sys.load[0]).toFixed(1) : '']) +
+    line([sys.cores ? sys.cores + ' cores' : '', sys.memory ? fmtBytes(sys.memory) + ' RAM' : '']) + '</div>';
   var hot = disks.filter(function (d) { return d.temp != null; });
   var temps = hot.map(function (d) {
     var nvme = /^nvme/.test(d.name), cls = d.temp >= (nvme ? 70 : 55) ? ' bad' : d.temp >= (nvme ? 60 : 45) ? ' warn' : '';  // SSDs run warmer
@@ -2161,7 +2162,7 @@ function updateNas() {
     (job ? '<div class="m-detail nas-job">' + esc(nasJobName(job)) + (pct != null ? ' · ' + Math.round(pct) + '%' : '') + '</div>' +
       '<div class="np-bar"><i style="width:' + (pct || 0) + '%"></i></div>' : '<div class="m-detail">None now</div>') + '</div>';
   redraw($('nasside'), '<div class="mcard px-libs"><div class="m-label">Disks</div><div class="ag-list">' +
-    (temps || '<div class="ag-empty">No temperatures</div>') + '</div></div>' + alertCard + appCard + jobCard);
+    (temps || '<div class="ag-empty">No temperatures</div>') + '</div>' + sysInfo + '</div>' + alertCard + appCard + jobCard);
 }
 
 // ---- feedback
