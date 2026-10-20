@@ -3,7 +3,8 @@ thingdeck agent for Windows.
 
 Sends the Car Thing the computer's time (for its clock) and lock state, system stats
 (CPU, memory, GPU, network), the focused app, the volume and audio devices, the
-calendars listed in calendars.txt next to the log, the Plex server in plex.txt next to
+calendars listed in calendars.txt next to the log, the Plex server in plex.txt and the TrueNAS
+server in truenas.txt next to
 the log, and what is playing in the system
 media session (the same one Windows shows in its media flyout: Spotify, browsers,
 Media Player, ...), over USB through `adb forward`. It also opens meeting links,
@@ -429,6 +430,7 @@ function Show-Panel([string]$widget) {
         'lights' { $script:hueFetched = [DateTime]::MinValue }
         'github' { $script:gitHubFetched = [DateTime]::MinValue }
         'plex' { $script:plexNext = [DateTime]::MinValue }
+        'truenas' { $script:nasNext = [DateTime]::MinValue }
         'monitor' { $script:gpuAt = [DateTime]::MinValue }
     }
 }
@@ -1010,7 +1012,7 @@ public static class ThingdeckNas {
     // calls: JSON-RPC method names; args: each call's params as a JSON array.
     public static string Call(string host, string key, string[] calls, string[] args) {
         using (var ws = new ClientWebSocket()) {
-            var cancel = new CancellationTokenSource(15000).Token;
+            var cancel = new CancellationTokenSource(5000).Token;      // the main loop waits on this: keep it short
             ws.ConnectAsync(new Uri("wss://" + host + "/api/current"), cancel).Wait();
             var results = new StringBuilder("[");
             for (int i = -1; i < calls.Length; i++) {
@@ -1271,7 +1273,7 @@ while ($true) {
     # The volume four times a second between rounds, so the Car Thing's volume bar follows the dial.
     for ($tick = 0; $tick -lt 4; $tick++) {
         if ($tunnelUp) {
-            try { Update-Audio; Update-Hue; Update-Plex } catch { Write-Log "update failed: $($_.Exception.Message)"; $tunnelUp = $false }
+            try { Update-Audio; Update-Hue; Update-Plex; Update-TrueNas } catch { Write-Log "update failed: $($_.Exception.Message)"; $tunnelUp = $false }
         }
         Start-Sleep -Milliseconds 250
     }
