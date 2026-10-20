@@ -216,12 +216,13 @@ them to the Car Thing **over the USB cable** (`adb forward`; no network):
   size of each library. The graphs need Plex Pass. The page refreshes every 3 seconds
   while it's on screen, every 30 seconds otherwise (see [Connecting
   Plex](#connecting-plex)).
-- **NAS (TrueNAS):** each pool as a tank that fills up (yellow from 80%, red from 90%)
-  with its health, free space and size, the temperature of every disk (NVMe drives have
-  their own, higher limits), the server's alerts, how many apps run and how many have
-  updates, and the jobs that run now (a scrub, a snapshot, replication or cloud sync
-  task, an app update), with the first one's progress. When no job runs, it shows the
-  next scheduled task and when it runs (a scrub waits for its threshold). Below the
+- **NAS (TrueNAS):** a dot on the NAS tab, in the accent color while the server answers
+  and red when it fails; each pool as a tank that fills up (yellow from 80%, red from
+  90%) with its health, free space and size, the temperature of every disk (NVMe drives
+  have their own, higher limits), the server's alerts, how many apps run and how many
+  have updates, and the jobs that run now (a scrub, a snapshot, replication or cloud
+  sync task, an app update), with the first one's progress. When no job runs, it shows
+  the next scheduled task and when it runs (a scrub waits for its threshold). Below the
   disks: the TrueNAS version, uptime, load, cores and memory. It refreshes every 10
   seconds while on screen, every minute otherwise (see [Connecting
   TrueNAS](#connecting-truenas)).
