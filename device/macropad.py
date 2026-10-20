@@ -406,8 +406,12 @@ class HostLink:
             self.utc_offset = offset * 60
             changed = True
         agent = body.get('agent')
-        if isinstance(agent, dict) and agent != self.agent:
-            self.agent = {'os': str(agent.get('os')), 'version': str(agent.get('version'))}
+        # An agent older than the version check sends none: keep a version of None, so the
+        # page says it is out of date instead of waiting for data that agent never sends.
+        agent = ({'os': str(agent.get('os')), 'version': str(agent.get('version'))} if isinstance(agent, dict)
+                 else {'os': None, 'version': None})
+        if agent != self.agent:
+            self.agent = agent
             changed = True
         locked = bool(body.get('locked'))
         if locked != self.locked:
@@ -1230,7 +1234,8 @@ class Pad:
 
     def agent_status(self):
         """The agent's version against the repo's (agents.json, written by deploy.sh):
-        {os, version, expected, outdated}, or None before the agent's first heartbeat."""
+        {os, version, expected, outdated}, or None before the agent's first heartbeat.
+        An agent that sends no version is out of date."""
         agent = self.host.agent
         if not agent:
             return None
@@ -1239,7 +1244,8 @@ class Pad:
                 expected = json.load(f).get(agent['os'])
         except (OSError, ValueError):
             expected = None
-        return dict(agent, expected=expected, outdated=bool(expected) and expected != agent['version'])
+        outdated = agent['version'] is None or bool(expected) and expected != agent['version']
+        return dict(agent, expected=expected, outdated=outdated)
 
     def publish_state(self):
         self.ui.publish('state', self.state())
