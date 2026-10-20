@@ -600,13 +600,16 @@ using System.Net;
 using System.Net.Security;
 using System.Security.Cryptography.X509Certificates;
 public static class ThingdeckHueTls {
-    public static string Bridge = "";
-    // The bridge's certificate comes from Philips' own authority, not a public one:
-    // accept it for the bridge's address only; everything else is checked as usual.
+    public static string Bridge = "", Nas = "";
+    // The bridge's certificate comes from Philips' own authority, not a public one, and a
+    // TrueNAS server's is usually self-signed: accept them for those two addresses only;
+    // everything else is checked as usual.
     static bool Check(object sender, X509Certificate certificate, X509Chain chain, SslPolicyErrors errors) {
         if (errors == SslPolicyErrors.None) return true;
         var request = sender as HttpWebRequest;
-        return request != null && Bridge != "" && request.RequestUri.Host == Bridge;
+        if (request == null) return false;
+        string host = request.RequestUri.Host;
+        return (Bridge != "" && host == Bridge) || (Nas != "" && host == Nas);
     }
     public static void Install() { ServicePointManager.ServerCertificateValidationCallback = Check; }
 }
@@ -991,6 +994,142 @@ function Update-Plex {
     $script:plexNeed = @($reply.need_art | Where-Object { $_ })
 }
 
+# --- TrueNAS. A TrueNAS server on the local network: pools, disk temperatures, alerts and
+# apps, through its JSON-RPC API over a WebSocket (wss://server/api/current). truenas.txt
+# next to the log holds the server's address on the first line and an API key on the second.
+# Always over https: TrueNAS revokes a key that is ever sent over plain http.
+$TrueNasFile = Join-Path (Split-Path $LogFile) 'truenas.txt'
+Add-Type @'
+using System;
+using System.Net.WebSockets;
+using System.Text;
+using System.Text.RegularExpressions;
+using System.Threading;
+public static class ThingdeckNas {
+    // Log in with the key, run the calls in order and return their results as one JSON array.
+    // calls: JSON-RPC method names; args: each call's params as a JSON array.
+    public static string Call(string host, string key, string[] calls, string[] args) {
+        using (var ws = new ClientWebSocket()) {
+            var cancel = new CancellationTokenSource(15000).Token;
+            ws.ConnectAsync(new Uri("wss://" + host + "/api/current"), cancel).Wait();
+            var results = new StringBuilder("[");
+            for (int i = -1; i < calls.Length; i++) {
+                string method = i < 0 ? "auth.login_with_api_key" : calls[i];
+                string param = i < 0 ? "[" + Quote(key) + "]" : args[i];
+                string request = "{\"jsonrpc\":\"2.0\",\"id\":" + (i + 2) + ",\"method\":\"" + method + "\",\"params\":" + param + "}";
+                ws.SendAsync(new ArraySegment<byte>(Encoding.UTF8.GetBytes(request)), WebSocketMessageType.Text, true, cancel).Wait();
+                string reply;       // skip notifications and other replies: wait for this call's id
+                var mine = new Regex("\"id\"\\s*:\\s*" + (i + 2) + "\\s*[,}]");
+                do { reply = Receive(ws, cancel); } while (!mine.IsMatch(reply));
+                if (i < 0) {
+                    if (!Regex.IsMatch(reply, "\"result\"\\s*:\\s*true"))
+                        throw new Exception("TrueNAS refused the API key: check the second line of truenas.txt");
+                    continue;
+                }
+                if (i > 0) results.Append(',');
+                results.Append(reply);
+            }
+            try { ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "", cancel).Wait(2000); } catch { }
+            return results.Append(']').ToString();
+        }
+    }
+    static string Receive(ClientWebSocket ws, CancellationToken cancel) {
+        var buffer = new byte[65536];
+        var message = new System.IO.MemoryStream();
+        WebSocketReceiveResult got;
+        do {
+            got = ws.ReceiveAsync(new ArraySegment<byte>(buffer), cancel).Result;
+            if (got.MessageType == WebSocketMessageType.Close) throw new Exception("TrueNAS closed the connection");
+            message.Write(buffer, 0, got.Count);
+        } while (!got.EndOfMessage);
+        return Encoding.UTF8.GetString(message.ToArray());
+    }
+    static string Quote(string s) {
+        return "\"" + s.Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"";
+    }
+}
+'@
+$nas = @{ host = $null; key = $null }
+$nasNext = [DateTime]::MinValue
+$nasSent = $null; $nasSentAt = [DateTime]::MinValue; $nasError = $null
+
+function Read-TrueNasConfig {
+    $lines = @()
+    if (Test-Path $TrueNasFile) { $lines = @(Get-Content $TrueNasFile | ForEach-Object { $_.Trim() } | Where-Object { $_ -and -not $_.StartsWith('#') }) }
+    $address = $(if ($lines.Count) { $lines[0] -replace '^[a-z]+://', '' -replace '/.*$', '' } else { $null })
+    [ThingdeckHueTls]::Nas = $(if ($address) { ($address -split ':')[0] } else { '' })
+    $script:nas = @{ host = $address; key = $(if ($lines.Count -gt 1) { $lines[1] } else { $null }) }
+}
+
+function Read-TrueNas {
+    Read-TrueNasConfig
+    if (-not $script:nas.host) { return @{ state = 'none' } }
+    if (-not $script:nas.key) { throw 'No API key: put one on the second line of truenas.txt' }
+    $calls = 'system.info', 'pool.query', 'disk.temperatures', 'alert.list', 'app.query'
+    $params = '[]',
+        '[[], {"select": ["name", "status", "healthy", "size", "allocated", "free", "scan"]}]',
+        '[[]]',
+        '[]',
+        '[[], {"select": ["name", "state", "upgrade_available"]}]'
+    $replies = [ThingdeckNas]::Call($script:nas.host, $script:nas.key, $calls, $params) | ConvertFrom-Json
+    $result = @{}
+    for ($i = 0; $i -lt $calls.Count; $i++) {
+        $reply = $replies[$i]
+        if ($reply.error) {
+            $reason = $(if ($reply.error.data.reason) { $reply.error.data.reason } else { $reply.error.message })
+            if ($calls[$i] -eq 'system.info') { throw "TrueNAS: $reason" }
+            Write-Log "truenas $($calls[$i]): $reason"; $result[$calls[$i]] = $null
+        } else { $result[$calls[$i]] = $reply.result }
+    }
+    $info = $result['system.info']
+    $disks = @()
+    if ($result['disk.temperatures']) {
+        foreach ($p in $result['disk.temperatures'].PSObject.Properties) {
+            $t = $(if ($p.Value -is [ValueType]) { $p.Value } elseif ($p.Value) { $p.Value.temp } else { $null })
+            $disks += [ordered]@{ name = $p.Name; temp = $t }
+        }
+    }
+    @{
+        state = 'ok'
+        system = [ordered]@{ host = $info.hostname; version = $info.version; uptime = [long]$info.uptime_seconds
+            memory = $info.physmem; cores = $info.cores; load = @($info.loadavg) }
+        pools = @(foreach ($p in $result['pool.query']) {
+            [ordered]@{ name = $p.name; status = $p.status; healthy = [bool]$p.healthy
+                size = $p.size; used = $p.allocated; free = $p.free
+                scan = $(if ($p.scan -and $p.scan.state -eq 'SCANNING') { [ordered]@{ kind = $p.scan.function; percent = $p.scan.percentage } } else { $null }) }
+        })
+        disks = @($disks | Sort-Object { $_.name })
+        alerts = @(foreach ($a in $result['alert.list']) {
+            if (-not $a.dismissed -and $a.level -ne 'INFO') { [ordered]@{ level = $a.level; text = ($a.formatted -replace '<[^>]+>', '').Trim() } }
+        })
+        apps = @(foreach ($a in $result['app.query']) { [ordered]@{ name = $a.name; state = $a.state; update = [bool]$a.upgrade_available } })
+    }
+}
+
+# Every 10 s while the NAS page is on screen, else every 60 s; 60 s after an error.
+# Sends only changes, and at least every 30 s.
+function Update-TrueNas {
+    if ((Get-Date) -lt $script:nasNext) { return }
+    $script:nasNext = (Get-Date).AddSeconds($(if (Test-Visible 'truenas') { 10 } else { 60 }))
+    try { $state = Read-TrueNas }
+    catch {
+        $script:nasNext = (Get-Date).AddSeconds(60)
+        $e = $_.Exception; while ($e.InnerException) { $e = $e.InnerException }
+        $message = $e.Message
+        if ($message -notmatch 'truenas.txt|^TrueNAS') { $message = "$($script:nas.host): $message" }
+        $state = @{ state = 'error'; error = $message }
+    }
+    if ($state.error -ne $script:nasError) {
+        $script:nasError = $state.error
+        if ($state.error) { Write-Log "truenas: $($state.error)" }
+    }
+    $key = $state | ConvertTo-Json -Compress -Depth 5
+    if ($key -eq $script:nasSent -and ((Get-Date) - $script:nasSentAt).TotalSeconds -lt 30) { return }
+    Send-Json 'truenas' $state 5 | Out-Null
+    $script:nasSent = $key
+    $script:nasSentAt = Get-Date
+}
+
 # Links the Car Thing asks to open: https links of known meeting services, and GitHub.
 $OpenableUrl ='^https://(meet\.google\.com|([a-z0-9-]+\.)?zoom\.us|teams\.microsoft\.com|teams\.live\.com|github\.com)/'
 
@@ -1003,6 +1142,7 @@ if ($Once) {
     Read-Audio | ConvertTo-Json
     $audioLists | ConvertTo-Json -Depth 4
     try { Read-Plex | ConvertTo-Json -Depth 6 } catch { "plex: $($_.Exception.Message)" }
+    try { Read-TrueNas | ConvertTo-Json -Depth 5 } catch { $e = $_.Exception; while ($e.InnerException) { $e = $e.InnerException }; "truenas: $($e.Message)" }
     exit
 }
 
