@@ -42,6 +42,8 @@ push_files() {
     done
     push_agent_versions
     "$ADB" shell "rm -rf $DEST/__pycache__"
+    # On storage before the restart: a power loss right after a push left every file empty.
+    "$ADB" shell sync
     echo "files checked and pushed"
 }
 
@@ -96,6 +98,7 @@ case "${1:-}" in
     config)
         check_files
         "$ADB" push -q "$SRC/config.json" "$DEST/config.json"
+        "$ADB" shell sync
         echo "config pushed; the pad reloads it within 2 s"
         ;;
     install)
