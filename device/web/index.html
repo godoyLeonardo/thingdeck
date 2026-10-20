@@ -674,9 +674,10 @@
   #tabmore.hidden { display: none; }
   #tabmore.down { background: var(--tile-hi); }
   .tab.on { background: var(--acc-soft); color: var(--acc); }
-  /* A dot after a live page's name: Plex while someone streams (see updateTabDots) */
+  /* A dot after a live page's name: Plex while someone streams, NAS alive or failing (see updateTabDots) */
   .tab-dot { display: none; width: 8px; height: 8px; margin-left: 6px; border-radius: 50%; vertical-align: 2px; }
   .tab-dot.alive { display: inline-block; background: var(--acc); }
+  .tab-dot.dead { display: inline-block; background: var(--bad); }
   #status { flex: none; display: flex; align-items: center; font: 500 calc(12px * var(--ts)) GeistMono, monospace; color: var(--muted); margin-left: 8px; }
   #status i { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); margin-right: 7px; }
   #status.connected i { background: var(--media); box-shadow: 0 0 8px var(--media); }
@@ -893,7 +894,8 @@ function variant(a) {
 function pageKey(p) { return p.name; }
 // The dot after a page's name in the bottom bar, by its widget: '' (none) or a class of .tab-dot.
 var TAB_DOTS = {
-  plex: function () { return plex.state === 'ok' && (plex.sessions || []).length ? 'alive' : ''; }      // someone streams
+  plex: function () { return plex.state === 'ok' && (plex.sessions || []).length ? 'alive' : ''; },     // someone streams
+  truenas: function () { return { ok: 'alive', error: 'dead' }[truenas.state] || ''; }                  // answers or fails
 };
 function updateTabDots() {
   [].forEach.call(document.querySelectorAll('[data-dot]'), function (dot) {
@@ -2543,6 +2545,7 @@ function connect() {
     } else if (m.type === 'truenas') {
       truenas = d;
       updateNas();
+      updateTabDots();
     } else if (m.type === 'audio') {
       setAudio(d);
     } else if (m.type === 'agenda') {

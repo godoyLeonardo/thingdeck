@@ -177,7 +177,7 @@ The arrow button at its end then points to the other tabs (› scrolls on, ‹ g
 to the start), and a drag that starts on the bar never switches pages. Details and
 the audio picker open as a card over the page; tapping outside it closes it.
 A live page's tab can show a dot after its name (`TAB_DOTS`, by widget): Plex while
-someone streams.
+someone streams, and NAS in the accent color while TrueNAS answers or red when it fails.
 
 In a page's clock header, every page but the media card shows the song playing on
 the right (title, then artist, cut off from the end when space runs out); tapping
