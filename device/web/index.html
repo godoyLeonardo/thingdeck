@@ -674,6 +674,9 @@
   #tabmore.hidden { display: none; }
   #tabmore.down { background: var(--tile-hi); }
   .tab.on { background: var(--acc-soft); color: var(--acc); }
+  /* A dot after a live page's name: Plex while someone streams (see updateTabDots) */
+  .tab-dot { display: none; width: 8px; height: 8px; margin-left: 6px; border-radius: 50%; vertical-align: 2px; }
+  .tab-dot.alive { display: inline-block; background: var(--acc); }
   #status { flex: none; display: flex; align-items: center; font: 500 calc(12px * var(--ts)) GeistMono, monospace; color: var(--muted); margin-left: 8px; }
   #status i { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); margin-right: 7px; }
   #status.connected i { background: var(--media); box-shadow: 0 0 8px var(--media); }
@@ -888,6 +891,15 @@ function variant(a) {
 
 // The page entries in the order picked in Settings → Tabs (same rules as Pad.ordered_pages).
 function pageKey(p) { return p.name; }
+// The dot after a page's name in the bottom bar, by its widget: '' (none) or a class of .tab-dot.
+var TAB_DOTS = {
+  plex: function () { return plex.state === 'ok' && (plex.sessions || []).length ? 'alive' : ''; }      // someone streams
+};
+function updateTabDots() {
+  [].forEach.call(document.querySelectorAll('[data-dot]'), function (dot) {
+    dot.className = 'tab-dot ' + TAB_DOTS[dot.getAttribute('data-dot')]();
+  });
+}
 function orderedEntries(withHidden) {
   var s = st.settings || {}, order = s.page_order || [], hidden = st.hidden || s.page_hidden || [], rank = {};
   order.forEach(function (k, i) { rank[k] = i; });
@@ -988,8 +1000,11 @@ function render() {
   $('dialname').textContent = modes[st.dial] ? modes[st.dial].name : '–';
 
   $('tabs').innerHTML = pages.map(function (pg, i) {
-    return '<div class="tab' + (i === st.page && !showSettings ? ' on' : '') + '" data-i="' + i + '">' + esc(pg.name || 'Page ' + (i + 1)) + '</div>';
+    var dot = (pg.widgets || []).filter(function (w) { return TAB_DOTS[w]; })[0];
+    return '<div class="tab' + (i === st.page && !showSettings ? ' on' : '') + '" data-i="' + i + '">' + esc(pg.name || 'Page ' + (i + 1)) +
+      (dot ? '<i class="tab-dot" data-dot="' + dot + '"></i>' : '') + '</div>';
   }).join('') + '<div class="tab' + (showSettings ? ' on' : '') + '" data-settings="1" title="Settings">⚙</div>';
+  updateTabDots();
   var on = $('tabs').querySelector('.on');
   if (on) on.scrollIntoView({ inline: 'nearest', block: 'nearest' });
   // Up to 7 pages share the bar evenly next to a narrow ⚙ (no scrolling; 6 and 7 with smaller text);
@@ -2524,6 +2539,7 @@ function connect() {
     } else if (m.type === 'plex') {
       plex = d;
       updatePlex();
+      updateTabDots();
     } else if (m.type === 'truenas') {
       truenas = d;
       updateNas();
