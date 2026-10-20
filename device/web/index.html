@@ -114,6 +114,12 @@
     --media: #98c379; --key: #61afef; --type: #e5c07b; --nav: #c678dd; --mouse: #56b6c2; --bad: #e06c75; --warn: #d19a66;
     --on-acc: #282c34;
   }
+  :root[data-theme="monokai"] {
+    --bg: #272822; --panel: #3e3d32; --tile: #3e3d32; --tile-hi: #49483e; --line: #575849; --edge: #3e3d32;
+    --text: #f8f8f2; --muted: #a8a48f; --faint: #75715e; --toast: #49483e; --veil: rgba(39,40,34,.92); --standby: #1e1f1c;
+    --media: #a6e22e; --key: #66d9ef; --type: #e6db74; --nav: #ae81ff; --mouse: #a1efe4; --bad: #f92672; --warn: #fd971f;
+    --on-acc: #272822;
+  }
   * { box-sizing: border-box; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); overflow: hidden;
     font-family: Geist, 'Circular Sp UI v3 T', 'Noto Sans', sans-serif; touch-action: none; cursor: none; }
@@ -1049,7 +1055,8 @@ var THEMES = {
   gruvbox:    { name: 'Gruvbox',     bg: '#282828', tile: '#3c3836', text: '#ebdbb2', acc: '#fabd2f' },
   tokyonight: { name: 'Tokyo Night', bg: '#1a1b26', tile: '#24283b', text: '#c0caf5', acc: '#7aa2f7' },
   solarized:  { name: 'Solarized',   bg: '#002b36', tile: '#073642', text: '#eee8d5', acc: '#2aa198' },
-  onedark:    { name: 'One Dark',    bg: '#282c34', tile: '#2c313a', text: '#abb2bf', acc: '#61afef' }
+  onedark:    { name: 'One Dark',    bg: '#282c34', tile: '#2c313a', text: '#abb2bf', acc: '#61afef' },
+  monokai:    { name: 'Monokai',     bg: '#272822', tile: '#3e3d32', text: '#f8f8f2', acc: '#a6e22e' }
 };
 var ACCENTS = {   // [on dark themes, on light themes]
   green: ['#1ed760', '#12a150'], blue: ['#5b9cff', '#2f6fe0'], purple: ['#a78bfa', '#7c5cdb'],
