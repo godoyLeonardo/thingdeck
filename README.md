@@ -207,14 +207,15 @@ them to the Car Thing **over the USB cable** (`adb forward`; no network):
   draft flag. Both lists scroll. Tap a row to open it in the browser on the computer.
   It refreshes every minute, or every 15 seconds while a workflow runs; pull down on either
   list to fetch it right away (see [Adding GitHub](#adding-github)).
-- **Plex:** the streams on your Plex Media Server. Each stream shows its poster, the
-  user and player, the progress and the quality. A tag shows how the server sends it:
-  direct play, direct stream, or transcode (HW for a hardware transcode). Under the
-  streams are the jobs that run now, with their progress: library scans and the
-  scheduled tasks (Settings → Scheduled Tasks in Plex). Next to the streams are graphs
-  of the server's CPU and bandwidth, and the size of each library. The graphs need Plex
-  Pass. The page refreshes every 3 seconds while it's on screen, every 30 seconds
-  otherwise (see [Connecting Plex](#connecting-plex)).
+- **Plex:** the streams on your Plex Media Server, and a dot on the Plex tab while
+  someone streams. Each stream shows its poster, the user and player, the progress and
+  the quality. A tag shows how the server sends it: direct play, direct stream, or
+  transcode (HW for a hardware transcode). Under the streams are the jobs that run now,
+  with their progress: library scans and the scheduled tasks (Settings → Scheduled Tasks
+  in Plex). Next to the streams are graphs of the server's CPU and bandwidth, and the
+  size of each library. The graphs need Plex Pass. The page refreshes every 3 seconds
+  while it's on screen, every 30 seconds otherwise (see [Connecting
+  Plex](#connecting-plex)).
 - **NAS (TrueNAS):** each pool as a tank that fills up (yellow from 80%, red from 90%)
   with its health, free space and size, the temperature of every disk (NVMe drives have
   their own, higher limits), the server's alerts, how many apps run and how many have
