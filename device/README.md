@@ -317,7 +317,8 @@ because Plex items can have keys that differ only in case (`guid` and `Guid`).
 `ConvertFrom-Json` in Windows PowerShell refuses those keys.
 
 Every 3 s while the Plex page is on screen (every 30 s otherwise, see [What updates
-when](#what-updates-when)) the agent reads `/`, `/status/sessions`, `/activities`,
+when](#what-updates-when)) the agent reads `/`, `/status/sessions`, `/activities` (library scans and
+scheduled tasks while they run, shown as Jobs under the streams),
 and the server's own history of load and bandwidth (`/statistics/resources` and
 `/statistics/bandwidth`, Plex Pass only). Then it posts the result to `POST /api/plex`. Every 5 minutes it
 counts the items of each library and reads `/updater/status`. A count is one request

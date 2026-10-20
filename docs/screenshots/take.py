@@ -225,16 +225,13 @@ def plex(with_posters):
             {'id': 's2', 'kind': 'episode', 'title': 'The Summit', 'sub': 'Ridgeline · S2 · E5', 'user': 'sam', 'player': 'Phone',
              'state': 'playing', 'position_ms': 1300000, 'duration_ms': 2700000, 'decision': 'transcode', 'hw': True,
              'quality': '1080p', 'kbps': 4200, 'local': False, 'art': 'summit'},
-            {'id': 's3', 'kind': 'track', 'title': 'Neon Skyline', 'sub': 'The Midnight Sample — Demo Tapes', 'user': 'jo',
-             'player': 'Desk speaker', 'state': 'paused', 'position_ms': 96000, 'duration_ms': 241000,
-             'decision': 'direct stream', 'hw': False, 'quality': 'FLAC', 'kbps': 950, 'local': True, 'art': 'neon'},
         ],
         'load': {'cpu': wave(24, 6, 60, 4), 'mem': wave(45, 2, 60, 9), 'plex_cpu': 14.2, 'plex_mem': 6.1},
         'net': {'lan': [int(x * 100000) for x in wave(36, 9, 60, 3)], 'wan': [int(x * 10000) for x in wave(34, 6, 60, 5)]},
         'libraries': [{'title': 'Movies', 'kind': 'movie', 'count': 412},
                       {'title': 'TV Shows', 'kind': 'show', 'count': 38, 'episodes': 1694},
                       {'title': 'Music', 'kind': 'artist', 'count': 120, 'albums': 236, 'tracks': 2810}],
-        'activities': [{'title': 'Scanning Movies', 'sub': '42 of 120 files', 'progress': 35}],
+        'activities': [{'title': 'Detecting intros', 'sub': 'Ridgeline · 14 of 40 episodes', 'progress': 35}],
         'server': {'name': 'home-server', 'version': '1.41.3.9314', 'update': None, 'transcodes': 1},
     }
     if with_posters:

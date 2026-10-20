@@ -61,8 +61,8 @@ The Car Thing's screen is 800×480. These use made-up demo data; to retake them,
 | **Volume bar:** shows when the volume changes | **Lock screen:** while the computer is locked |
 | ![Lights page: Philips Hue rooms and zones tinted with their light color, with switches and brightness bars](docs/screenshots/lights.png) | ![A room card: brightness, warm-to-cool white, scenes and its lights](docs/screenshots/room.png) |
 | **Lights:** Philips Hue rooms and zones, with the song playing in the top bar | **A room:** brightness, white, scenes, each light |
-| ![Plex page: three streams with posters and transcode tags, the server's CPU and bandwidth graphs, and the libraries](docs/screenshots/plex.png) | ![NAS page: TrueNAS pools as tanks that fill up, disk temperatures, alerts and apps](docs/screenshots/nas.png) |
-| **Plex:** streams and how each is sent, server load, libraries | **NAS:** TrueNAS pools, disks, alerts and apps |
+| ![Plex page: two streams with posters and transcode tags, a running job, the server's CPU and bandwidth graphs, and the libraries](docs/screenshots/plex.png) | ![NAS page: TrueNAS pools as tanks that fill up, disk temperatures, alerts and apps](docs/screenshots/nas.png) |
+| **Plex:** streams and how each is sent, running jobs, server load, libraries | **NAS:** TrueNAS pools, disks, alerts and apps |
 | ![Settings, General: brightness, host OS, keyboard layout, dial direction and clock format](docs/screenshots/general.png) | ![Settings, Appearance: themes, accent colors, the hue slider and icon options](docs/screenshots/settings.png) |
 | **Settings → General:** brightness, host OS, layout | **Settings → Appearance** |
 | ![Settings, Tabs: the pages in order with up and down arrows](docs/screenshots/tabs.png) | ![A meeting reminder over the Media page: a countdown with Join meeting and Dismiss](docs/screenshots/reminder.png) |
@@ -204,9 +204,10 @@ them to the Car Thing **over the USB cable** (`adb forward`; no network):
   list to fetch it right away (see [Adding GitHub](#adding-github)).
 - **Plex:** the streams on your Plex Media Server. Each stream shows its poster, the
   user and player, the progress and the quality. A tag shows how the server sends it:
-  direct play, direct stream, or transcode (HW for a hardware transcode). Next to the
-  streams are graphs of the server's CPU and bandwidth, and the size of each library,
-  with any library scan in progress. The graphs need Plex Pass. The page refreshes
+  direct play, direct stream, or transcode (HW for a hardware transcode). Under the
+  streams are the jobs that run now, with their progress: library scans and the
+  scheduled tasks (Settings → Scheduled Tasks in Plex). Next to the streams are graphs
+  of the server's CPU and bandwidth, and the size of each library. The graphs need Plex Pass. The page refreshes
   every 3 seconds while it's on screen, every 30 seconds otherwise (see
   [Connecting Plex](#connecting-plex)).
 - **NAS (TrueNAS):** each pool as a tank that fills up (yellow from 80%, red from 90%)

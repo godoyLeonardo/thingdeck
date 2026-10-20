@@ -417,6 +417,8 @@
   .nas-alert { font-size: calc(13px * var(--ts)); color: var(--muted); line-height: 1.3; margin-bottom: 10px;
     display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
   .nas .mcard .m-detail { margin-bottom: 10px; }
+  .px-jobs .ag-day { margin-top: 12px; }
+  .px-jobs .ag-empty { margin-top: 2px; }
   .monitor { flex: 1; min-width: 0; display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: minmax(0, 1fr); grid-gap: 8px; }
   .monitor.half { grid-template-columns: 1fr 1fr; grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); }
   .mcard { background: var(--tile); border-radius: 16px; padding: 10px 12px 0; display: flex; flex-direction: column;
@@ -2011,7 +2013,7 @@ function plexLibrary(l) {
   return '<div class="px-lib"><div class="ev-main"><div class="ev-title">' + esc(l.title || '') + '</div>' +
     '<div class="ev-sub">' + esc(sub) + '</div></div><div class="px-num">' + fmtCount(l.count) + '</div></div>';
 }
-function plexActivity(a) {       // a library scan or another server task, with its progress
+function plexActivity(a) {       // a library scan or a scheduled task, with its progress
   return '<div class="px-lib"><div class="ev-main"><div class="ev-title">' + esc(a.title || '') + '</div>' +
     '<div class="ev-sub">' + esc(a.sub || '') + '</div>' +
     '<div class="np-bar"><i style="width:' + Math.max(0, Math.min(100, a.progress || 0)) + '%"></i></div></div></div>';
@@ -2031,20 +2033,24 @@ function updatePlex() {
   }
   if (!$('pxs')) {
     box.className = 'plex';
-    box.innerHTML = '<div class="card px-streams" id="pxs"></div><div class="monitor half px-side" id="pxside"></div>';
+    box.innerHTML = '<div class="card px-streams" id="pxs"><h3 id="pxh"></h3><div class="ag-list"><div id="pxsl"></div>' +
+      '<div class="px-jobs" id="pxj"></div></div></div><div class="monitor half px-side" id="pxside"></div>';
     box._html = null;
   }
   var server = p.server || {}, sessions = p.sessions || [], load = p.load, net = p.net;
   var version = (server.version || '').split('.').slice(0, 3).join('.');
   var last = function (a) { return a && a.length ? a[a.length - 1] : null; };
   var plain = function (html) { return html.replace(/<\/?small>/g, ' ').trim(); };
-  redraw($('pxs'), '<h3>' + esc(server.name || 'Plex') + ' · ' +
+  redraw($('pxh'), esc(server.name || 'Plex') + ' · ' +
     (sessions.length ? sessions.length + (sessions.length === 1 ? ' stream' : ' streams') : 'idle') +
     (server.transcodes ? ' · ' + server.transcodes + ' transcoding' : '') +
-    '<span>' + esc(server.update ? 'Update ' + server.update : version) + '</span></h3><div class="ag-list">' +
-    (sessions.length ? sessions.map(plexRow).join('')
-      : '<div class="ag-empty"><b>Nothing streaming</b>' + (server.update ? esc('Plex ' + server.update + ' is out') : '') + '</div>') +
-    '</div>');
+    '<span>' + esc(server.update ? 'Update ' + server.update : version) + '</span>');
+  redraw($('pxsl'), sessions.length ? sessions.map(plexRow).join('')
+    : '<div class="ag-empty"><b>Nothing streaming</b>' + (server.update ? esc('Plex ' + server.update + ' is out') : '') + '</div>');
+  // Library scans and the scheduled tasks (Settings → Scheduled Tasks in Plex) while they run.
+  var jobs = p.activities || [];
+  redraw($('pxj'), '<div class="ag-day">Jobs' + (jobs.length ? ' · ' + jobs.length + ' running' : '') + '</div>' +
+    (jobs.length ? jobs.map(plexActivity).join('') : '<div class="ag-empty">None running</div>'));
   var bars = $('pxs').querySelectorAll('.px-row .np-bar i');
   sessions.forEach(function (s, i) {
     if (bars[i]) bars[i].style.width = (s.duration_ms ? Math.min(100, (s.position_ms || 0) / s.duration_ms * 100) : 0) + '%';
@@ -2062,7 +2068,7 @@ function updatePlex() {
     bw = mcard('Bandwidth', fmtRate(last(total)), 'WAN ' + plain(fmtRate(last(net.wan))),
       spark(total, max, 'v', true, total.length) + spark(net.wan, max, 'tx', false, total.length));
   }
-  var libs = (p.activities || []).map(plexActivity).join('') + (p.libraries || []).map(plexLibrary).join('');
+  var libs = (p.libraries || []).map(plexLibrary).join('');
   redraw($('pxside'), cpu + bw + '<div class="mcard px-libs"><div class="m-label">Libraries</div><div class="ag-list">' +
     (libs || '<div class="ag-empty">Counting…</div>') + '</div></div>');
 }
