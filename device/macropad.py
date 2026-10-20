@@ -1091,6 +1091,7 @@ class Pad:
         self._auto_level = None        # auto brightness: the level now, None to jump to the sensor's
         self._dimmed = False
         self._dim_timer = None
+        self.settings_open = False     # the screen shows Settings (the page says so, POST /api/view)
         self.lock = threading.RLock()
         self.hid.on_report_request = self.detect_os
         self.load_saved()
@@ -1512,6 +1513,9 @@ class Pad:
             n = len(self.pages())
             if not n:
                 return
+            if self.settings_open and ref in ('next', 'prev'):
+                ref = 0 if ref == 'next' else -1      # Settings (⚙) is the tab after the last page
+            leaving, self.settings_open = self.settings_open, False
             if ref == 'next':
                 self.page = (self.page + 1) % n
             elif ref == 'prev':
@@ -1520,6 +1524,8 @@ class Pad:
                 idx = self._resolve(self.pages(), ref)
                 if idx is not None:
                     self.page = idx
+        if leaving:
+            self.ui.publish('view', {'settings': False})      # the page closes Settings, also on the same page
         self.publish_state()
 
     def set_dial(self, ref):
@@ -1813,6 +1819,8 @@ class Handler(BaseHTTPRequestHandler):
             pad.press_preset(int(body.get('index', -1)))
         elif path == '/api/page':
             pad.set_page(body.get('page', 'next'))
+        elif path == '/api/view':
+            pad.settings_open = bool(body.get('settings'))
         elif path == '/api/dial':
             pad.set_dial(body.get('dial', 'next'))
         elif path == '/api/settings':
