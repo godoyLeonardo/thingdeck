@@ -148,7 +148,7 @@ wheel with `mods`, sequences or dial presses containing those): on a lock screen
 they would land in the password box. Media keys, volume, plain wheel, clicks and
 mic mute still work. Lock detection: `LogonUI` running (Windows), the
 freedesktop or GNOME screensaver `GetActive` over D-Bus (Linux),
-`CGSSessionScreenIsLocked` (macOS).
+`IOConsoleLocked` in `ioreg` (macOS; older versions listed `CGSSessionScreenIsLocked`).
 
 ### Now playing
 

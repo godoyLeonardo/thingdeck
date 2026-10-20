@@ -415,8 +415,8 @@ switching, per-OS overrides) is in [device/README.md](device/README.md#configjso
   the Lights, Plex and NAS pages cannot reach the bridge or the servers.
 - **The live pages, the clock and the lock screen need the agent** on each
   computer. Without it, there's no clock, the Media page shows its controls and a hint, and
-  Calendar, Status, Code, Plex and NAS say the agent is missing. The macOS and Linux agents are
-  untested on real machines so far.
+  Calendar, Status, Code, Plex and NAS say the agent is missing. The macOS agent is tested on
+  an Apple Silicon Mac (macOS 27); the Linux agent is untested on real machines so far.
 - **No Windows CPU temperature:** Windows only gives it to programs running as
   administrator with a hardware driver, so the Status page leaves it out there.
 
