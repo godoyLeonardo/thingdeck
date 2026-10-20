@@ -126,6 +126,12 @@
     --media: #31748f; --key: #9ccfd8; --type: #f6c177; --nav: #c4a7e7; --mouse: #ebbcba; --bad: #eb6f92; --warn: #f6c177;
     --on-acc: #191724;
   }
+  :root[data-theme="everforest"] {
+    --bg: #2d353b; --panel: #343f44; --tile: #343f44; --tile-hi: #3d484d; --line: #475258; --edge: #343f44;
+    --text: #d3c6aa; --muted: #9da9a0; --faint: #4f585e; --toast: #3d484d; --veil: rgba(45,53,59,.92); --standby: #232a2e;
+    --media: #a7c080; --key: #7fbbb3; --type: #dbbc7f; --nav: #d699b6; --mouse: #83c092; --bad: #e67e80; --warn: #e69875;
+    --on-acc: #2d353b;
+  }
   * { box-sizing: border-box; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); overflow: hidden;
     font-family: Geist, 'Circular Sp UI v3 T', 'Noto Sans', sans-serif; touch-action: none; cursor: none; }
@@ -1063,7 +1069,8 @@ var THEMES = {
   solarized:  { name: 'Solarized',   bg: '#002b36', tile: '#073642', text: '#eee8d5', acc: '#2aa198' },
   onedark:    { name: 'One Dark',    bg: '#282c34', tile: '#2c313a', text: '#abb2bf', acc: '#61afef' },
   monokai:    { name: 'Monokai',     bg: '#272822', tile: '#3e3d32', text: '#f8f8f2', acc: '#a6e22e' },
-  rosepine:   { name: 'Rosé Pine',   bg: '#191724', tile: '#1f1d2e', text: '#e0def4', acc: '#ebbcba' }
+  rosepine:   { name: 'Rosé Pine',   bg: '#191724', tile: '#1f1d2e', text: '#e0def4', acc: '#ebbcba' },
+  everforest: { name: 'Everforest',  bg: '#2d353b', tile: '#343f44', text: '#d3c6aa', acc: '#a7c080' }
 };
 var ACCENTS = {   // [on dark themes, on light themes]
   green: ['#1ed760', '#12a150'], blue: ['#5b9cff', '#2f6fe0'], purple: ['#a78bfa', '#7c5cdb'],
