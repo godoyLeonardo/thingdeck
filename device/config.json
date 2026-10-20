@@ -34,8 +34,8 @@
 
   "presets": [
     { "label": "First", "page": 0 },
-    { "label": "Left", "page": "prev" },
-    { "label": "Right", "page": "next" },
+    { "label": "Left", "page": "prev", "hold": { "label": "Previous track", "media": "prev" } },
+    { "label": "Right", "page": "next", "hold": { "label": "Next track", "media": "next" } },
     { "label": "Last", "page": -1 }
   ],
 
