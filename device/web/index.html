@@ -108,6 +108,12 @@
     --media: #859900; --key: #268bd2; --type: #b58900; --nav: #6c71c4; --mouse: #2aa198; --bad: #dc322f; --warn: #cb4b16;
     --on-acc: #fdf6e3;
   }
+  :root[data-theme="onedark"] {
+    --bg: #282c34; --panel: #21252b; --tile: #2c313a; --tile-hi: #3e4451; --line: #3e4451; --edge: #2c313a;
+    --text: #abb2bf; --muted: #9199a6; --faint: #4b5263; --toast: #3e4451; --veil: rgba(40,44,52,.92); --standby: #1e2127;
+    --media: #98c379; --key: #61afef; --type: #e5c07b; --nav: #c678dd; --mouse: #56b6c2; --bad: #e06c75; --warn: #d19a66;
+    --on-acc: #282c34;
+  }
   * { box-sizing: border-box; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); overflow: hidden;
     font-family: Geist, 'Circular Sp UI v3 T', 'Noto Sans', sans-serif; touch-action: none; cursor: none; }
@@ -1042,7 +1048,8 @@ var THEMES = {
   catppuccin: { name: 'Catppuccin',  bg: '#181825', tile: '#313244', text: '#cdd6f4', acc: '#cba6f7' },
   gruvbox:    { name: 'Gruvbox',     bg: '#282828', tile: '#3c3836', text: '#ebdbb2', acc: '#fabd2f' },
   tokyonight: { name: 'Tokyo Night', bg: '#1a1b26', tile: '#24283b', text: '#c0caf5', acc: '#7aa2f7' },
-  solarized:  { name: 'Solarized',   bg: '#002b36', tile: '#073642', text: '#eee8d5', acc: '#2aa198' }
+  solarized:  { name: 'Solarized',   bg: '#002b36', tile: '#073642', text: '#eee8d5', acc: '#2aa198' },
+  onedark:    { name: 'One Dark',    bg: '#282c34', tile: '#2c313a', text: '#abb2bf', acc: '#61afef' }
 };
 var ACCENTS = {   // [on dark themes, on light themes]
   green: ['#1ed760', '#12a150'], blue: ['#5b9cff', '#2f6fe0'], purple: ['#a78bfa', '#7c5cdb'],

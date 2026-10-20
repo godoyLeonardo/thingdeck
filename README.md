@@ -30,8 +30,8 @@ as soon as you plug it in.
   tab order and hidden tabs, device info, and Reconnect / Restart / Reboot.
   Settings are saved on the Car Thing and survive power cycles.
 - **Themes:** Dark, Black, Light, and the editor color schemes Nord, Dracula,
-  Catppuccin, Gruvbox, Tokyo Night and Solarized, each with its own accent, one of
-  six accent colors, or any hue from a slider. Icons come in three styles (solid,
+  Catppuccin, Gruvbox, Tokyo Night, Solarized and One Dark, each with its own accent,
+  one of six accent colors, or any hue from a slider. Icons come in three styles (solid,
   outline, emoji) and three colors (neutral, accent, or a color per tile category).
 - **Computer agent (optional):** a small background agent on the computer adds what's
   playing with its cover, Philips Hue lights, your calendar with Join buttons,
