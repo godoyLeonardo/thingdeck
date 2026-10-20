@@ -167,19 +167,19 @@ them to the Car Thing **over the USB cable** (`adb forward`; no network):
   plays in, playing/paused and a live progress bar, on a card tinted with the cover's
   colors, with round media controls under the progress bar. When nothing is playing
   it says so; the controls work either way.
-- **Calendar:** the Calendar page shows today, tomorrow and the rest of the next two weeks
-  (− and + at the top left show 1 to 4 weeks) from your calendars (see [Adding your calendar](#adding-your-calendar)): repeating
-  events, moved or cancelled occurrences and time zones included, meetings you
-  declined left out. The next event is highlighted with a countdown. Events with a
-  Google Meet, Zoom or Teams link get a Join button that opens the link on the computer.
-  Tap an event for its details: date, time and length, place, calendar and notes.
-  With two calendars or more, tabs at the top show **All** or one calendar. The Car
-  Thing keeps the tab you pick, and the number of weeks for each tab. If the picked
-  calendar is gone, it shows All. In All, a colored dot shows each event's calendar,
-  in the color of its tab.
-  Five minutes before any timed event in any calendar, a reminder card comes up on any page with a
-  countdown and **Dismiss**, plus **Join meeting** for a meeting with a link or
-  **Details** for anything else; it stays until two minutes after the start.
+- **Calendar:** the Calendar page shows today, tomorrow and the rest of the next two
+  weeks (− and + at the top left show 1 to 4 weeks) from your calendars (see [Adding
+  your calendar](#adding-your-calendar)): repeating events, moved or cancelled
+  occurrences and time zones included, meetings you declined left out. The next event is
+  highlighted with a countdown. Events with a Google Meet, Zoom or Teams link get a Join
+  button that opens the link on the computer. Tap an event for its details: date, time
+  and length, place, calendar and notes. With two calendars or more, tabs at the top
+  show **All** or one calendar. The Car Thing keeps the tab you pick, and the number of
+  weeks for each tab. If the picked calendar is gone, it shows All. In All, a colored
+  dot shows each event's calendar, in the color of its tab. Five minutes before any
+  timed event in any calendar, a reminder card comes up on any page with a countdown and
+  **Dismiss**, plus **Join meeting** for a meeting with a link or **Details** for
+  anything else; it stays until two minutes after the start.
 - **Status:** the Status page shows CPU, memory, GPU and network speed, each with
   a graph of the last two minutes. The GPU needs an NVIDIA card (`nvidia-smi`), or
   an AMD one on Linux; CPU temperature shows on Linux.
@@ -212,17 +212,18 @@ them to the Car Thing **over the USB cable** (`adb forward`; no network):
   direct play, direct stream, or transcode (HW for a hardware transcode). Under the
   streams are the jobs that run now, with their progress: library scans and the
   scheduled tasks (Settings → Scheduled Tasks in Plex). Next to the streams are graphs
-  of the server's CPU and bandwidth, and the size of each library. The graphs need Plex Pass. The page refreshes
-  every 3 seconds while it's on screen, every 30 seconds otherwise (see
-  [Connecting Plex](#connecting-plex)).
+  of the server's CPU and bandwidth, and the size of each library. The graphs need Plex
+  Pass. The page refreshes every 3 seconds while it's on screen, every 30 seconds
+  otherwise (see [Connecting Plex](#connecting-plex)).
 - **NAS (TrueNAS):** each pool as a tank that fills up (yellow from 80%, red from 90%)
   with its health, free space and size, the temperature of every disk (NVMe drives have
-  their own, higher limits), the server's alerts, how many apps run and how many
-  have updates, and the jobs that run now (a scrub, a snapshot, replication or cloud
-  sync task, an app update), with the first one's progress. When no job runs, it shows
-  the next scheduled task and when it runs (a scrub waits for its threshold). Below
-  the disks: the TrueNAS version, uptime, load, cores and memory. It refreshes every 10
-  seconds while on screen, every minute otherwise (see [Connecting TrueNAS](#connecting-truenas)).
+  their own, higher limits), the server's alerts, how many apps run and how many have
+  updates, and the jobs that run now (a scrub, a snapshot, replication or cloud sync
+  task, an app update), with the first one's progress. When no job runs, it shows the
+  next scheduled task and when it runs (a scrub waits for its threshold). Below the
+  disks: the TrueNAS version, uptime, load, cores and memory. It refreshes every 10
+  seconds while on screen, every minute otherwise (see [Connecting
+  TrueNAS](#connecting-truenas)).
 - **Volume and audio devices:** when the volume or mute changes (the dial, the Mute
   tile, your keyboard), a volume bar shows at the top for a moment. The Media page
   header shows the current output; tap it to pick the output and input devices.
@@ -366,12 +367,12 @@ API key. It needs TrueNAS 25.04 or later (the WebSocket API).
    1-AbCdEf…
    ```
 
-The NAS page shows up within a minute; no restart needed. The agent always connects
-over HTTPS: TrueNAS revokes a key that is ever sent over plain HTTP. It accepts the
-server's self-signed certificate for that address only. The agent only reads (system
-info, pools, disk temperatures, alerts, apps, running jobs). The key carries the rights of the user
-who made it, so for read-only access, make it as a user in the read-only
-administrators group. Keep `truenas.txt` to yourself.
+The NAS page shows up within a minute; no restart needed. The agent always connects over
+HTTPS: TrueNAS revokes a key that is ever sent over plain HTTP. It accepts the server's
+self-signed certificate for that address only. The agent only reads (system info, pools,
+disk temperatures, alerts, apps, running jobs). The key carries the rights of the user
+who made it, so for read-only access, make it as a user in the read-only administrators
+group. Keep `truenas.txt` to yourself.
 
 ## When the computer sleeps
 
