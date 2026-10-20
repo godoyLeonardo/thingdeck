@@ -24,8 +24,8 @@ as soon as you plug it in.
   [Host OS](#host-os)).
 - **Keyboard layouts:** typed text is translated for the host layout
   (Latin American and US are included).
-- **Settings** (the ⚙ tab): brightness (light sensor or manual), host OS, layout,
-  dial direction, clock format, themes and icons,
+- **Settings** (the ⚙ tab): brightness (light sensor, darker or brighter in stops, or
+  manual), host OS, layout, dial direction, clock format, themes and icons,
   tab order and hidden tabs, device info, and Reconnect / Restart / Reboot.
   Settings are saved on the Car Thing and survive power cycles.
 - **Themes:** Dark, Black, Light, and the editor color schemes Nord, Dracula,

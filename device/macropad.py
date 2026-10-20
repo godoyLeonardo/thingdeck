@@ -9,7 +9,9 @@ import base64
 import collections
 import datetime
 import fcntl
+import glob
 import json
+import math
 import os
 import queue
 import select
@@ -32,6 +34,8 @@ FFS_DIR = '/dev/usb-ffs/hid'
 WEBAPP_DIR = '/usr/share/qt-superbird-app/webapp'
 BACKLIGHT = '/sys/class/backlight/aml-bl/brightness'
 BRIGHTNESS_MIN = 5          # brightness levels run 5..255 (Settings slider)
+BRIGHTNESS_STOPS = 3        # auto brightness offset: -3..+3 stops in half stops (a stop doubles or halves the light)
+LIGHT_SENSOR = '/sys/bus/iio/devices/iio:device*/in_intensity0_raw'    # the TMD2772 ambient light sensor
 THEMES = ('dark', 'black', 'light', 'nord', 'dracula', 'catppuccin', 'gruvbox', 'tokyonight', 'solarized')
 ACCENTS = ('theme', 'green', 'blue', 'purple', 'orange', 'pink', 'red')   # palettes: web/index.html; or a hue 0-359
 OS_MODES = ('auto', 'windows', 'mac', 'linux')
@@ -960,6 +964,15 @@ def write_backlight(level):
         log('brightness:', e)
 
 
+def sensor_level(raw):
+    """The brightness level the stock sp-als-backlight service sets for a light sensor
+    reading, fitted to its log (within 1 level): 25 in the dark, then up with the log of
+    the reading, 210 at most."""
+    if raw <= 12:
+        return 25.0
+    return min(210.0, 63.3 + 19.3 * math.log(raw - 12.2))
+
+
 # ------------------------------------------------------------------ the pad
 
 class Pad:
@@ -987,11 +1000,12 @@ class Pad:
         # Device settings changed from the Settings tab; kept in state.json.
         # None means "use config.json".
         self.settings = {'os_mode': 'auto', 'layout': None, 'dial_invert': None,
-                         'brightness_auto': True, 'brightness': 180,
+                         'brightness_auto': True, 'brightness': 180, 'brightness_stops': 0,
                          'theme': 'dark', 'accent': 'theme',
                          'clock_24h': True, 'icon_style': None,
                          'icon_color': None, 'page_order': [], 'page_hidden': [], 'page_shown': []}
-        self._als_running = None    # stock light-sensor service state, as last set by us
+        self._stock_stopped = False    # the stock light-sensor service, stopped by us
+        self._auto_level = None        # auto brightness: the level now, None to jump to the sensor's
         self._dimmed = False
         self._dim_timer = None
         self.lock = threading.RLock()
@@ -1047,6 +1061,7 @@ class Pad:
             'page_shown': lambda v: isinstance(v, list) and len(v) <= 64 and all(isinstance(x, str) for x in v),
             'brightness_auto': lambda v: isinstance(v, bool),
             'brightness': lambda v: isinstance(v, int) and BRIGHTNESS_MIN <= v <= 255,
+            'brightness_stops': lambda v: type(v) in (int, float) and abs(v) <= BRIGHTNESS_STOPS and v * 2 == int(v * 2),
         }
         if key not in valid or not valid[key](value):
             raise ValueError('bad setting %s=%r' % (key, value))
@@ -1062,19 +1077,47 @@ class Pad:
         self.publish_state()
 
     def apply_brightness(self):
-        """Apply the brightness setting (not while dimmed for standby)."""
+        """Apply the brightness setting (not while dimmed for standby). In auto, follow_sensor
+        jumps to the new level on its next reading."""
         if self._dimmed:
             return
-        self._light_sensor(self.settings['brightness_auto'])
+        self._stop_stock_sensor()
+        self._auto_level = None
         if not self.settings['brightness_auto']:
             write_backlight(self.settings['brightness'])
 
-    def _light_sensor(self, on):
-        # The stock sp-als-backlight service drives the backlight from the light
-        # sensor; manual levels need it stopped. supervisorctl is slow, so only on a switch.
-        if on != self._als_running:
-            subprocess.call(['supervisorctl', 'start' if on else 'stop', 'backlight'], stdout=subprocess.DEVNULL)
-            self._als_running = on
+    def _stop_stock_sensor(self):
+        # The stock sp-als-backlight service drives the backlight from the light sensor, but
+        # it has no offset, so follow_sensor does its job. supervisorctl is slow: only once.
+        if not self._stock_stopped:
+            subprocess.call(['supervisorctl', 'stop', 'backlight'], stdout=subprocess.DEVNULL)
+            self._stock_stopped = True
+
+    def follow_sensor(self):
+        """Auto brightness: the stock service's level for the light sensor, times 2 for each
+        stop of the offset. Every 0.5 s it moves a fifth of the way there, so it fades the
+        way the stock service did and a passing shadow doesn't flicker it."""
+        paths = glob.glob(LIGHT_SENSOR)
+        if not paths:
+            log('no light sensor: auto brightness stays where it is')
+            return
+        written = None
+        while True:
+            time.sleep(0.5)
+            if self._dimmed or not self.settings['brightness_auto']:
+                written = None
+                continue
+            try:
+                with open(paths[0]) as f:
+                    raw = int(f.read())
+            except (OSError, ValueError):
+                continue
+            target = max(BRIGHTNESS_MIN, min(255.0, sensor_level(raw) * 2 ** self.settings['brightness_stops']))
+            level = target if self._auto_level is None else self._auto_level + (target - self._auto_level) / 5
+            self._auto_level = level
+            if round(level) != written and not self._dimmed and self.settings['brightness_auto']:
+                written = round(level)
+                write_backlight(written)
 
     # -- standby dimming: minimum brightness while the computer sleeps or is gone
     def on_usb_status(self, status):
@@ -1095,7 +1138,7 @@ class Pad:
     def _dim(self):
         if self.standby() and not self._dimmed:
             self._dimmed = True
-            self._light_sensor(False)
+            self._stop_stock_sensor()
             write_backlight(BRIGHTNESS_MIN)
             log('standby: brightness at minimum')
 
@@ -1847,8 +1890,8 @@ def gadget(*args):
 def main():
     pad = Pad()
     serve_ui(pad)
-    if not pad.settings['brightness_auto']:
-        pad.apply_brightness()
+    pad.apply_brightness()
+    threading.Thread(target=pad.follow_sensor, daemon=True).start()
     if pad.config.get('kiosk', True) and '--no-kiosk' not in sys.argv:
         threading.Thread(target=take_over_kiosk, daemon=True).start()
 
