@@ -1213,6 +1213,7 @@ function pollInfo() {
   }).catch(function () {});
 }
 function openSettings(open) {
+  if (open !== showSettings) post('/api/view', { settings: open });     // a page move from Settings goes to the first page
   showSettings = open;
   clearInterval(infoTimer);
   if (open) { pollInfo(); infoTimer = setInterval(pollInfo, 5000); }
@@ -2534,10 +2535,13 @@ function connect() {
       updateAgenda();
     } else if (m.type === 'toast') {
       toast(d.text, d.level);
+    } else if (m.type === 'view') {
+      if (!d.settings && showSettings) openSettings(false);
     }
   };
 }
 load().then(function () { if (st.message) toast(st.message, st.mode === 'error' ? 'fail' : 'warn'); });
+post('/api/view', { settings: false });      // a reload starts outside Settings
 connect();
 </script>
 </body>

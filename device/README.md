@@ -492,11 +492,12 @@ page, or `adb shell`).
 |---|---|---|---|
 | GET | `/api/ping` | | Health check (used by `shim.html`) |
 | GET | `/api/state` | | Config, state, presets, now playing, stats, agenda, audio, github, hue, plex, truenas |
-| GET | `/api/events` | | SSE stream: `state`, `config`, `fired`, `turn`, `hw`, `toast`, `nowplaying`, `stats`, `agenda`, `audio`, `github`, `hue`, `hue_dial`, `plex`, `truenas` |
+| GET | `/api/events` | | SSE stream: `state`, `config`, `fired`, `turn`, `hw`, `toast`, `nowplaying`, `stats`, `agenda`, `audio`, `github`, `hue`, `hue_dial`, `plex`, `truenas`, `view` |
 | GET | `/api/info` | | Uptime, temperature, memory, load, brightness |
 | POST | `/api/tap` | `{"page", "index"}` | Run a tile |
 | POST | `/api/preset` | `{"index"}` | Run a preset |
 | POST | `/api/page`, `/api/dial`, `/api/os` | `{"page"}` / `{"dial"}` / `{"os"}` | Switch page / dial mode / host OS |
+| POST | `/api/view` | `{"settings"}` | The page shows Settings or not. From Settings, `"next"` goes to the first page and `"prev"` to the last; any page move closes Settings (event `view`) |
 | POST | `/api/settings` | `{"theme": "nord", …}` | Change settings (saved in `state.json`) |
 | POST | `/api/host` | `{"time_ms", "utc_offset_min", "locked"}` | Heartbeat from the host agent: sets the clock, lock state |
 | POST | `/api/nowplaying` | `{"title", "artist", "album", "album_artist", "track_number", "app", "playing", "position_ms", "duration_ms", "shuffle", "repeat", "art_key", "art"?, "art_type"?}` | From the host agent; `{"title": null}` clears. Replies `{"need_art": bool}` |
