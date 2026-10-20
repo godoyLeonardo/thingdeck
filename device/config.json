@@ -33,10 +33,10 @@
   ],
 
   "presets": [
-    { "label": "Prev", "media": "prev" },
-    { "label": "Play/Pause", "media": "play_pause" },
-    { "label": "Next", "media": "next" },
-    { "label": "Mute", "media": "mute" }
+    { "label": "First", "page": 0 },
+    { "label": "Left", "page": "prev" },
+    { "label": "Right", "page": "next" },
+    { "label": "Last", "page": -1 }
   ],
 
   "pages": [
