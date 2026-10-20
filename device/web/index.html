@@ -2090,16 +2090,18 @@ function fmtUptime(s) {
   var d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600);
   return d ? d + ' d ' + h + ' h' : h + ' h ' + Math.floor(s % 3600 / 60) + ' min';
 }
-// A pool as a tank: how full on top, the level, then its name, health and free space.
-function nasPool(p) {
+// A pool as a tank: how full on top, the level, then its name, health, free space, size and a scrub in progress.
+// scanRow: some pool scrubs, so each column keeps that line and the tanks stay the same height.
+function nasPool(p, scanRow) {
   var used = p.size ? p.used / p.size * 100 : 0, level = used >= 90 ? ' bad' : used >= 80 ? ' warn' : '';
   var status = String(p.status || '?'), tag = status === 'ONLINE' && p.healthy ? 'dp' : status === 'DEGRADED' || !p.healthy ? 'tc' : 'bad';
   return '<div class="nas-col"><div class="nas-pct' + level + '">' + Math.round(used) + '<small>%</small></div>' +
     '<div class="nas-tank' + level + '"><i style="height:' + used.toFixed(1) + '%"></i></div>' +
     '<div class="nas-name">' + esc(p.name || '') + '</div>' +
     '<div class="px-tag ' + tag + '">' + esc(p.healthy || status !== 'ONLINE' ? status : 'UNHEALTHY') + '</div>' +
-    '<div class="nas-free">' + (p.scan ? '<span class="nas-scan">' + esc((p.scan.kind || 'scan').toLowerCase()) + ' ' + Math.round(p.scan.percent || 0) + '%</span>'
-      : fmtBytes(p.free) + ' free') + '</div></div>';
+    '<div class="nas-free">' + fmtBytes(p.free) + ' free</div><div class="nas-free">of ' + fmtBytes(p.size) + '</div>' +
+    (p.scan ? '<div class="nas-free nas-scan">' + esc((p.scan.kind || 'scan').toLowerCase()) + ' ' + Math.round(p.scan.percent || 0) + '%</div>'
+      : scanRow ? '<div class="nas-free">&nbsp;</div>' : '') + '</div>';
 }
 // TrueNAS job methods by name. The scrub and app jobs add their pool or app; others show the method.
 var NAS_JOBS = {
@@ -2134,7 +2136,8 @@ function updateNas() {
   var sys = n.system || {}, pools = n.pools || [], disks = n.disks || [], alerts = n.alerts || [], apps = n.apps || [], jobs = n.jobs || [];
   var line = function (parts) { parts = parts.filter(function (x) { return x; }); return parts.length ? '<div>' + parts.join(' · ') + '</div>' : ''; };
   redraw($('nasp'), '<h3>' + esc(sys.host || 'TrueNAS') + '</h3><div class="nas-cols">' +
-    (pools.map(nasPool).join('') || '<div class="ag-empty">No pools</div>') + '</div>' +
+    (pools.map(function (p) { return nasPool(p, pools.some(function (q) { return q.scan; })); }).join('') ||
+      '<div class="ag-empty">No pools</div>') + '</div>' +
     '<div class="nas-sys">' + line([sys.version ? 'TrueNAS ' + esc(String(sys.version).replace(/^TrueNAS-/, '')) : '']) +
       line([sys.uptime ? 'up ' + fmtUptime(sys.uptime) : '', sys.cores ? sys.cores + ' cores' : '']) +
       line([sys.memory ? fmtBytes(sys.memory) + ' RAM' : '', sys.load && sys.load.length ? 'load ' + Number(sys.load[0]).toFixed(1) : '']) + '</div>');
