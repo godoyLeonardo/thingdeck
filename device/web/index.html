@@ -487,6 +487,7 @@
     color: var(--muted); white-space: pre-wrap; word-break: break-word; }
   .sh-notes::-webkit-scrollbar { display: none; }
   .sh-actions { display: flex; justify-content: flex-end; margin-top: 12px; }
+  .sh-link { margin-top: 10px; font: 500 calc(12.5px * var(--ts)) GeistMono, monospace; color: var(--muted); word-break: break-all; }
   .sh-actions .btn { flex: none; min-width: 120px; padding: 0 18px; margin-left: 8px; }
   .sh-actions .btn.primary { background: var(--acc); color: var(--on-acc); }
   /* audio: the volume bar (over everything) and, in a page's clock header, the output pill */
@@ -1887,6 +1888,42 @@ function ghRow(id, state, title, sub, when, wrap) {
     '<div class="ev-main"><div class="ev-title">' + esc(title) + '</div><div class="ev-sub">' + sub + '</div></div>' +
     '<div class="gh-when">' + when + '</div></div>';
 }
+// A run or pull request in a card: what it is, its state and times, and its link, with a
+// button that opens it on the computer (POST /api/github/open, by its id).
+var RUN_STATES = { success: 'Succeeded', failure: 'Failed', timed_out: 'Timed out', startup_failure: 'Failed to start',
+  action_required: 'Needs action', cancelled: 'Cancelled', skipped: 'Skipped', neutral: 'Neutral', stale: 'Stale' };
+var CHECKS = { SUCCESS: 'Checks pass', FAILURE: 'Checks fail', ERROR: 'Checks fail', PENDING: 'Checks run', EXPECTED: 'Checks wait' };
+var REVIEWS = { APPROVED: 'Approved', CHANGES_REQUESTED: 'Changes requested', REVIEW_REQUIRED: 'Review required' };
+function longTime(iso) { var ms = Date.parse(iso); return longDay(ms) + ' · ' + fmtClock(ms); }
+function since(iso) { var a = ago(iso); return a === 'now' ? 'just now' : a + ' ago'; }
+function openGitHub(id) {
+  var g = github, run = (g.runs || []).filter(function (r) { return r.id === id; })[0];
+  var pr = (g.prs || []).filter(function (p) { return p.id === id; })[0], html;
+  if (run) {
+    var running = run.status === 'in_progress', done = run.status === 'completed';
+    var state = running ? 'Running for ' + fmtLength(Math.max(60000, Date.now() - Date.parse(run.created)))
+      : !done ? 'Queued ' + since(run.created) : (RUN_STATES[run.conclusion] || 'Done') + ' · ' + since(run.updated);
+    html = '<div class="m-label">Workflow run · ' + esc((g.repo || '').split('/').pop()) + '</div>' +
+      '<div class="sh-title">' + esc(run.workflow) + '</div>' +
+      '<div class="sh-when">' + esc(state) + '</div>' +
+      '<div class="sh-where">' + esc([run.branch, run.event].filter(function (x) { return x; }).join(' · ')) + '</div>' +
+      '<div class="sh-notes">' + esc(run.title || '') + '<br>Started ' + esc(longTime(run.created)) +
+        (done ? ', took ' + esc(fmtLength(Math.max(60000, Date.parse(run.updated) - Date.parse(run.created)))) : '') + '</div>';
+  } else if (pr) {
+    html = '<div class="m-label">Pull request · ' + esc(pr.repo + '#' + pr.number) + '</div>' +
+      '<div class="sh-title">' + esc(pr.title) + '</div>' +
+      '<div class="sh-when">' + esc([CHECKS[pr.checks] || 'No checks', pr.draft ? 'Draft' : ''].filter(function (x) { return x; }).join(' · ')) + '</div>' +
+      '<div class="sh-where">' + esc(REVIEWS[pr.review] || 'No review yet') + '</div>' +
+      '<div class="sh-notes">Updated ' + esc(longTime(pr.updated)) + '</div>';
+  } else return;
+  var link = (run || pr).url || '';
+  $('sheetcard').innerHTML = html + (link ? '<div class="sh-link">' + esc(link.replace(/^https?:\/\//, '')) + '</div>' : '') +
+    '<div class="sh-actions"><div class="btn primary" data-gh-open="' + esc(id) + '">Open on computer</div>' +
+    '<div class="btn" data-sheet-close="1">Close</div></div>';
+  $('sheet').className = 'show';
+  sheetOpen = true;
+  sheetMode = 'github';
+}
 function updateGitHub() {
   var box = $('github');
   if (!box) return;
@@ -2402,7 +2439,7 @@ document.addEventListener('pointerdown', function (e) {
   startX = e.clientX; startY = e.clientY;
   startInBar = !!e.target.closest('#bar, .cal-tabs');
   startOnSlider = !!e.target.closest('[data-hue-bar], [data-hue-lbar]');   // dragging a light's brightness, not swiping
-  downEl = e.target.closest('.tile[data-i], .preset[data-i], #dial, .tab, #status, [data-set], [data-sys], [data-sec], [data-media], [data-join], [data-guard], [data-kill], [data-ev], [data-sheet-close], [data-sheet-card], [data-audio], [data-audio-dev], [data-gh], #tabmore, [data-hue-room], [data-hue-toggle], [data-hue-ltoggle], [data-hue-scene], [data-hue-alloff], [data-hue-pair], [data-hue-bar], [data-hue-lbar], [data-tab-move], [data-tabs-reset], [data-tab-hide], [data-goto-media], [data-rm-join], [data-rm-dismiss], [data-cal], [data-weeks]');
+  downEl = e.target.closest('.tile[data-i], .preset[data-i], #dial, .tab, #status, [data-set], [data-sys], [data-sec], [data-media], [data-join], [data-guard], [data-kill], [data-ev], [data-sheet-close], [data-sheet-card], [data-audio], [data-audio-dev], [data-gh], #tabmore, [data-hue-room], [data-hue-toggle], [data-hue-ltoggle], [data-hue-scene], [data-hue-alloff], [data-hue-pair], [data-hue-bar], [data-hue-lbar], [data-tab-move], [data-tabs-reset], [data-tab-hide], [data-goto-media], [data-rm-join], [data-rm-dismiss], [data-cal], [data-weeks], [data-gh-open]');
   if (downEl) downEl.classList.add('down');
 });
 document.addEventListener('pointercancel', function () { if (downEl) downEl.classList.remove('down'); downEl = null; });
@@ -2425,7 +2462,8 @@ document.addEventListener('pointerup', function (e) {
   if (el.hasAttribute('data-sheet-close')) closeSheet();
   else if (el.hasAttribute('data-ev')) openEvent(el.getAttribute('data-ev'));
   else if (el.hasAttribute('data-audio')) openAudio();
-  else if (el.hasAttribute('data-gh')) post('/api/github/open', { id: el.getAttribute('data-gh') });
+  else if (el.hasAttribute('data-gh')) openGitHub(el.getAttribute('data-gh'));
+  else if (el.hasAttribute('data-gh-open')) { fire(el); post('/api/github/open', { id: el.getAttribute('data-gh-open') }); closeSheet(); }
   else if (el.id === 'tabmore') scrollTabs();
   else if (el.hasAttribute('data-tab-move')) { var mv = el.getAttribute('data-tab-move').split('|'); moveTab(mv[0], parseInt(mv[1], 10)); }
   else if (el.hasAttribute('data-tabs-reset')) post('/api/settings', { page_order: [], page_hidden: [], page_shown: [] });
