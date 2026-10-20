@@ -1533,13 +1533,20 @@ class Pad:
                 self.flash('tile', index, tiles[index].get('label'))
                 self.run(tiles[index])
 
-    def press_preset(self, index):
+    def press_preset(self, index, hold=False):
+        """A top button: its action, or with hold=True its "hold" action (pressed HOLD_SECONDS or longer)."""
         if self.standby():
             return
         preset = self.presets()[index] if 0 <= index < 4 else None
-        if preset:
-            self.flash('preset', index, preset.get('label'))
-            self.run(preset)
+        action = preset.get('hold') if preset and hold else preset
+        if action:
+            self.flash('preset', index, action.get('label') or preset.get('label'))
+            self.run(action)
+
+    def preset_holds(self, index):
+        """Whether a top button has a "hold" action: then its tap fires on release."""
+        preset = self.presets()[index] if 0 <= index < 4 else None
+        return bool(preset and preset.get('hold'))
 
     def turn(self, steps):
         if self.standby():
@@ -1607,7 +1614,7 @@ def input_loop(pad, keys_path, rotary_path):
             fds[os.open(path, os.O_RDONLY)] = path
     presets = {KEY_1: 0, KEY_2: 1, KEY_3: 2, KEY_4: 3}
     named = {KEY_ESC: 'back', KEY_M: 'menu', KEY_ENTER: 'knob'}
-    down = {}   # code -> (deadline, hold fired)
+    down = {}   # code -> (deadline, hold fired), for buttons with a hold action
 
     def has_hold(code):
         return code in named and pad.config.get('hardware', {}).get(named[code], {}).get('hold')
@@ -1622,7 +1629,10 @@ def input_loop(pad, keys_path, rotary_path):
         for code, (deadline, fired) in list(down.items()):
             if not fired and now >= deadline:
                 down[code] = (deadline, True)
-                pad.hardware(named[code], 'hold')
+                if code in presets:
+                    pad.press_preset(presets[code], hold=True)
+                else:
+                    pad.hardware(named[code], 'hold')
         for fd in ready:
             data = os.read(fd, EVENT_SIZE * 32)
             for off in range(0, len(data) - EVENT_SIZE + 1, EVENT_SIZE):
@@ -1632,7 +1642,14 @@ def input_loop(pad, keys_path, rotary_path):
                 elif etype == EV_KEY and value in (0, 1):
                     if code in presets:
                         if value == 1:
-                            pad.press_preset(presets[code])
+                            if pad.preset_holds(presets[code]):
+                                down[code] = (now + HOLD_SECONDS, False)
+                            else:
+                                pad.press_preset(presets[code])
+                        elif code in down:
+                            _, fired = down.pop(code)
+                            if not fired:
+                                pad.press_preset(presets[code])
                     elif code in named:
                         if value == 1:
                             if has_hold(code):

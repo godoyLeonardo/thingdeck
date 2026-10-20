@@ -14,9 +14,9 @@ as soon as you plug it in.
   start hidden and can be turned on there. On live pages, the top bar also shows the song
   playing (tap it for Media).
 - **4 top buttons:** presets, by default first page, page left, page right and last
-  page (a page can set its own). Live pages show a big clock and the date at the top
-  instead of their labels, and the buttons still work; a tile page of your own shows
-  the labels.
+  page; hold 2 or 3 for the previous or next track (a page can set its own). Live pages
+  show a big clock and the date at the top instead of their labels, and the buttons
+  still work; a tile page of your own shows the labels.
 - **Dial:** volume, Hue lights (the room you last tapped), scroll, zoom, scrub (arrow keys),
   browser tabs, undo/redo. The menu (M) button switches dial mode.
 - **Windows, macOS and Linux:** each tile can have per-OS shortcuts. The pad
@@ -113,7 +113,7 @@ them.
 
 | Control | Default |
 |---|---|
-| Buttons 1–4 (top edge) | Presets: first page, page left, page right, last page |
+| Buttons 1–4 (top edge) | Presets: first page, page left, page right, last page · hold 2: previous track, hold 3: next track |
 | Dial turn | Current dial mode (Volume, Lights, Scroll, Zoom, Scrub, Tabs, Undo/Redo) |
 | Dial press | Dial mode action (mute, middle click, reset zoom, …) |
 | Dial hold | Play/Pause |

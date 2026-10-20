@@ -429,8 +429,12 @@ Top level:
 | `grid` | Tile grid `[columns, rows]`, default `[4, 2]`; pages can override it |
 | `hardware` | `knob`, `back`, `menu`: `{"tap": action, "hold": action}`; `dial_invert` |
 | `dial_modes` | `[{"name", "cw", "ccw", "press"}]` |
-| `presets` | Default 4 top-button actions (first page `{"page": 0}`, `"prev"`, `"next"`, last page `{"page": -1}`) |
+| `presets` | Default 4 top-button actions (first page `{"page": 0}`, `"prev"`, `"next"`, last page `{"page": -1}`); 2 and 3 have a `hold` for the previous and next track |
 | `pages` | `[{"name", "presets"?, "grid"?, "nowplaying"?, "header"?, "widgets"?, "kill"?, "audio"?, "tiles": [...]}]` |
+
+A preset can also have `hold`, an action with its own `label`, for a press of 0.45 s or
+longer (`HOLD_SECONDS`). A preset with `hold` fires its own action on release; one
+without it fires on press.
 
 Tiles and presets are actions plus `label`, optional `icon` (an emoji) or `symbol`
 (a built-in icon drawn in the current icon style, or as an emoji in the emoji style),
