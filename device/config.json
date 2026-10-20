@@ -85,6 +85,12 @@
       "widgets": ["plex"]
     },
     {
+      "_note": "Pools, disk temperatures, alerts and apps of the TrueNAS server in truenas.txt on the computer (needs the computer agent).",
+      "name": "NAS",
+      "header": "clock",
+      "widgets": ["truenas"]
+    },
+    {
       "name": "Desktop",
       "presets": [
         { "label": "◀ Desktop", "key": "ctrl+win+left", "mac": { "key": "ctrl+left" }, "linux": { "key": "win+pageup" } },

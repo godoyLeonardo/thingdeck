@@ -374,6 +374,22 @@
   .plex h3, .plex .m-label { font-size: calc(12.5px * var(--ts)); }
   .plex .m-detail { font-size: calc(13.5px * var(--ts)); }
   .plex .m-value { font-size: calc(34px * var(--ts)); }
+  /* the NAS page: Plex's layout, with pools on the left */
+  .nas-pool { padding: 7px 0 9px; }
+  .nas-row { display: flex; align-items: center; }
+  .nas-row .ev-title { flex: 1; min-width: 0; font-size: calc(18px * var(--ts)); }
+  .nas-pool .np-bar { height: 8px; border-radius: 4px; margin: 7px 0 5px; }
+  .nas-pool .np-bar i { transition: none; }
+  .np-bar.warn i { background: var(--warn); }
+  .np-bar.bad i { background: var(--bad); }
+  .nas-pool .ev-sub { font-size: calc(13.5px * var(--ts)); }
+  .nas-scan { color: var(--acc); margin-left: 6px; }
+  .px-num.warn, .m-value.warn { color: var(--warn); }
+  .px-num.bad, .m-value.bad { color: var(--bad); }
+  .m-value.good { color: var(--good); }
+  .nas-alert { font-size: calc(13px * var(--ts)); color: var(--muted); line-height: 1.3; margin-bottom: 10px;
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .nas .mcard .m-detail { margin-bottom: 10px; }
   .monitor { flex: 1; min-width: 0; display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: minmax(0, 1fr); grid-gap: 8px; }
   .monitor.half { grid-template-columns: 1fr 1fr; grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); }
   .mcard { background: var(--tile); border-radius: 16px; padding: 10px 12px 0; display: flex; flex-direction: column;
@@ -759,6 +775,7 @@ function load() {
     github = j.github || github;
     hue = j.hue || hue;
     plex = j.plex || plex;
+    truenas = j.truenas || truenas;
     render();
   });
 }
@@ -1401,6 +1418,7 @@ function renderWidgets(page, g) {
       if (w === 'github') return '<div class="gh-wrap"><div class="gh-pull" id="ghpull"></div><div class="gh" id="github"></div></div>';
       if (w === 'lights') return '<div class="lights" id="lights"></div>';
       if (w === 'plex') return '<div class="plex" id="plex"></div>';
+      if (w === 'truenas') return '<div class="plex nas" id="nas"></div>';
       return '';
     }).join('') + '</div>' + (page.kill ? KILL_HTML : '') + '</div>';
   }
@@ -1410,6 +1428,7 @@ function renderWidgets(page, g) {
   updateGitHub();
   updateLights();
   updatePlex();
+  updateNas();
 }
 // The kill switch: lifting the cover is the confirmation, and it locks the target in:
 // the service only kills that process id if it still has focus.
@@ -2031,6 +2050,66 @@ function updatePlex() {
     (libs || '<div class="ag-empty">Counting…</div>') + '</div></div>');
 }
 
+// ---- TrueNAS (widget "truenas"): the agent reads the server in truenas.txt through its API
+var truenas = { state: 'unknown' };
+function fmtBytes(b) {
+  if (b == null) return '–';
+  var units = ['B', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB'], i = 0;
+  while (b >= 1024 && i < units.length - 1) { b /= 1024; i++; }
+  return (b >= 100 || i === 0 ? Math.round(b) : b.toFixed(1)) + ' ' + units[i];
+}
+function fmtUptime(s) {
+  var d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600);
+  return d ? d + ' d ' + h + ' h' : h + ' h ' + Math.floor(s % 3600 / 60) + ' min';
+}
+function nasPool(p) {
+  var used = p.size ? p.used / p.size * 100 : 0;
+  var status = String(p.status || '?'), tag = status === 'ONLINE' && p.healthy ? 'dp' : status === 'DEGRADED' || !p.healthy ? 'tc' : 'bad';
+  var scan = p.scan ? '<span class="nas-scan">' + esc((p.scan.kind || 'scan').toLowerCase()) + ' ' + Math.round(p.scan.percent || 0) + '%</span>' : '';
+  return '<div class="nas-pool"><div class="nas-row"><div class="ev-title">' + esc(p.name || '') + '</div>' +
+    '<div class="px-tag ' + tag + '">' + esc(p.healthy || status !== 'ONLINE' ? status : 'UNHEALTHY') + '</div></div>' +
+    '<div class="np-bar' + (used >= 90 ? ' bad' : used >= 80 ? ' warn' : '') + '"><i style="width:' + used.toFixed(1) + '%"></i></div>' +
+    '<div class="ev-sub">' + fmtBytes(p.used) + ' of ' + fmtBytes(p.size) + ' · ' + Math.round(used) + '% used · ' + fmtBytes(p.free) + ' free' + scan + '</div></div>';
+}
+function updateNas() {
+  var box = $('nas');
+  if (!box) return;
+  var n = truenas;
+  if (n.state !== 'ok') {
+    box.className = 'plex nas msg';
+    redraw(box, n.state === 'none' ? stateCard('TrueNAS', 'Add your TrueNAS server', 'Put its address and an API key in truenas.txt on the computer, next to calendars.txt (see README).')
+      : n.state === 'error' ? stateCard('TrueNAS', 'TrueNAS isn’t answering', n.error || 'Unknown error')
+      : agentCard('TrueNAS', 'your TrueNAS server'));
+    return;
+  }
+  if (!$('nasp')) {
+    box.className = 'plex nas';
+    box.innerHTML = '<div class="card px-streams" id="nasp"></div><div class="monitor half px-side" id="nasside"></div>';
+    box._html = null;
+  }
+  var sys = n.system || {}, pools = n.pools || [], disks = n.disks || [], alerts = n.alerts || [], apps = n.apps || [];
+  redraw($('nasp'), '<h3>' + esc(sys.host || 'TrueNAS') + ' · ' + pools.length + (pools.length === 1 ? ' pool' : ' pools') +
+    (sys.uptime ? '<span>up ' + fmtUptime(sys.uptime) + '</span>' : '') + '</h3><div class="ag-list">' +
+    (pools.map(nasPool).join('') || '<div class="ag-empty">No pools</div>') + '</div>');
+  var hot = disks.filter(function (d) { return d.temp != null; });
+  var temps = hot.map(function (d) {
+    var cls = d.temp >= 55 ? ' bad' : d.temp >= 45 ? ' warn' : '';
+    return '<div class="px-lib"><div class="ev-main"><div class="ev-title">' + esc(d.name) + '</div></div>' +
+      '<div class="px-num' + cls + '">' + Math.round(d.temp) + '°</div></div>';
+  }).join('');
+  var worst = alerts.filter(function (a) { return /CRITICAL|ALERT|EMERGENCY|ERROR/.test(a.level); }).length;
+  var alertCard = '<div class="mcard"><div class="m-label">Alerts</div><div class="m-value' + (worst ? ' bad' : alerts.length ? ' warn' : ' good') + '">' +
+    alerts.length + '</div>' + (alerts.length ? '<div class="nas-alert">' + esc(alerts[0].text || '') + '</div>' : '<div class="m-detail">All clear</div>') + '</div>';
+  var running = apps.filter(function (a) { return a.state === 'RUNNING'; }).length;
+  var updates = apps.filter(function (a) { return a.update; }).length;
+  var stopped = apps.filter(function (a) { return a.state !== 'RUNNING' && a.state !== 'STOPPED'; });
+  var appCard = '<div class="mcard"><div class="m-label">Apps</div><div class="m-value">' + running + '<small>/ ' + apps.length + ' up</small></div>' +
+    '<div class="m-detail">' + (stopped.length ? esc(stopped[0].name) + ' ' + esc(String(stopped[0].state).toLowerCase())
+      : updates ? updates + (updates === 1 ? ' update' : ' updates') : 'Up to date') + '</div></div>';
+  redraw($('nasside'), '<div class="mcard px-libs"><div class="m-label">Disks</div><div class="ag-list">' +
+    (temps || '<div class="ag-empty">No temperatures</div>') + '</div></div>' + alertCard + appCard);
+}
+
 // ---- feedback
 function fire(el) {
   if (!el) return;
@@ -2275,6 +2354,9 @@ function connect() {
     } else if (m.type === 'plex') {
       plex = d;
       updatePlex();
+    } else if (m.type === 'truenas') {
+      truenas = d;
+      updateNas();
     } else if (m.type === 'audio') {
       setAudio(d);
     } else if (m.type === 'agenda') {
