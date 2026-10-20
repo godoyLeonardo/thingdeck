@@ -107,14 +107,26 @@ def read_url(url):
 
 # ------------------------------------------------------------------ macOS
 
+app_names = {}      # bundle id -> display name
+
+
+def mac_app_name(bundle_id):
+    if bundle_id and bundle_id not in app_names:
+        info = run(['lsappinfo', 'info', '-only', 'name', '-app', bundle_id]) or ''
+        name = re.search(r'"LSDisplayName"="(.*?)"', info) or re.search(r'^"(.*?)" ASN:', info, re.M)
+        app_names[bundle_id] = name.group(1) if name else None
+    return app_names.get(bundle_id)
+
+
 def mac_snapshot():
-    out = run(['nowplaying-cli', 'get', 'title', 'artist', 'album', 'duration', 'elapsedTime', 'playbackRate'])
+    out = run(['nowplaying-cli', 'get', 'title', 'artist', 'album', 'duration', 'elapsedTime', 'playbackRate',
+               'clientBundleIdentifier'])
     if out:
-        lines = [None if l in ('null', '') else l for l in out.split('\n')[:6]]
-        if len(lines) == 6 and lines[0]:
-            title, artist, album, duration, elapsed, rate = lines
+        lines = [None if l in ('null', '') else l for l in out.split('\n')[:7]]
+        if len(lines) == 7 and lines[0]:
+            title, artist, album, duration, elapsed, rate, bundle_id = lines
             return {
-                'title': title, 'artist': artist, 'album': album,
+                'title': title, 'artist': artist, 'album': album, 'app': mac_app_name(bundle_id),
                 'playing': (as_int(float(rate) * 1000) or 0) > 0 if rate else False,
                 'position_ms': as_int(float(elapsed) * 1000) if elapsed else None,
                 'duration_ms': as_int(float(duration) * 1000) if duration else None,
