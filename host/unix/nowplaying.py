@@ -1175,7 +1175,9 @@ def linux_locked():
 
 
 def mac_locked():
-    return '"CGSSessionScreenIsLocked" = Yes' in (run(['ioreg', '-n', 'Root', '-d1']) or '')
+    # Newer macOS sets IOConsoleLocked and no longer lists CGSSessionScreenIsLocked in ioreg.
+    out = run(['ioreg', '-n', 'Root', '-d1']) or ''
+    return '"IOConsoleLocked" = Yes' in out or '"CGSSessionScreenIsLocked" = Yes' in out
 
 
 def heartbeat(locked):
