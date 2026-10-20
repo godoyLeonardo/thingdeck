@@ -1656,14 +1656,14 @@ function updateAgenda() {
   var html = '', day = null, next = null;
   for (var i = 0; i < events.length && !next; i++) if (!events[i].all_day) next = events[i];
   if (cols && events.length) {
-    // Today | Tomorrow | the rest of the week, each a card that scrolls on its own.
+    // Today | Tomorrow | the rest of the two weeks, each a card that scrolls on its own.
     var parts = ['', '', ''], laterDay = null;
     events.forEach(function (e) {
       var d = dayNumber(Math.max(e.start, now)), c = Math.min(2, d - today);
       if (c === 2 && d !== laterDay) { laterDay = d; parts[2] += '<div class="ag-day">' + dayLabel(Math.max(e.start, now)) + '</div>'; }
       parts[c] += eventHTML(e, e === next, true);
     });
-    var titles = ['Today', 'Tomorrow', 'Later this week'];
+    var titles = ['Today', 'Tomorrow', 'Next two weeks'];
     html = parts.map(function (p, c) {
       return '<div class="card ag-col"><h3>' + titles[c] + '</h3><div class="ag-list">' +
         (p || '<div class="ag-empty">' + (c === 0 ? 'Nothing else today' : 'Nothing planned') + '</div>') + '</div></div>';
@@ -1677,7 +1677,7 @@ function updateAgenda() {
   if (!events.length) {
     if (agenda.state === 'none') html = stateCard('Calendar', 'No calendar yet', 'Put your Google Calendar’s secret iCal address in calendars.txt on the computer (see README).');
     else if (agenda.error) html = stateCard('Calendar', 'Couldn’t get the calendar', agenda.error);
-    else if (agenda.state === 'ok') html = stateCard('Calendar', 'Nothing coming up', 'No events in the next 7 days.');
+    else if (agenda.state === 'ok') html = stateCard('Calendar', 'Nothing coming up', 'No events in the next 14 days.');
     else html = agentCard('Calendar', 'your calendar');
   }
   if (box.innerHTML !== html) {

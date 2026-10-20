@@ -51,8 +51,8 @@ The Car Thing's screen is 800×480. These use made-up demo data; to retake them,
 
 | | |
 |---|---|
-| ![Media page: the song playing, its cover and progress, media controls, and the audio output in the header](docs/screenshots/media.png) | ![Calendar page: today, tomorrow and later this week, with Join buttons on meetings](docs/screenshots/calendar.png) |
-| **Media:** what's playing, with controls and the audio output | **Calendar:** the coming week; a meeting in progress pulses |
+| ![Media page: the song playing, its cover and progress, media controls, and the audio output in the header](docs/screenshots/media.png) | ![Calendar page: today, tomorrow and the next two weeks, with Join buttons on meetings](docs/screenshots/calendar.png) |
+| **Media:** what's playing, with controls and the audio output | **Calendar:** the next two weeks; a meeting in progress pulses |
 | ![Status page: CPU, memory, GPU and network graphs, and the covered kill switch for the focused app](docs/screenshots/status.png) | ![Code page: the latest GitHub Actions runs and your open pull requests](docs/screenshots/code.png) |
 | **Status:** live stats and the kill switch | **Code:** GitHub Actions runs and your pull requests |
 | ![Event details card with time, length, notes and a Join meeting button](docs/screenshots/event.png) | ![Audio device picker with output and input lists](docs/screenshots/audio.png) |
@@ -166,7 +166,7 @@ them to the Car Thing **over the USB cable** (`adb forward`; no network):
   plays in, playing/paused and a live progress bar, on a card tinted with the cover's
   colors, with round media controls under the progress bar. When nothing is playing
   it says so; the controls work either way.
-- **Calendar:** the Calendar page shows today, tomorrow and the rest of the week
+- **Calendar:** the Calendar page shows today, tomorrow and the rest of the next two weeks
   from your calendars (see [Adding your calendar](#adding-your-calendar)): repeating
   events, moved or cancelled occurrences and time zones included, meetings you
   declined left out. The next event is highlighted with a countdown. Events with a
