@@ -254,6 +254,8 @@ TRUENAS = {
     'alerts': [{'level': 'WARNING', 'text': 'Pool backup state is DEGRADED: One or more devices has been removed.'}],
     'apps': [{'name': 'plex', 'state': 'RUNNING', 'update': False}, {'name': 'nextcloud', 'state': 'RUNNING', 'update': True},
              {'name': 'immich', 'state': 'RUNNING', 'update': False}, {'name': 'syncthing', 'state': 'STOPPED', 'update': False}],
+    'jobs': [{'method': 'pool.scrub.scrub', 'target': 'tank', 'percent': 42.0, 'text': None, 'started': None},
+             {'method': 'cloudsync.sync', 'target': None, 'percent': 71.0, 'text': 'Sending photos', 'started': None}],
 }
 
 

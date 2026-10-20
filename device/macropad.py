@@ -902,12 +902,12 @@ class HostPlex:
 
 
 TRUENAS_TTL = 150       # seconds without an update before the TrueNAS data counts as gone (off screen: every 60 s)
-TRUENAS_FIELDS = ('system', 'pools', 'disks', 'alerts', 'apps')
+TRUENAS_FIELDS = ('system', 'pools', 'disks', 'alerts', 'apps', 'jobs')
 
 
 class HostTrueNAS:
     """A TrueNAS server on the local network, through the host agent: pools, disk
-    temperatures, alerts and apps, every 10 s while its page is on screen."""
+    temperatures, alerts, apps and running jobs, every 10 s while its page is on screen."""
 
     def __init__(self, ui):
         self.ui = ui
