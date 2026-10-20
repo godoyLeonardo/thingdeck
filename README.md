@@ -62,10 +62,12 @@ The Car Thing's screen is 800×480. These use made-up demo data; to retake them,
 | **Lights:** Philips Hue rooms and zones, with the song playing in the top bar | **A room:** brightness, white, scenes, each light |
 | ![Plex page: three streams with posters and transcode tags, the server's CPU and bandwidth graphs, and the libraries](docs/screenshots/plex.png) | ![NAS page: TrueNAS pools as tanks that fill up, disk temperatures, alerts and apps](docs/screenshots/nas.png) |
 | **Plex:** streams and how each is sent, server load, libraries | **NAS:** TrueNAS pools, disks, alerts and apps |
-| ![Settings, Appearance: themes, accent colors, the hue slider and icon options](docs/screenshots/settings.png) | ![Settings, Tabs: the pages in order with up and down arrows](docs/screenshots/tabs.png) |
-| **Settings → Appearance** | **Settings → Tabs:** the order, and which tabs show |
-| ![A meeting reminder over the Media page: a countdown with Join meeting and Dismiss](docs/screenshots/reminder.png) | |
-| **Reminder:** 5 minutes before an event, on any page | |
+| ![Settings, General: brightness, host OS, keyboard layout, dial direction and clock format](docs/screenshots/general.png) | ![Settings, Appearance: themes, accent colors, the hue slider and icon options](docs/screenshots/settings.png) |
+| **Settings → General:** brightness, host OS, layout | **Settings → Appearance** |
+| ![Settings, Tabs: the pages in order with up and down arrows](docs/screenshots/tabs.png) | ![A meeting reminder over the Media page: a countdown with Join meeting and Dismiss](docs/screenshots/reminder.png) |
+| **Settings → Tabs:** the order, and which tabs show | **Reminder:** 5 minutes before an event, on any page |
+| ![Standby screen: the clock and "Computer is asleep", with a Reconnect button](docs/screenshots/standby.png) | |
+| **Standby:** while the computer sleeps | |
 
 ## Requirements
 
