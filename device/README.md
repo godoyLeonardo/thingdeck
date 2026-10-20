@@ -356,7 +356,8 @@ through its JSON-RPC 2.0 API over a WebSocket, `wss://<address>/api/current`
 calls `auth.login_with_api_key`, then `system.info`, `pool.query` (only the fields it
 shows, through `select`), `disk.temperatures`, `alert.list`, `app.query` and
 `core.get_jobs` (the `RUNNING` jobs; without `select`, because TrueNAS fails on it for
-jobs), and closes it. Replies are matched by `id`, so notifications in between are skipped. A
+jobs), and the scheduled tasks (`pool.scrub.query`, `pool.snapshottask.query`,
+`replication.query`, `cloudsync.query`, `rsynctask.query`, `cronjob.query`), and closes it. Replies are matched by `id`, so notifications in between are skipped. A
 failing call other than `system.info` only leaves its part empty.
 
 It is always TLS: TrueNAS revokes an API key that arrives over plain HTTP. The
@@ -369,6 +370,11 @@ Every 10 s while the NAS page is on screen, 60 s otherwise and after an error, t
 agent posts `POST /api/truenas` with `{state, system, pools, disks, alerts, apps, jobs}`.
 A job is `{method, target, percent, text, started}`. The page names it from the method
 (`pool.scrub.scrub` is "Scrub" plus the pool), so the names exist once for both agents.
+`tasks` holds the enabled tasks with a schedule, `{kind, name, schedule, threshold}`, and
+each pool has `scrubbed`, the end of its last scrub. `HostTrueNAS` works out the next run
+(`cron_next`: cron fields, `begin`/`end`, the computer's UTC offset) and publishes the
+first one as `next`, `{kind, name, at}`. A scrub skips runs until its last scrub ended
+more than `threshold` - 1 days before, as TrueNAS does.
 It sends only changes, plus one at least every 30 s. Alerts leave out dismissed and
 INFO ones. A call waits at most 5 s, because the Windows agent's main loop waits on it.
 `HostTrueNAS` keeps the last update and clears it after 150 s without one. The widget

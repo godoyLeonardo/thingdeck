@@ -1039,6 +1039,28 @@ TRUENAS_CALLS = [
     ('app.query', [[], {'select': ['name', 'state', 'upgrade_available']}]),
     ('core.get_jobs', [[['state', '=', 'RUNNING']]]),      # no 'select': TrueNAS fails on it for jobs
 ]
+# The scheduled tasks, so the Car Thing can show the next one: (query, kind, fields that name it).
+TRUENAS_TASKS = [
+    ('pool.scrub.query', 'scrub', ('pool_name',)),
+    ('pool.snapshottask.query', 'snapshot', ('dataset',)),
+    ('replication.query', 'replication', ('name',)),
+    ('cloudsync.query', 'cloudsync', ('description',)),
+    ('rsynctask.query', 'rsync', ('desc', 'path')),
+    ('cronjob.query', 'cron', ('description', 'command')),
+]
+TRUENAS_CALLS += [(method, []) for method, _, _ in TRUENAS_TASKS]
+
+
+def truenas_tasks(r):
+    """The enabled tasks with a schedule: {kind, name, schedule, threshold}. The Car Thing works out
+    when each runs next (a replication without 'auto' runs only by hand)."""
+    tasks = []
+    for method, kind, fields in TRUENAS_TASKS:
+        for t in r.get(method) or []:
+            if t.get('enabled') and t.get('auto', True) and t.get('schedule'):
+                name = next((str(t[f]) for f in fields if t.get(f)), '')
+                tasks.append({'kind': kind, 'name': name[:60], 'schedule': t['schedule'], 'threshold': t.get('threshold')})
+    return tasks
 
 
 def truenas_job(j):
@@ -1181,7 +1203,9 @@ class TrueNasLink:
             pools.append({'name': p.get('name'), 'status': p.get('status'), 'healthy': bool(p.get('healthy')),
                           'size': p.get('size'), 'used': p.get('allocated'), 'free': p.get('free'),
                           'scan': {'kind': scan.get('function'), 'percent': scan.get('percentage')}
-                          if scan.get('state') == 'SCANNING' else None})
+                          if scan.get('state') == 'SCANNING' else None,
+                          'scrubbed': (scan.get('end_time') or {}).get('$date')       # the last scrub's end, in ms
+                          if scan.get('function') == 'SCRUB' and scan.get('state') == 'FINISHED' else None})
         return {
             'state': 'ok',
             'system': {'host': info.get('hostname'), 'version': info.get('version'), 'uptime': int(info.get('uptime_seconds') or 0),
@@ -1193,6 +1217,7 @@ class TrueNasLink:
             'apps': [{'name': a.get('name'), 'state': a.get('state'), 'update': bool(a.get('upgrade_available'))}
                      for a in r.get('app.query') or []],
             'jobs': [truenas_job(j) for j in r.get('core.get_jobs') or []],
+            'tasks': truenas_tasks(r),
         }
 
     def update(self):
