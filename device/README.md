@@ -194,27 +194,27 @@ clears them. The reply carries a meeting link to open (`open`) and whether the
 service needs the calendars again (`need_calendar`, e.g. after a restart), so the
 agent needs no second request.
 
-**Calendars:** the agent downloads the addresses in `calendars.txt` every 5 minutes
-and posts the iCal text as it is to `POST /api/calendar` when it changes
-(`?none=1`: no `calendars.txt`; `?error=`: a download failed). `ics.py` reads it
-here, so the logic exists once for every OS: VTIMEZONE observances (DST included),
-RRULE (DAILY/WEEKLY/MONTHLY/YEARLY with COUNT, UNTIL, INTERVAL, BYDAY, BYMONTHDAY,
-BYMONTH, BYSETPOS), EXDATE, RDATE, RECURRENCE-ID (moved or cancelled occurrences),
-and events the calendar's owner declined (a Google feed's name is the owner's address).
-One-off events that ended before today are skipped while reading: a 4 MB feed takes
-about 2 s on the Car Thing. `Agenda` lists the events from local midnight
-to 28 days later (`AGENDA_WEEKS`, the most the page shows), recomputes every 5 minutes and when the UTC offset changes, and
-sends `agenda` events. All-day and floating times use the computer's UTC offset.
-An `agenda` event also has `calendars`: a name for each calendar, by the events' `cal`
-index (its `X-WR-CALNAME`, "Calendar 2" without one, and the number added to a name used
-twice). With two names or more, the page shows tabs above the agenda: All and each name.
-The tab is the setting `calendar` (a name, or `null` for All) in `state.json`. A name
-that is not in `calendars` shows All. On the left of the bar, − and + set how many weeks
-the page shows, 1 to 4 (2 when none is saved), for each tab: the setting `calendar_weeks`,
-`{"<name>" or "" for All: weeks}`. The page filters the 4 weeks the device sends.
-Each calendar has a color by its index (`CAL_COLORS`, the theme's own colors): a dot on
-its tab, and before the title of its events in All. The tabs filter only the page: reminders come from
-every calendar.
+**Calendars:** the agent downloads the addresses in `calendars.txt` every 5 minutes and
+posts the iCal text as it is to `POST /api/calendar` when it changes (`?none=1`: no
+`calendars.txt`; `?error=`: a download failed). `ics.py` reads it here, so the logic
+exists once for every OS: VTIMEZONE observances (DST included), RRULE
+(DAILY/WEEKLY/MONTHLY/YEARLY with COUNT, UNTIL, INTERVAL, BYDAY, BYMONTHDAY, BYMONTH,
+BYSETPOS), EXDATE, RDATE, RECURRENCE-ID (moved or cancelled occurrences), and events the
+calendar's owner declined (a Google feed's name is the owner's address). One-off events
+that ended before today are skipped while reading: a 4 MB feed takes about 2 s on the
+Car Thing. `Agenda` lists the events from local midnight to 28 days later
+(`AGENDA_WEEKS`, the most the page shows), recomputes every 5 minutes and when the UTC
+offset changes, and sends `agenda` events. All-day and floating times use the computer's
+UTC offset. An `agenda` event also has `calendars`: a name for each calendar, by the
+events' `cal` index (its `X-WR-CALNAME`, "Calendar 2" without one, and the number added
+to a name used twice). With two names or more, the page shows tabs above the agenda: All
+and each name. The tab is the setting `calendar` (a name, or `null` for All) in
+`state.json`. A name that is not in `calendars` shows All. On the left of the bar, − and
++ set how many weeks the page shows, 1 to 4 (2 when none is saved), for each tab: the
+setting `calendar_weeks`, `{"<name>" or "" for All: weeks}`. The page filters the 4
+weeks the device sends. Each calendar has a color by its index (`CAL_COLORS`, the
+theme's own colors): a dot on its tab, and before the title of its events in All. The
+tabs filter only the page: reminders come from every calendar.
 
 **Join:** the UI posts `POST /api/calendar/open` with an event id; only events with
 a Meet, Zoom or Teams link have one. The link goes out once, in the reply to the
@@ -335,13 +335,14 @@ because Plex items can have keys that differ only in case (`guid` and `Guid`).
 `ConvertFrom-Json` in Windows PowerShell refuses those keys.
 
 Every 3 s while the Plex page is on screen (every 30 s otherwise, see [What updates
-when](#what-updates-when)) the agent reads `/`, `/status/sessions`, `/activities` (library scans and
-scheduled tasks while they run, shown as Jobs under the streams),
-and the server's own history of load and bandwidth (`/statistics/resources` and
-`/statistics/bandwidth`, Plex Pass only). Then it posts the result to `POST /api/plex`. Every 5 minutes it
-counts the items of each library and reads `/updater/status`. A count is one request
-with `X-Plex-Container-Size=0`, which gives `totalSize` and no items. When the server
-does not answer, the agent tries again after 30 s, so the other pages do not wait.
+when](#what-updates-when)) the agent reads `/`, `/status/sessions`, `/activities`
+(library scans and scheduled tasks while they run, shown as Jobs under the streams), and
+the server's own history of load and bandwidth (`/statistics/resources` and
+`/statistics/bandwidth`, Plex Pass only). Then it posts the result to `POST /api/plex`.
+Every 5 minutes it counts the items of each library and reads `/updater/status`. A count
+is one request with `X-Plex-Container-Size=0`, which gives `totalSize` and no items.
+When the server does not answer, the agent tries again after 30 s, so the other pages do
+not wait.
 
 The bandwidth history has one row per device and sample, at uneven times. The agent
 adds up the rows per 6 s, LAN and WAN apart, and sends bytes per second.
@@ -358,15 +359,16 @@ changes the progress bars in place.
 
 ### TrueNAS
 
-The agent reads the TrueNAS server in `truenas.txt` (address, then an API key)
-through its JSON-RPC 2.0 API over a WebSocket, `wss://<address>/api/current`
-(TrueNAS 25.04+; the REST API is deprecated there). Each read opens one connection,
-calls `auth.login_with_api_key`, then `system.info`, `pool.query` (only the fields it
-shows, through `select`), `disk.temperatures`, `alert.list`, `app.query` and
-`core.get_jobs` (the `RUNNING` jobs; without `select`, because TrueNAS fails on it for
-jobs), and the scheduled tasks (`pool.scrub.query`, `pool.snapshottask.query`,
-`replication.query`, `cloudsync.query`, `rsynctask.query`, `cronjob.query`), and closes it. Replies are matched by `id`, so notifications in between are skipped. A
-failing call other than `system.info` only leaves its part empty.
+The agent reads the TrueNAS server in `truenas.txt` (address, then an API key) through
+its JSON-RPC 2.0 API over a WebSocket, `wss://<address>/api/current` (TrueNAS 25.04+;
+the REST API is deprecated there). Each read opens one connection, calls
+`auth.login_with_api_key`, then `system.info`, `pool.query` (only the fields it shows,
+through `select`), `disk.temperatures`, `alert.list`, `app.query` and `core.get_jobs`
+(the `RUNNING` jobs; without `select`, because TrueNAS fails on it for jobs), and the
+scheduled tasks (`pool.scrub.query`, `pool.snapshottask.query`, `replication.query`,
+`cloudsync.query`, `rsynctask.query`, `cronjob.query`), and closes it. Replies are
+matched by `id`, so notifications in between are skipped. A failing call other than
+`system.info` only leaves its part empty.
 
 It is always TLS: TrueNAS revokes an API key that arrives over plain HTTP. The
 certificate is usually self-signed, so the agents accept it for that address only (the
