@@ -757,7 +757,7 @@
   </div>
   <div id="volhud"><div class="vh-icon"></div><div class="vh-bar"><i></i></div><div class="vh-num"></div></div>
   <div id="toast"></div>
-  <div id="reminder"><div class="rm-card"><div class="m-label">Meeting</div><div class="rm-when" id="rm-when"></div>
+  <div id="reminder"><div class="rm-card"><div class="m-label" id="rm-label">Meeting</div><div class="rm-when" id="rm-when"></div>
     <div class="rm-title" id="rm-title"></div><div class="rm-sub" id="rm-sub"></div>
     <div class="rm-actions"><div class="btn primary" id="rm-join" data-rm-join="1">Join meeting</div><div class="btn" data-rm-dismiss="1">Dismiss</div></div></div></div>
   <div id="sheet" data-sheet-close="1"><div class="sheet-card" id="sheetcard" data-sheet-card="1"></div></div>
@@ -1093,16 +1093,17 @@ function renderSettings() {
       '<span>Agent</span><b' + (st.agent && st.agent.outdated ? ' class="warn"' : '') + '>' + agentText() + '</b>';
   }
 }
-// ---- meeting reminder: from 5 minutes before a meeting with a link (Meet, Zoom, Teams)
-// until 2 minutes after it starts, a card over every page, with a countdown and Join.
-// Dismissed meetings stay dismissed (kept in this browser's storage, so a reload keeps it).
+// ---- event reminder: from 5 minutes before any timed event (not all-day ones)
+// until 2 minutes after it starts, a card over every page, with a countdown and Join (a
+// meeting with a link) or Details (any other timed event). Dismissed ones stay dismissed
+// (kept in this browser's storage, so a reload keeps it).
 var REMIND_BEFORE = 5 * 60000, REMIND_AFTER = 2 * 60000, reminderShown = false, reminderEvent = null, remindDismissed = {};
 try { remindDismissed = JSON.parse(localStorage.getItem('thingdeck.dismissed') || '{}'); } catch (e) { }
 function checkReminder() {
   var now = Date.now(), e = null;
   if (!standbyShown && !lockShown) {
     e = (agenda.events || []).filter(function (x) {
-      return !x.all_day && x.link && !remindDismissed[x.id] && now >= x.start - REMIND_BEFORE && now < x.start + REMIND_AFTER;
+      return !x.all_day && !remindDismissed[x.id] && now >= x.start - REMIND_BEFORE && now < x.start + REMIND_AFTER;
     })[0] || null;
   }
   reminderEvent = e;
@@ -1112,6 +1113,8 @@ function checkReminder() {
   var left = Math.round((e.start - now) / 1000), m = Math.floor(Math.abs(left) / 60), s = Math.abs(left) % 60;
   $('rm-when').textContent = left > 0 ? 'Starts in ' + m + ':' + (s < 10 ? '0' : '') + s
     : m < 1 ? 'Starting now' : 'Started ' + m + ' min ago';
+  $('rm-label').textContent = e.link ? 'Meeting' : 'Event';
+  $('rm-join').textContent = e.link ? 'Join meeting' : 'Details';
   $('rm-title').textContent = e.title;
   $('rm-sub').textContent = [fmtClock(e.start) + ' – ' + fmtClock(e.end), e.where].filter(function (x) { return x; }).join(' · ');
 }
@@ -2264,7 +2267,12 @@ document.addEventListener('pointerup', function (e) {
   else if (el.hasAttribute('data-tabs-reset')) post('/api/settings', { page_order: [], page_hidden: [], page_shown: [] });
   else if (el.hasAttribute('data-tab-hide')) toggleTab(el.getAttribute('data-tab-hide'));
   else if (el.hasAttribute('data-goto-media')) gotoMedia();
-  else if (el.hasAttribute('data-rm-join')) { fire(el); post('/api/calendar/open', { id: reminderEvent.id }); dismissReminder(); }
+  else if (el.hasAttribute('data-rm-join')) {
+    var ev = reminderEvent;
+    fire(el);
+    dismissReminder();
+    if (ev.link) post('/api/calendar/open', { id: ev.id }); else openEvent(ev.id);
+  }
   else if (el.hasAttribute('data-rm-dismiss')) dismissReminder();
   else if (el.hasAttribute('data-hue-bar') || el.hasAttribute('data-hue-lbar')) { }       // handled by the drag code
   else if (el.hasAttribute('data-hue-toggle')) hueToggle(el.getAttribute('data-hue-toggle'), false);
