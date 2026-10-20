@@ -169,6 +169,12 @@
     --media: #9be22d; --key: #7f9cff; --type: #ffc43d; --nav: #b07cff; --mouse: #3fe0c0; --bad: #ff4b3e; --warn: #ff8a1f;
     --on-acc: #140c1f;
   }
+  :root[data-theme="crimson"] {
+    --bg: #150707; --panel: #210b0b; --tile: #2a0e0e; --tile-hi: #3a1414; --line: #521d1d; --edge: #2a0e0e;
+    --text: #f6ece8; --muted: #c7948a; --faint: #5e2a24; --toast: #3a1414; --veil: rgba(21,7,7,.92); --standby: #0c0303;
+    --media: #a6d65a; --key: #5fa8ff; --type: #ffd84d; --nav: #c58cff; --mouse: #45d1c5; --bad: #ff3b30; --warn: #ffb627;
+    --on-acc: #150707;
+  }
   * { box-sizing: border-box; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); overflow: hidden;
     font-family: Geist, 'Circular Sp UI v3 T', 'Noto Sans', sans-serif; touch-action: none; cursor: none; }
@@ -1113,7 +1119,8 @@ var THEMES = {
   ayu:         { name: 'Ayu',          bg: '#0b0e14', tile: '#131721', text: '#bfbdb6', acc: '#e6b450' },
   latte:       { name: 'Latte',        bg: '#e6e9ef', tile: '#eff1f5', text: '#4c4f69', acc: '#8839ef', light: true },
   githublight: { name: 'GitHub Light', bg: '#f6f8fa', tile: '#ffffff', text: '#1f2328', acc: '#0969da', light: true },
-  ultraviolet: { name: 'Ultraviolet',  bg: '#140c1f', tile: '#22163a', text: '#ece6f5', acc: '#9be22d' }
+  ultraviolet: { name: 'Ultraviolet',  bg: '#140c1f', tile: '#22163a', text: '#ece6f5', acc: '#9be22d' },
+  crimson:     { name: 'Crimson',      bg: '#150707', tile: '#2a0e0e', text: '#f6ece8', acc: '#ff7a1a' }
 };
 var ACCENTS = {   // [on dark themes, on light themes]
   green: ['#1ed760', '#12a150'], blue: ['#5b9cff', '#2f6fe0'], purple: ['#a78bfa', '#7c5cdb'],
