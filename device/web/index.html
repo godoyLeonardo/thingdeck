@@ -2187,6 +2187,11 @@ function nasJobName(j) {
   if (!name) return method.replace(/[._]/g, ' ');
   return name + (j.target && /^(pool\.scrub|app)\./.test(method) ? ' ' + j.target : '');
 }
+// The scheduled task that runs next (the device works it out from the schedules), by kind.
+var NAS_TASKS = { scrub: 'Scrub', snapshot: 'Snapshot', replication: 'Replication', cloudsync: 'Cloud sync', rsync: 'Rsync' };
+function nasTaskName(t) {
+  return t.kind === 'cron' ? t.name || 'Cron job' : (NAS_TASKS[t.kind] || t.kind) + (t.name ? ' ' + t.name : '');
+}
 function updateNas() {
   var box = $('nas');
   if (!box) return;
@@ -2230,7 +2235,10 @@ function updateNas() {
   var job = jobs[0], pct = job && job.percent != null ? Math.max(0, Math.min(100, job.percent)) : null;
   var jobCard = '<div class="mcard nas-jobs"><div class="m-label">Jobs</div><div class="m-value">' + jobs.length + '<small> running</small></div>' +
     (job ? '<div class="m-detail nas-job">' + esc(nasJobName(job)) + (pct != null ? ' · ' + Math.round(pct) + '%' : '') + '</div>' +
-      '<div class="np-bar"><i style="width:' + (pct || 0) + '%"></i></div>' : '<div class="m-detail">None now</div>') + '</div>';
+      '<div class="np-bar"><i style="width:' + (pct || 0) + '%"></i></div>'
+      : n.next ? '<div class="m-detail nas-job">Next: ' + esc(nasTaskName(n.next)) + '</div>' +
+        '<div class="m-detail">' + esc(dayLabel(n.next.at) + ' ' + fmtClock(n.next.at)) + '</div>'
+      : '<div class="m-detail">None now</div>') + '</div>';
   redraw($('nasside'), '<div class="mcard px-libs"><div class="m-label">Disks</div><div class="ag-list">' +
     (temps || '<div class="ag-empty">No temperatures</div>') + '</div>' + sysInfo + '</div>' + alertCard + appCard + jobCard);
 }

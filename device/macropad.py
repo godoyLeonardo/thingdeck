@@ -913,14 +913,84 @@ class HostPlex:
 
 TRUENAS_TTL = 150       # seconds without an update before the TrueNAS data counts as gone (off screen: every 60 s)
 TRUENAS_FIELDS = ('system', 'pools', 'disks', 'alerts', 'apps', 'jobs')
+CRON_NAMES = {name: i for names in (('sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'),
+                                     ('', 'jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'))
+              for i, name in enumerate(names) if name}
+
+
+def cron_values(field, lo, hi):
+    """The values one cron field allows: *, 5, 1-5, */15, 5/10, lists of those, and day or month names."""
+    values = set()
+    for part in str(field).lower().split(','):
+        part, _, step = part.partition('/')
+        step = int(step) if step else 1
+        if part in ('*', ''):
+            first, last = lo, hi
+        elif '-' in part:
+            first, last = (int(CRON_NAMES.get(x, x)) for x in part.split('-', 1))
+        else:
+            first = int(CRON_NAMES.get(part, part))
+            last = hi if step > 1 else first
+        values.update(range(first, last + 1, step))
+    return values
+
+
+def cron_next(schedule, after):
+    """The first time after `after` (a naive local datetime) that a TrueNAS schedule
+    {minute, hour, dom, month, dow, begin?, end?} runs, within a year; None if never.
+    As in cron, a day matches both dom and dow, or either one when both are set."""
+    minutes = sorted(cron_values(schedule.get('minute', '00'), 0, 59))
+    hours = sorted(cron_values(schedule.get('hour', '*'), 0, 23))
+    doms, months = cron_values(schedule.get('dom', '*'), 1, 31), cron_values(schedule.get('month', '*'), 1, 12)
+    dows = {d % 7 for d in cron_values(schedule.get('dow', '*'), 0, 7)}          # 0 and 7 are Sunday
+    either = str(schedule.get('dom', '*')) != '*' and str(schedule.get('dow', '*')) != '*'
+    begin, end = (tuple(int(x) for x in str(schedule.get(k) or v).split(':')[:2]) for k, v in (('begin', '00:00'), ('end', '23:59')))
+    for i in range(366):
+        day = after.date() + datetime.timedelta(days=i)
+        dom_ok, dow_ok = day.day in doms, (day.weekday() + 1) % 7 in dows
+        if day.month not in months or not ((dom_ok or dow_ok) if either else (dom_ok and dow_ok)):
+            continue
+        for h in hours:
+            for m in minutes:
+                at = datetime.datetime(day.year, day.month, day.day, h, m)
+                if at > after and begin <= (h, m) <= end:
+                    return at
+    return None
+
+
+def next_task(tasks, pools, utc_offset):
+    """The scheduled task that runs next: {kind, name, at (ms)}, or None. A scrub runs only when
+    the pool's last scrub ended more than `threshold` - 1 days before, as in TrueNAS's
+    plugins/zpool/scrub_impl.py."""
+    offset = datetime.timedelta(seconds=utc_offset or 0)
+    now = datetime.datetime.utcfromtimestamp(time.time()) + offset
+    scrubbed = {p.get('name'): p.get('scrubbed') for p in pools or []}
+    best = None
+    for task in tasks or []:
+        try:
+            at = cron_next(task.get('schedule') or {}, now)
+            last = scrubbed.get(task.get('name')) if task.get('kind') == 'scrub' else None
+            for _ in range(60):                  # a weekly scrub with a 35-day threshold skips a few weeks
+                if at is None or last is None or (at - offset - EPOCH).total_seconds() * 1000 - last > (int(task.get('threshold') or 0) - 1) * 86400000:
+                    break
+                at = cron_next(task['schedule'], at)
+        except (ValueError, TypeError, AttributeError) as e:
+            log('truenas: cannot read the schedule of %r: %s' % (task.get('name'), e))
+            continue
+        if at is not None and (best is None or at < best[0]):
+            best = (at, task)
+    if best is None:
+        return None
+    return {'kind': best[1].get('kind'), 'name': best[1].get('name'), 'at': int((best[0] - offset - EPOCH).total_seconds() * 1000)}
 
 
 class HostTrueNAS:
     """A TrueNAS server on the local network, through the host agent: pools, disk
-    temperatures, alerts, apps and running jobs, every 10 s while its page is on screen."""
+    temperatures, alerts, apps and running jobs, every 10 s while its page is on screen,
+    and the scheduled task that runs next."""
 
-    def __init__(self, ui):
-        self.ui = ui
+    def __init__(self, ui, host):
+        self.ui, self.host = ui, host
         self.published = {'state': 'unknown'}
         self.updated = None
 
@@ -928,6 +998,8 @@ class HostTrueNAS:
         data = {k: body[k] for k in TRUENAS_FIELDS if k in body}
         data['state'] = str(body.get('state') or 'error')
         data['error'] = str(body['error']) if body.get('error') else None
+        if data['state'] == 'ok':
+            data['next'] = next_task(body.get('tasks'), body.get('pools'), self.host.utc_offset)
         self.published, self.updated = data, time.monotonic()
         self.ui.publish('truenas', data)
 
@@ -997,7 +1069,7 @@ class Pad:
         self.audio = HostAudio(self.ui)
         self.hue = HostHue(self.ui)
         self.plex = HostPlex(self.ui)
-        self.truenas = HostTrueNAS(self.ui)
+        self.truenas = HostTrueNAS(self.ui, self.host)
         self.hid = Hid(lambda status: self.on_usb_status(status))
         self.config = {}
         self.config_mtime = 0
