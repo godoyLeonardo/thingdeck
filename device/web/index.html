@@ -463,8 +463,8 @@
     justify-content: center; background: rgba(0, 0, 0, .72); }
   #reminder.show { display: flex; }
   .rm-card { width: 620px; padding: 22px 28px; border-radius: 22px; background: var(--tile); box-shadow: 0 16px 50px rgba(0, 0, 0, .6);
-    border: 2px solid var(--acc-soft); animation: remind 2.4s ease-in-out infinite; }
-  @keyframes remind { 50% { border-color: var(--acc); } }
+    border: 2px solid var(--acc-soft); }
+  .rm-card.lit { border-color: var(--acc); }      /* animate() turns it on and off once a second */
   .rm-when { margin-top: 8px; font-size: calc(46px * var(--ts)); font-weight: 700; letter-spacing: -.02em; color: var(--acc);
     font-variant-numeric: tabular-nums; }
   .rm-title { margin-top: 4px; font-size: calc(26px * var(--ts)); font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -1672,6 +1672,8 @@ function animate() {
   if (frame % MOTION_FPS) return;      // the rest blinks once a second
   var on = frame / MOTION_FPS % 2 === 1;
   [].forEach.call(document.querySelectorAll('.live'), function (dot) { dot.classList.toggle('dim', on); });
+  var card = document.querySelector('#reminder.show .rm-card');
+  if (card) card.classList.toggle('lit', on);
 }
 setInterval(animate, 1000 / MOTION_FPS);
 function updateTopNp() {
