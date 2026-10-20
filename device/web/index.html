@@ -336,8 +336,7 @@
   .st-run, .st-warn { color: var(--warn); }
   .st-wait, .st-off { color: var(--muted); }
   .spin { width: 15px; height: 15px; border-radius: 50%; border: 2.5px solid currentColor; border-right-color: transparent;
-    animation: spin .9s linear infinite; }
-  @keyframes spin { to { transform: rotate(360deg); } }
+    will-change: transform; }      /* animate() turns it */
   /* small motion where something is live: equalizer bars while a song plays, a pulsing dot for a
      meeting in progress, the armed kill switch glowing. What keeps moving moves from animate(),
      not in a CSS animation: see animate(). */
@@ -1666,6 +1665,9 @@ function animate() {
   [].forEach.call(document.querySelectorAll('.eq i'), function (bar, i) {      // each bar on its own wave
     var k = i % 3;
     bar.style.transform = 'scaleY(' + (.3 + .7 * Math.abs(Math.sin(t * Math.PI * (1.1 + .25 * k) + k * 1.3))).toFixed(2) + ')';
+  });
+  [].forEach.call(document.querySelectorAll('.spin'), function (spin) {      // a turn a second
+    spin.style.transform = 'rotate(' + frame % MOTION_FPS * 360 / MOTION_FPS + 'deg)';
   });
   if (frame % MOTION_FPS) return;      // the rest blinks once a second
   var on = frame / MOTION_FPS % 2 === 1;
