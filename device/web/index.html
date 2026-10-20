@@ -160,7 +160,7 @@
   .np-progress { margin-top: auto; }
   .np-bar { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
   .np-top .np-bar { background: rgba(var(--npacc, 125, 132, 146), .2); }
-  .np-bar i { display: block; height: 100%; width: 0; background: var(--acc); transition: width .5s linear; }
+  .np-bar i { display: block; height: 100%; width: 0; background: var(--acc); }     /* set once a second, no transition */
   .np-times { display: flex; justify-content: space-between; font: 500 calc(13px * var(--ts)) GeistMono, monospace; color: var(--muted); margin-top: 6px; }
   .np-controls { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; }
   .tile.round { flex: none; width: 54px; height: 54px; padding: 0; border-radius: 50%; align-items: center; justify-content: center;
@@ -380,7 +380,6 @@
   .px-art svg { width: 20px; height: 20px; }
   .px-art.sq { height: 44px; }                  /* album covers are square */
   .px-row .np-bar { height: 4px; margin-top: 7px; }
-  .px-row .np-bar i { transition: none; }       /* set in place every 3 s, see updatePlex() */
   .px-info { flex: none; width: 124px; display: flex; flex-direction: column; align-items: flex-end; margin-left: 10px; }
   .px-tag { font: 600 calc(10.5px * var(--ts)) GeistMono, monospace; letter-spacing: .04em; text-transform: uppercase;
     padding: 3px 7px; border-radius: 6px; background: var(--tile-hi); white-space: nowrap; }
@@ -1470,7 +1469,7 @@ function updateNowPlaying() {
     $('np-dur').textContent = fmtTime(dur);
   }
 }
-setInterval(updateNowPlaying, 500);
+setInterval(updateNowPlaying, 1000);
 
 // ---- the agenda and system monitor (a page with "widgets": ["agenda", "monitor"]), both
 // from the computer agent: its calendars (read on the device) and its stats every 2 s.
