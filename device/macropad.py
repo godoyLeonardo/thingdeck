@@ -817,14 +817,14 @@ class LinkOpener:
         return pending[0] if pending and time.monotonic() - pending[1] < 15 else None
 
 
-GITHUB_FIELDS_RUN = ('workflow', 'status', 'conclusion', 'branch', 'title', 'event', 'created', 'updated')
-GITHUB_FIELDS_PR = ('repo', 'number', 'title', 'draft', 'checks', 'review', 'updated')
+GITHUB_FIELDS_RUN = ('workflow', 'status', 'conclusion', 'branch', 'title', 'event', 'created', 'updated', 'url')
+GITHUB_FIELDS_PR = ('repo', 'number', 'title', 'draft', 'checks', 'review', 'updated', 'url')
 
 
 class GitHubStatus:
     """A repo's latest workflow runs and the user's open pull requests, which the agent
     reads with the gh CLI (the repo is set in github.txt on the computer). Rows open on
-    the computer when tapped; their links stay here and the UI only gets ids."""
+    the computer by their ids: the UI gets each link only to show it."""
 
     def __init__(self, ui, opener):
         self.ui, self.opener = ui, opener
