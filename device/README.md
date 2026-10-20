@@ -184,7 +184,7 @@ it goes to the first page with `"nowplaying": true`.
 ### Calendar and system stats
 
 A page with `"widgets"` shows live panels instead of tiles: `["agenda"]` (Calendar)
-lays the coming days out as Today / Tomorrow / Later this week columns,
+lays the coming days out as Today / Tomorrow / Next two weeks columns,
 `["monitor"]` (Status) shows CPU, memory, GPU and network cards, and
 `["agenda", "monitor"]` puts a list and a 2×2 grid side by side.
 
@@ -203,7 +203,7 @@ BYMONTH, BYSETPOS), EXDATE, RDATE, RECURRENCE-ID (moved or cancelled occurrences
 and events the calendar's owner declined (a Google feed's name is the owner's address).
 One-off events that ended before today are skipped while reading: a 4 MB feed takes
 about 2 s on the Car Thing. `Agenda` lists the events from local midnight
-to 7 days later, recomputes every 5 minutes and when the UTC offset changes, and
+to 14 days later, recomputes every 5 minutes and when the UTC offset changes, and
 sends `agenda` events. All-day and floating times use the computer's UTC offset.
 
 **Join:** the UI posts `POST /api/calendar/open` with an event id; only events with

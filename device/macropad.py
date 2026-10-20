@@ -711,8 +711,8 @@ class HostHue:
         self.ui.publish('hue_dial', {'room': room['id']})
 
 
-AGENDA_DAYS = 7         # today and the next days
-AGENDA_MAX = 80         # events sent to the UI
+AGENDA_DAYS = 14        # today and the next days
+AGENDA_MAX = 160        # events sent to the UI
 EPOCH = datetime.datetime(1970, 1, 1)
 
 
