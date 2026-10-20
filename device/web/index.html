@@ -609,7 +609,11 @@
   .seg div { padding: 0 12px; height: 34px; line-height: 34px; border-radius: 8px; font-size: calc(14px * var(--ts)); font-weight: 500; color: var(--muted); }
   .seg div.on { background: var(--acc-soft); color: var(--acc); }
   .slider { display: flex; align-items: center; min-height: 46px; transition: opacity .15s; }
-  .slider.dim { opacity: .45; }
+  .stepper { display: flex; align-items: center; flex: none; }
+  .stepper .btn { flex: none; width: 48px; font-size: calc(20px * var(--ts)); }
+  .stepper .btn.off { opacity: .35; }
+  .stepper .btn.down { background: var(--acc-soft); color: var(--acc); }
+  .stepper b { min-width: 96px; text-align: center; font: 500 calc(14px * var(--ts)) GeistMono, monospace; }
   .slider span { font-size: calc(16px * var(--ts)); width: 26px; text-align: center; }
   input[type=range] { -webkit-appearance: none; flex: 1; height: 40px; background: transparent; margin: 0 8px; }
   input[type=range]::-webkit-slider-runnable-track { height: 8px; border-radius: 4px; background: var(--line); }
@@ -733,6 +737,8 @@
       <div class="row"><label>Brightness<small id="bnow"></small></label>
         <div class="seg"><div data-set="brightness_auto" data-val="true">Auto</div><div data-set="brightness_auto" data-val="false">Manual</div></div></div>
       <div class="slider" id="bslider"><span>☀</span><input type="range" id="bright" min="5" max="255" step="1"><span>☀️</span></div>
+      <div class="row" id="bstops"><label>Darker / brighter<small>light stops</small></label>
+        <div class="stepper"><div class="btn" data-set="brightness_stops" id="bdown">−</div><b id="bstopsv"></b><div class="btn" data-set="brightness_stops" id="bup">+</div></div></div>
       <h3 style="margin-top:10px">Input</h3>
       <div class="row"><label>Host OS<small id="osdet"></small></label>
         <div class="seg"><div data-set="os_mode" data-val="&quot;auto&quot;">Auto</div><div data-set="os_mode" data-val="&quot;windows&quot;">Windows</div><div data-set="os_mode" data-val="&quot;mac&quot;">macOS</div><div data-set="os_mode" data-val="&quot;linux&quot;">Linux</div></div></div>
@@ -1072,16 +1078,25 @@ function renderSettings() {
     var key = opts[i].getAttribute('data-set');
     opts[i].classList.toggle('on', JSON.stringify(current[key]) === opts[i].getAttribute('data-val'));
   }
-  $('bslider').classList.toggle('dim', !!s.brightness_auto);
+  // Auto: the offset in stops instead of the slider. The buttons carry the value they set.
+  var stops = s.brightness_stops || 0, STOPS = 3;
+  $('bslider').style.display = s.brightness_auto ? 'none' : '';
+  $('bstops').style.display = s.brightness_auto ? '' : 'none';
+  $('bdown').setAttribute('data-val', JSON.stringify(Math.max(-STOPS, stops - 0.5)));
+  $('bup').setAttribute('data-val', JSON.stringify(Math.min(STOPS, stops + 0.5)));
+  $('bdown').classList.toggle('off', stops <= -STOPS);
+  $('bup').classList.toggle('off', stops >= STOPS);
+  $('bstopsv').textContent = (stops > 0 ? '+' : stops < 0 ? '−' : '') + Math.abs(stops) + (Math.abs(stops) === 1 ? ' stop' : ' stops');
   if (!draggingHue) {
     $('hue').value = typeof s.accent === 'number' ? s.accent : hexHue(themeAccent(current.theme, current.accent));
   }
   if (!dragging) {
-    $('bright').value = s.brightness_auto && info ? info.brightness_now : s.brightness;
+    $('bright').value = s.brightness;
   }
   $('osdet').textContent = { windows: 'detected: Windows', other: 'detected: Linux or macOS' }[st.os_detected] || 'not detected yet';
   renderTabOrder(s);
-  $('bnow').textContent = s.brightness_auto ? 'light sensor' : Math.round((s.brightness || 0) / 2.55) + '%';
+  $('bnow').textContent = s.brightness_auto ? 'light sensor' + (info ? ' · ' + Math.round(info.brightness_now / 2.55) + '%' : '')
+    : Math.round((s.brightness || 0) / 2.55) + '%';
   if (info) {
     var up = Math.floor(info.uptime), h = Math.floor(up / 3600), m = Math.floor(up % 3600 / 60);
     $('kv').innerHTML =

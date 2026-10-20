@@ -80,8 +80,8 @@ The result picks per-OS action overrides, and it can pick a per-OS layout
 
 When the HID function is not `connected` (host suspended or gone), the UI shows
 the standby screen after 3 s, and hardware input is ignored. After the same 3 s
-the backlight drops to its minimum (`BRIGHTNESS_MIN`, with the light-sensor service
-stopped); the brightness setting is applied again when the host is back.
+the backlight drops to its minimum (`BRIGHTNESS_MIN`, and auto brightness pauses);
+the brightness setting is applied again when the host is back.
 
 **After resume.** The host resets the bus. `adbd` then closes and reopens its
 FunctionFS files, and with configfs that unbinds the whole gadget. Nothing in the
@@ -249,8 +249,13 @@ number (0–359), drawn light on dark themes and dark on light ones.
 ### Brightness
 
 `/sys/class/backlight/aml-bl/brightness` is **inverted**: 0–255, and higher means
-dimmer. Auto mode keeps the stock `sp-als-backlight` light-sensor service running.
-Manual mode stops it and writes `260 - level`.
+dimmer, so a level is written as `260 - level`. The stock `sp-als-backlight` service
+always stays stopped, because it has no offset. In auto mode, `Pad.follow_sensor` reads
+the TMD2772 light sensor (`in_intensity0_raw`) every 0.5 s. It uses the stock curve,
+fitted to that service's log: level 25 in the dark, `63.3 + 19.3 ln(raw - 12.2)` above a
+reading of 12, and 210 at most. It multiplies the level by 2 for each stop of the offset
+(`brightness_stops`, -3 to +3 in half stops; Settings → General). Then it fades a
+fifth of the way to that level on each reading, as the stock service did.
 
 ### GitHub
 
