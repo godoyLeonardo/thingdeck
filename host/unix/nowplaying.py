@@ -1225,7 +1225,7 @@ def main():
     last_signature, last_sent = None, 0.0
     cover_sent_for, cover_tries = '', 0
     last_host, last_host_sent = None, 0.0
-    last_stats, kill_result = 0.0, None
+    last_stats, last_focus, kill_result = 0.0, None, None
     audio = AudioLink()
     hue = HueLink()
     plex = PlexLink()
@@ -1241,12 +1241,13 @@ def main():
                     continue
                 tunnel = True
                 last_signature, cover_sent_for, last_host, calendar_hash = None, '', None, None
-            # Stats (and the focused app) every 2 s; the reply may ask to kill that app, open a
-            # meeting link or resend the calendars.
-            if time.monotonic() - last_stats >= 2:
-                last_stats = time.monotonic()
+            # Stats (and the focused app) every 2 s, and right away when another app comes to the
+            # front; the reply may ask to kill that app, open a meeting link or resend the calendars.
+            focused = focus()
+            if time.monotonic() - last_stats >= 2 or focused != last_focus:
+                last_stats, last_focus = time.monotonic(), focused
                 body = stats.read()
-                body['focus'] = focus()
+                body['focus'] = focused
                 if kill_result:
                     body['kill_result'], kill_result = kill_result, None
                 reply = send('stats', body)
