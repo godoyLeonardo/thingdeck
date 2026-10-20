@@ -64,7 +64,7 @@ The Car Thing's screen is 800×480. These use made-up demo data.
 | ![Settings, Appearance: themes, accent colors, the hue slider and icon options](docs/screenshots/settings.png) | ![Settings, Tabs: the pages in order with up and down arrows](docs/screenshots/tabs.png) |
 | **Settings → Appearance** | **Settings → Tabs:** the order, and which tabs show |
 | ![A meeting reminder over the Media page: a countdown with Join meeting and Dismiss](docs/screenshots/reminder.png) | |
-| **Meeting reminder:** 5 minutes before, on any page | |
+| **Reminder:** 5 minutes before an event, on any page | |
 
 ## Requirements
 
@@ -168,9 +168,9 @@ them to the Car Thing **over the USB cable** (`adb forward`; no network):
   declined left out. The next event is highlighted with a countdown. Events with a
   Google Meet, Zoom or Teams link get a Join button that opens the link on the computer.
   Tap an event for its details: date, time and length, place, calendar and notes.
-  Five minutes before a meeting with a link, a reminder card comes up on any page
-  with a countdown, **Join meeting** and **Dismiss**; it stays until two minutes
-  after the start.
+  Five minutes before any timed event, a reminder card comes up on any page with a
+  countdown and **Dismiss**, plus **Join meeting** for a meeting with a link or
+  **Details** for anything else; it stays until two minutes after the start.
 - **Status:** the Status page shows CPU, memory, GPU and network speed, each with
   a graph of the last two minutes. The GPU needs an NVIDIA card (`nvidia-smi`), or
   an AMD one on Linux; CPU temperature shows on Linux.

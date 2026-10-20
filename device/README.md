@@ -216,9 +216,10 @@ its notes (descriptions, HTML turned into plain text, up to 2000 characters) and
 calendar name from `GET /api/calendar/event?id=…`.
 
 **Reminder:** the UI checks the agenda every second and shows a card for the first
-timed event with a meeting link from 5 minutes before its start to 2 minutes after
-(not over standby or the lock screen). Join opens the link as above; Join and Dismiss
-both hide it for that event, remembered in the browser's `localStorage`
+timed event (all-day ones aside) from 5 minutes before its start to 2 minutes after
+(not over standby or the lock screen). An event with a meeting link gets Join, which
+opens the link as above; any other gets Details, which opens its details card. Either
+button and Dismiss hide it for that event, remembered in the browser's `localStorage`
 (`thingdeck.dismissed`, kept for a day).
 
 ### Kill switch
