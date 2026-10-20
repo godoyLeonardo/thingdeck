@@ -174,7 +174,8 @@ them to the Car Thing **over the USB cable** (`adb forward`; no network):
   Tap an event for its details: date, time and length, place, calendar and notes.
   With two calendars or more, tabs at the top show **All** or one calendar. The Car
   Thing keeps the tab you pick, and the number of weeks for each tab. If the picked
-  calendar is gone, it shows All.
+  calendar is gone, it shows All. In All, a colored dot shows each event's calendar,
+  in the color of its tab.
   Five minutes before any timed event in any calendar, a reminder card comes up on any page with a
   countdown and **Dismiss**, plus **Join meeting** for a meeting with a link or
   **Details** for anything else; it stays until two minutes after the start.
