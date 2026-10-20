@@ -45,7 +45,8 @@ built-in browser. How it works is in [device/README.md](device/README.md).
 
 ## Screenshots
 
-The Car Thing's screen is 800×480. These use made-up demo data.
+The Car Thing's screen is 800×480. These use made-up demo data; to retake them, run
+`docs/screenshots/take.py` (it says how in its header).
 
 | | |
 |---|---|
