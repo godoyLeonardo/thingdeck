@@ -138,6 +138,12 @@
     --media: #98bb6c; --key: #7e9cd8; --type: #e6c384; --nav: #957fb8; --mouse: #7aa89f; --bad: #e46876; --warn: #ffa066;
     --on-acc: #1f1f28;
   }
+  :root[data-theme="github"] {
+    --bg: #0d1117; --panel: #161b22; --tile: #161b22; --tile-hi: #21262d; --line: #30363d; --edge: #21262d;
+    --text: #e6edf3; --muted: #8b949e; --faint: #30363d; --toast: #21262d; --veil: rgba(13,17,23,.92); --standby: #010409;
+    --media: #3fb950; --key: #58a6ff; --type: #d29922; --nav: #bc8cff; --mouse: #39c5cf; --bad: #ff7b72; --warn: #db6d28;
+    --on-acc: #0d1117;
+  }
   * { box-sizing: border-box; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); overflow: hidden;
     font-family: Geist, 'Circular Sp UI v3 T', 'Noto Sans', sans-serif; touch-action: none; cursor: none; }
@@ -1077,7 +1083,8 @@ var THEMES = {
   monokai:    { name: 'Monokai',     bg: '#272822', tile: '#3e3d32', text: '#f8f8f2', acc: '#a6e22e' },
   rosepine:   { name: 'Rosé Pine',   bg: '#191724', tile: '#1f1d2e', text: '#e0def4', acc: '#ebbcba' },
   everforest: { name: 'Everforest',  bg: '#2d353b', tile: '#343f44', text: '#d3c6aa', acc: '#a7c080' },
-  kanagawa:   { name: 'Kanagawa',    bg: '#1f1f28', tile: '#2a2a37', text: '#dcd7ba', acc: '#7e9cd8' }
+  kanagawa:   { name: 'Kanagawa',    bg: '#1f1f28', tile: '#2a2a37', text: '#dcd7ba', acc: '#7e9cd8' },
+  github:     { name: 'GitHub Dark', bg: '#0d1117', tile: '#161b22', text: '#e6edf3', acc: '#58a6ff' }
 };
 var ACCENTS = {   // [on dark themes, on light themes]
   green: ['#1ed760', '#12a150'], blue: ['#5b9cff', '#2f6fe0'], purple: ['#a78bfa', '#7c5cdb'],
