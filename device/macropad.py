@@ -45,8 +45,8 @@ def log(*args):
 
 
 def page_key(entry):
-    """What the tab order calls a config.json page entry: a choice slot's id, else its name."""
-    return entry.get('id') if 'choices' in entry else entry.get('name')
+    """What the tab order calls a config.json page entry: its name."""
+    return entry.get('name')
 
 
 # ---------------------------------------------------------------- HID tables
@@ -984,7 +984,7 @@ class Pad:
         # None means "use config.json".
         self.settings = {'os_mode': 'auto', 'layout': None, 'dial_invert': None,
                          'brightness_auto': True, 'brightness': 180,
-                         'theme': 'dark', 'accent': 'theme', 'page_choices': {},
+                         'theme': 'dark', 'accent': 'theme',
                          'clock_24h': True, 'icon_style': None,
                          'icon_color': None, 'page_order': [], 'page_hidden': [], 'page_shown': []}
         self._als_running = None    # stock light-sensor service state, as last set by us
@@ -1038,7 +1038,6 @@ class Pad:
             'clock_24h': lambda v: isinstance(v, bool),
             'icon_style': lambda v: v is None or v in ICON_STYLES,
             'icon_color': lambda v: v is None or v in ICON_COLORS,
-            'page_choices': self._valid_page_choices,
             'page_order': lambda v: isinstance(v, list) and len(v) <= 64 and all(isinstance(x, str) for x in v),
             'page_hidden': lambda v: isinstance(v, list) and len(v) <= 64 and all(isinstance(x, str) for x in v),
             'page_shown': lambda v: isinstance(v, list) and len(v) <= 64 and all(isinstance(x, str) for x in v),
@@ -1057,13 +1056,6 @@ class Pad:
             self.apply_brightness()
         self.save()
         self.publish_state()
-
-    def _valid_page_choices(self, value):
-        """{slot id: choice name or None (= default)} for the config's choice slots."""
-        slots = {p.get('id'): [c.get('name') for c in p['choices']]
-                 for p in self.config.get('pages', []) if 'choices' in p}
-        return isinstance(value, dict) and all(
-            k in slots and (v is None or v in slots[k]) for k, v in value.items())
 
     def apply_brightness(self):
         """Apply the brightness setting (not while dimmed for standby)."""
@@ -1174,8 +1166,8 @@ class Pad:
         return True
 
     def pages(self):
-        """The pages as shown: in the Settings order, and a slot with "choices" shows one of them (see page_choice)."""
-        return [self.page_choice(p)[1] if 'choices' in p else p for p in self.ordered_pages()]
+        """The pages as shown, in the Settings order."""
+        return self.ordered_pages()
 
     def ordered_pages(self, hidden=False):
         """config.json's page entries in the order picked in Settings → Tabs, without the ones
@@ -1214,19 +1206,6 @@ class Pad:
             self.page = keys.index(current) if current in keys else 0
         self.publish_state()
 
-    def page_choice(self, slot):
-        """(name, page) a choice slot shows: the one picked in Settings, else its default
-        for the host OS. A slot looks like
-        {"id": "calls", "label": "Calls page", "default": {"windows": "Discord", "other": "Meetings"},
-         "choices": [{"name": "Meetings", ...}, {"name": "Discord", ...}]}"""
-        choices = {c.get('name'): c for c in slot.get('choices', [])}
-        name = self.settings['page_choices'].get(slot.get('id'))
-        if name not in choices:
-            default = slot.get('default')
-            if isinstance(default, dict):
-                default = default.get(self.host_os(), default.get('other'))
-            name = default if default in choices else next(iter(choices), None)
-        return name, choices.get(name, {'name': name or '?', 'tiles': []})
 
     def dials(self):
         return self.config.get('dial_modes', [])

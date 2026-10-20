@@ -746,8 +746,6 @@
       <h3 style="margin-top:10px">Clock</h3>
       <div class="row"><label>Format<small>time comes from the computer</small></label>
         <div class="seg"><div data-set="clock_24h" data-val="true">24h</div><div data-set="clock_24h" data-val="false">12h</div></div></div>
-      <h3 style="margin-top:10px">Pages</h3>
-      <div id="pagechoices"></div>
     </div>
     </div>
   </div>
@@ -848,31 +846,9 @@ function variant(a) {
   for (var k in o) r[k] = o[k];
   return r;
 }
-// A page slot with "choices" shows the one picked in Settings, else its per-OS default
-// (same rules as Pad.page_choice in macropad.py).
-function choiceName(slot, ignorePicked) {
-  var names = (slot.choices || []).map(function (c) { return c.name; });
-  var picked = ((st.settings || {}).page_choices || {})[slot.id];
-  if (!ignorePicked && names.indexOf(picked) >= 0) return picked;
-  var d = slot['default'];
-  if (d && typeof d === 'object') d = d[st.os] || d.other;
-  return names.indexOf(d) >= 0 ? d : names[0];
-}
-// Settings → General → Pages: one row per choice slot, "Auto" = the OS default.
-function renderPageChoices(s) {
-  var picked = s.page_choices || {};
-  $('pagechoices').innerHTML = (cfg.pages || []).filter(function (p) { return p.choices; }).map(function (slot) {
-    var cur = picked[slot.id] || null;
-    var opts = [null].concat(slot.choices.map(function (c) { return c.name; }));
-    return '<div class="row"><label>' + esc(slot.label || 'Page') + '<small>auto: ' + esc(choiceName(slot, true)) +
-      '</small></label><div class="seg">' + opts.map(function (name) {
-        return '<div data-choice-slot="' + esc(slot.id) + '" data-val="' + esc(JSON.stringify(name)) + '"' +
-          (name === cur ? ' class="on"' : '') + '>' + esc(name || 'Auto') + '</div>';
-      }).join('') + '</div></div>';
-  }).join('');
-}
+
 // The page entries in the order picked in Settings → Tabs (same rules as Pad.ordered_pages).
-function pageKey(p) { return p.choices ? p.id : p.name; }
+function pageKey(p) { return p.name; }
 function orderedEntries(withHidden) {
   var s = st.settings || {}, order = s.page_order || [], hidden = st.hidden || s.page_hidden || [], rank = {};
   order.forEach(function (k, i) { rank[k] = i; });
@@ -890,7 +866,7 @@ function renderTabOrder() {
   var entries = orderedEntries(true), hidden = st.hidden || (st.settings || {}).page_hidden || [], n = 0;
   var unset = st.unconfigured || [];
   $('taborder').innerHTML = entries.map(function (p, i) {
-    var name = esc(p.choices ? resolvePage(p).name + ' (' + (p.label || 'choice') + ')' : p.name), off = hidden.indexOf(pageKey(p)) >= 0;
+    var name = esc(p.name), off = hidden.indexOf(pageKey(p)) >= 0;
     if (unset.indexOf(pageKey(p)) >= 0) name += ' <small class="to-unset">· not set up</small>';
     var btn = function (dir, disabled) {
       return '<div class="to-btn' + (disabled ? ' off' : '') + '"' + (disabled ? '' : ' data-tab-move="' + esc(pageKey(p)) + '|' + dir + '"') + '>' +
@@ -923,12 +899,7 @@ function moveTab(key, dir) {
   keys[i] = keys[j]; keys[j] = key;
   post('/api/settings', { page_order: keys });
 }
-function resolvePage(p) {
-  if (!p.choices) return p;
-  var name = choiceName(p);
-  for (var i = 0; i < p.choices.length; i++) if (p.choices[i].name === name) return p.choices[i];
-  return { name: '?', tiles: [] };
-}
+
 function kind(a) {
   if (!a) return 'key';
   if (a.color) return a.color;
@@ -941,7 +912,7 @@ function kind(a) {
 
 // ---- rendering
 function render() {
-  var pages = orderedEntries().map(resolvePage);
+  var pages = orderedEntries();
   var page = pages[st.page] || { tiles: [] };
   currentPage = page;
   var grid = page.grid || cfg.grid || [4, 2];
@@ -1109,7 +1080,6 @@ function renderSettings() {
     $('bright').value = s.brightness_auto && info ? info.brightness_now : s.brightness;
   }
   $('osdet').textContent = { windows: 'detected: Windows', other: 'detected: Linux or macOS' }[st.os_detected] || 'not detected yet';
-  renderPageChoices(s);
   renderTabOrder(s);
   $('bnow').textContent = s.brightness_auto ? 'light sensor' : Math.round((s.brightness || 0) / 2.55) + '%';
   if (info) {
@@ -1618,7 +1588,7 @@ function updateTopNp() {
   if (box.innerHTML !== html) box.innerHTML = html;
 }
 function gotoMedia() {
-  var i = orderedEntries().map(resolvePage).findIndex(function (p) { return p.nowplaying; });
+  var i = orderedEntries().findIndex(function (p) { return p.nowplaying; });
   if (i >= 0) post('/api/page', { page: i });
 }
 function updateAudioPill() {
@@ -2265,7 +2235,7 @@ document.addEventListener('pointerdown', function (e) {
   startX = e.clientX; startY = e.clientY;
   startInBar = !!e.target.closest('#bar');
   startOnSlider = !!e.target.closest('[data-hue-bar], [data-hue-lbar]');   // dragging a light's brightness, not swiping
-  downEl = e.target.closest('.tile[data-i], .preset[data-i], #dial, .tab, #status, [data-set], [data-sys], [data-sec], [data-choice-slot], [data-media], [data-join], [data-guard], [data-kill], [data-ev], [data-sheet-close], [data-sheet-card], [data-audio], [data-audio-dev], [data-gh], #tabmore, [data-hue-room], [data-hue-toggle], [data-hue-ltoggle], [data-hue-scene], [data-hue-alloff], [data-hue-pair], [data-hue-bar], [data-hue-lbar], [data-tab-move], [data-tabs-reset], [data-tab-hide], [data-goto-media], [data-rm-join], [data-rm-dismiss]');
+  downEl = e.target.closest('.tile[data-i], .preset[data-i], #dial, .tab, #status, [data-set], [data-sys], [data-sec], [data-media], [data-join], [data-guard], [data-kill], [data-ev], [data-sheet-close], [data-sheet-card], [data-audio], [data-audio-dev], [data-gh], #tabmore, [data-hue-room], [data-hue-toggle], [data-hue-ltoggle], [data-hue-scene], [data-hue-alloff], [data-hue-pair], [data-hue-bar], [data-hue-lbar], [data-tab-move], [data-tabs-reset], [data-tab-hide], [data-goto-media], [data-rm-join], [data-rm-dismiss]');
   if (downEl) downEl.classList.add('down');
 });
 document.addEventListener('pointercancel', function () { if (downEl) downEl.classList.remove('down'); downEl = null; });
@@ -2308,11 +2278,6 @@ document.addEventListener('pointerup', function (e) {
   else if (el.hasAttribute('data-kill')) pressKill();
   else if (el.hasAttribute('data-join')) { fire(el); post('/api/calendar/open', { id: el.getAttribute('data-join') }); closeSheet(); }
   else   if (el.hasAttribute('data-media')) post('/api/run', { media: el.getAttribute('data-media') });
-  else   if (el.hasAttribute('data-choice-slot')) {
-    var choices = JSON.parse(JSON.stringify((st.settings || {}).page_choices || {}));
-    choices[el.getAttribute('data-choice-slot')] = JSON.parse(el.getAttribute('data-val'));   // null = default
-    post('/api/settings', { page_choices: choices });
-  }
   else   if (el.hasAttribute('data-set')) {
     var body = {};
     body[el.getAttribute('data-set')] = JSON.parse(el.getAttribute('data-val'));
@@ -2344,10 +2309,9 @@ function connect() {
     var m = JSON.parse(e.data), d = m.data;
     if (m.type === 'state') {
       var pageChanged = d.page !== st.page, osChanged = d.os !== st.os;
-      var choicesChanged = JSON.stringify((d.settings || {}).page_choices) !== JSON.stringify((st.settings || {}).page_choices);
       st = d;
       if (pageChanged && showSettings) openSettings(false);
-      if (pageChanged || osChanged || choicesChanged) load(); else render();   // presets come per page, OS and choice
+      if (pageChanged || osChanged) load(); else render();   // presets come per page and per OS
       if (d.agent && d.agent.outdated && !agentWarned) {     // once per page load
         agentWarned = true;
         toast('The computer agent is out of date: run ./deploy.sh all', 'warn');
