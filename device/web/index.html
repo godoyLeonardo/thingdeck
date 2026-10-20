@@ -120,6 +120,12 @@
     --media: #a6e22e; --key: #66d9ef; --type: #e6db74; --nav: #ae81ff; --mouse: #a1efe4; --bad: #f92672; --warn: #fd971f;
     --on-acc: #272822;
   }
+  :root[data-theme="rosepine"] {
+    --bg: #191724; --panel: #1f1d2e; --tile: #1f1d2e; --tile-hi: #26233a; --line: #403d52; --edge: #26233a;
+    --text: #e0def4; --muted: #908caa; --faint: #524f67; --toast: #26233a; --veil: rgba(25,23,36,.92); --standby: #12101a;
+    --media: #31748f; --key: #9ccfd8; --type: #f6c177; --nav: #c4a7e7; --mouse: #ebbcba; --bad: #eb6f92; --warn: #f6c177;
+    --on-acc: #191724;
+  }
   * { box-sizing: border-box; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); overflow: hidden;
     font-family: Geist, 'Circular Sp UI v3 T', 'Noto Sans', sans-serif; touch-action: none; cursor: none; }
@@ -1056,7 +1062,8 @@ var THEMES = {
   tokyonight: { name: 'Tokyo Night', bg: '#1a1b26', tile: '#24283b', text: '#c0caf5', acc: '#7aa2f7' },
   solarized:  { name: 'Solarized',   bg: '#002b36', tile: '#073642', text: '#eee8d5', acc: '#2aa198' },
   onedark:    { name: 'One Dark',    bg: '#282c34', tile: '#2c313a', text: '#abb2bf', acc: '#61afef' },
-  monokai:    { name: 'Monokai',     bg: '#272822', tile: '#3e3d32', text: '#f8f8f2', acc: '#a6e22e' }
+  monokai:    { name: 'Monokai',     bg: '#272822', tile: '#3e3d32', text: '#f8f8f2', acc: '#a6e22e' },
+  rosepine:   { name: 'Rosé Pine',   bg: '#191724', tile: '#1f1d2e', text: '#e0def4', acc: '#ebbcba' }
 };
 var ACCENTS = {   // [on dark themes, on light themes]
   green: ['#1ed760', '#12a150'], blue: ['#5b9cff', '#2f6fe0'], purple: ['#a78bfa', '#7c5cdb'],
