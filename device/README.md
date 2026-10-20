@@ -193,6 +193,7 @@ song playing kept 60-66% of a core busy on every live page, and the Media page a
   own layer (`will-change: transform`). They cost about 55% of a core while they show,
   and nothing when no song plays. Measured: 8 frames about 20%, 24 frames without their
   own layer about 68%; a CSS animation costs the same with or without its own layer.
+- The dot of a meeting in progress blinks once a second.
 - The progress bars move once a second, with no transition (a song's bar moves about
   2 px a second, so a transition adds nothing).
 
