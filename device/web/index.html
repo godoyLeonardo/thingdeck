@@ -2162,7 +2162,7 @@ function connect() {
       var mode = (cfg.dial_modes || [])[st.dial];      // the volume dial: show the bar right away
       if (mode && mode.cw && mode.cw.media === 'vol_up') showVolume();
     } else if (m.type === 'hw') {
-      if (d.button === 'knob' || d.button === 'back') fire($('dial'));
+      if (d.button === 'knob' || d.button === 'menu') fire($('dial'));     // back changes the page, which shows by itself
     } else if (m.type === 'nowplaying') {
       var had = !!np, track = np && [np.art, np.title, np.artist, np.album, np.app, np.playing].join('|');
       setNowPlaying(d);
