@@ -402,7 +402,7 @@ Top level:
 | `grid` | Tile grid `[columns, rows]`, default `[4, 2]`; pages can override it |
 | `hardware` | `knob`, `back`, `menu`: `{"tap": action, "hold": action}`; `dial_invert` |
 | `dial_modes` | `[{"name", "cw", "ccw", "press"}]` |
-| `presets` | Default 4 top-button actions |
+| `presets` | Default 4 top-button actions (first page `{"page": 0}`, `"prev"`, `"next"`, last page `{"page": -1}`) |
 | `pages` | `[{"name", "presets"?, "grid"?, "nowplaying"?, "header"?, "widgets"?, "kill"?, "audio"?, "tiles": [...]}]` |
 
 Tiles and presets are actions plus `label`, optional `icon` (an emoji) or `symbol`
