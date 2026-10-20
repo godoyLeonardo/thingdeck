@@ -8,7 +8,7 @@ as soon as you plug it in.
 - **Touchscreen:** pages of large tiles (Desktop, Shell, and a calls page: Discord
   or Meetings), each sending a shortcut, a media key, typed text or a sequence of
   steps, plus live pages filled by the computer agent: Media, Lights (Philips Hue),
-  Calendar, Status, Code (GitHub) and Plex. Up to seven tabs share the bottom bar;
+  Calendar, Status, Code (GitHub), Plex and NAS (TrueNAS). Up to seven tabs share the bottom bar;
   with more, it shows four at a time and scrolls. Settings → Tabs sets their order
   and hides any you don't use; live pages you haven't set up (no config file yet)
   start hidden and can be turned on there. On live pages, the top bar also shows the song
@@ -34,7 +34,8 @@ as soon as you plug it in.
 - **Computer agent (optional):** a small background agent on the computer adds what's
   playing with its cover, Philips Hue lights, your calendar with Join buttons,
   CPU/memory/GPU/network graphs, a kill switch for the app in focus, GitHub Actions
-  runs and pull requests, the streams and load of your Plex server, a volume bar,
+  runs and pull requests, the streams and load of your Plex server, your TrueNAS
+  pools, disks, alerts and apps, a volume bar,
   an audio device picker, a clock and a lock screen (see [Computer agent](#computer-agent)).
 - **Standby screen** while the computer sleeps; the pad reconnects by itself
   when it wakes up.
@@ -62,6 +63,8 @@ The Car Thing's screen is 800×480. These use made-up demo data.
 | **Desktop:** a tile page | **Settings → Appearance** |
 | ![Settings, Tabs: the pages in order with up and down arrows](docs/screenshots/tabs.png) | ![Plex page: three streams with posters and transcode tags, the server's CPU and bandwidth graphs, and the libraries](docs/screenshots/plex.png) |
 | **Settings → Tabs:** the order, and which tabs show | **Plex:** streams and how each is sent, server load, libraries |
+| ![NAS page: TrueNAS pools as tanks that fill up, disk temperatures, alerts and apps](docs/screenshots/nas.png) | ![A meeting reminder over the Code page: a countdown with Join meeting and Dismiss](docs/screenshots/reminder.png) |
+| **NAS:** TrueNAS pools, disks, alerts and apps | **Meeting reminder:** 5 minutes before, on any page |
 
 ## Requirements
 
@@ -209,6 +212,12 @@ them to the Car Thing **over the USB cable** (`adb forward`; no network):
   with any library scan in progress. The graphs need Plex Pass. The page refreshes
   every 3 seconds while it's on screen, every 30 seconds otherwise (see
   [Connecting Plex](#connecting-plex)).
+- **NAS (TrueNAS):** each pool as a tank that fills up (yellow from 80%, red from 90%)
+  with its health and free space, the temperature of every disk (NVMe drives have
+  their own, higher limits), the server's alerts, and how many apps run and how many
+  have updates. Below the pools: the TrueNAS version, uptime, cores, memory and load.
+  It refreshes every 10 seconds while on screen, every minute otherwise (see
+  [Connecting TrueNAS](#connecting-truenas)).
 - **Volume and audio devices:** when the volume or mute changes (the dial, the Mute
   tile, your keyboard), a volume bar shows at the top for a moment. The Media page
   header shows the current output; tap it to pick the output and input devices.
@@ -218,16 +227,17 @@ them to the Car Thing **over the USB cable** (`adb forward`; no network):
   - macOS: the volume always; switching devices needs `brew install switchaudio-osx`.
 - **Clock:** the agent sets the Car Thing's clock and time zone (DST included).
   The time shows large with the date at the top of the live pages (Media, Lights,
-  Calendar, Status, Code, Plex), and on the standby and lock
+  Calendar, Status, Code, Plex, NAS), and on the standby and lock
   screens; 24h/12h is under Settings → General → Clock.
 - **Lock screen:** while the computer is locked, the Car Thing shows the clock,
   "🔒 Computer locked", the cover and what's playing, and media buttons. Tiles,
   presets and dial modes that press keys are blocked while locked, so nothing gets
   typed into the password box; media keys, volume and the wheel still work.
 
-The agent works hardest for the page on screen: Lights, Status (its GPU reading), Code
-and Plex update every few seconds while you look at them and slowly otherwise (every
-30 seconds; GitHub every 5 minutes), and opening one of them fetches its data right away.
+The agent works hardest for the page on screen: Lights, Status (its GPU reading), Code,
+Plex and NAS update every few seconds while you look at them and slowly otherwise (every
+30 seconds; GitHub every 5 minutes, NAS every minute), and opening one of them fetches
+its data right away.
 What the other screens need (the song, volume, lock state, calendar) keeps its usual pace.
 
 Install it once per computer (and once per OS on a dual-boot PC). It starts at
@@ -326,6 +336,31 @@ networks that are allowed without auth" does not ask for one. The agent reads
 The token gives access to your Plex account, so keep `plex.txt` to yourself. The
 graphs of CPU and bandwidth need Plex Pass. Without it, the page shows the streams and
 libraries only.
+
+### Connecting TrueNAS
+
+The agent reads your TrueNAS server on the local network through its own API, with an
+API key. It needs TrueNAS 25.04 or later (the WebSocket API).
+
+1. Open the TrueNAS web interface (for example `https://192.168.1.30`) and sign in.
+2. Click the **person icon** at the top right, then **My API Keys**. (If it isn't
+   there, use **Credentials → API Keys** in the sidebar.)
+3. Click **Add**, name it `thingdeck`, leave **Non-expiring** on, and **Save**.
+4. TrueNAS shows the key **only once**: copy it.
+5. Create `truenas.txt` next to `calendars.txt` with the server's address on the
+   first line and the key on the second:
+
+   ```
+   192.168.1.30
+   1-AbCdEf…
+   ```
+
+The NAS page shows up within a minute; no restart needed. The agent always connects
+over HTTPS: TrueNAS revokes a key that is ever sent over plain HTTP. It accepts the
+server's self-signed certificate for that address only. The agent only reads (system
+info, pools, disk temperatures, alerts, apps). The key carries the rights of the user
+who made it, so for read-only access, make it as a user in the read-only
+administrators group. Keep `truenas.txt` to yourself.
 
 ## When the computer sleeps
 
