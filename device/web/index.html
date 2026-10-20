@@ -1680,7 +1680,10 @@ function stateCard(label, title, text, opts) {
     (opts.button || '') + '</div>';
 }
 // The usual "no agent yet / waiting for it" pair, for a page whose data comes from the agent.
+// An agent that is out of date can be too old to send this page's data, so say that instead of waiting.
 function agentCard(label, what, cls) {
+  if (st.agent && st.agent.outdated)
+    return stateCard(label, 'The computer agent is out of date', 'Run ./deploy.sh all on the computer to update it and see ' + what + ' here.', { cls: cls });
   return st.clock ? stateCard(label, 'Waiting for ' + what + '…', 'It usually takes a few seconds after the computer connects.', { waiting: true, cls: cls })
     : stateCard(label, 'No computer agent', 'Install it on the computer to see ' + what + ' here (see README).', { cls: cls });
 }
