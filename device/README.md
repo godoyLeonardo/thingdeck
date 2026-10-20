@@ -181,6 +181,26 @@ In a page's clock header, every page but the media card shows the song playing o
 the right (title, then artist, cut off from the end when space runs out); tapping
 it goes to the first page with `"nowplaying": true`.
 
+### Motion and CPU
+
+The kiosk browser is Chromium 69. It composites on the GPU (Mali-G31) but paints on the
+CPU, and every frame it makes costs a fixed share of a core. A CSS animation or transition
+that never stops makes 60 frames a second: on the Car Thing, the equalizer bars of the
+song playing kept 60-66% of a core busy on every live page, and the Media page about
+140%. So no CSS animation runs without stop:
+
+- `animate()` moves the equalizer bars at 24 frames a second (`MOTION_FPS`), each on its
+  own layer (`will-change: transform`). They cost about 55% of a core while they show,
+  and nothing when no song plays. Measured: 8 frames about 20%, 24 frames without their
+  own layer about 68%; a CSS animation costs the same with or without its own layer.
+  The spinners (waiting cards, GitHub runs and checks) turn at the same rate, one turn
+  a second.
+- The dot of a meeting in progress and the reminder card's border blink once a second.
+- The progress bars move once a second, with no transition (a song's bar moves about
+  2 px a second, so a transition adds nothing).
+
+Short transitions that run once (a tap, a page change, the volume bar) are fine.
+
 ### Calendar and system stats
 
 A page with `"widgets"` shows live panels instead of tiles: `["agenda"]` (Calendar)
