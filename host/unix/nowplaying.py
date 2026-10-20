@@ -359,8 +359,11 @@ def linux_focus():
 def mac_focus():
     """The frontmost app through lsappinfo, which needs no permission prompt."""
     front = (run(['lsappinfo', 'front']) or '').strip()
-    info = run(['lsappinfo', 'info', '-only', 'pid', '-only', 'name', front]) if front else None
-    pid, name = re.search(r'"pid"=(\d+)', info or ''), re.search(r'"LSDisplayName"="(.*?)"', info or '')
+    info = (run(['lsappinfo', 'info', '-only', 'pid', '-only', 'name', front]) if front else None) or ''
+    # Older macOS prints "pid"=123 and "LSDisplayName"="Finder"; newer ones the full record
+    # ("Finder" ASN:0x0-0x22022: … pid = 123 …) whatever -only asks for.
+    pid = re.search(r'"?pid"?\s*=\s*(\d+)', info)
+    name = re.search(r'"LSDisplayName"="(.*?)"', info) or re.search(r'^"(.*?)" ASN:', info, re.M)
     return (int(pid.group(1)) if pid else None), (name.group(1) if name else '')
 
 
