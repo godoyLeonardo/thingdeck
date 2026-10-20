@@ -753,7 +753,7 @@
   .tab.on { background: var(--acc-soft); color: var(--acc); }
   #status { flex: none; display: flex; align-items: center; font: 500 calc(12px * var(--ts)) GeistMono, monospace; color: var(--muted); margin-left: 8px; }
   #status i { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); margin-right: 7px; }
-  #status.connected i { background: var(--media); box-shadow: 0 0 8px var(--media); }
+  #status.connected i { background: var(--acc); box-shadow: 0 0 8px var(--acc); }      /* the accent; red (.bad) when it fails */
   #status.suspended i { background: var(--warn); }
   #status.bad i { background: var(--bad); }
 
@@ -1095,7 +1095,7 @@ function renderStatus() {
   if (st.mode === 'safe') { text = 'SAFE MODE'; s.className = 'suspended'; }
   else if (st.mode === 'error') { text = 'USB ERROR'; s.className = 'bad'; }
   else if (st.mode === 'starting') { text = 'STARTING'; }
-  else if (st.usb === 'connected') { text = ''; s.className = 'connected'; }   // the green dot says it
+  else if (st.usb === 'connected') { text = ''; s.className = 'connected'; }   // the accent-colored dot says it
   else if (st.usb === 'suspended') { text = 'HOST ASLEEP'; s.className = 'suspended'; }
   else { text = 'NO HOST'; s.className = 'bad'; }
   if (st.mode === 'ok' && st.usb === 'connected') {
