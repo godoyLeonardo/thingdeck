@@ -975,6 +975,7 @@ class Pad:
         self.config = {}
         self.config_mtime = 0
         self.page = 0
+        self.auto_hidden = set()   # pages hidden because their feature has no config (see refresh_hidden)
         self.dial = 0
         self.mode = 'starting'   # starting | ok | safe | error
         self.message = ''
@@ -985,7 +986,7 @@ class Pad:
                          'brightness_auto': True, 'brightness': 180,
                          'theme': 'dark', 'accent': 'theme', 'page_choices': {},
                          'clock_24h': True, 'icon_style': None,
-                         'icon_color': None, 'page_order': [], 'page_hidden': []}
+                         'icon_color': None, 'page_order': [], 'page_hidden': [], 'page_shown': []}
         self._als_running = None    # stock light-sensor service state, as last set by us
         self._dimmed = False
         self._dim_timer = None
@@ -1040,12 +1041,13 @@ class Pad:
             'page_choices': self._valid_page_choices,
             'page_order': lambda v: isinstance(v, list) and len(v) <= 64 and all(isinstance(x, str) for x in v),
             'page_hidden': lambda v: isinstance(v, list) and len(v) <= 64 and all(isinstance(x, str) for x in v),
+            'page_shown': lambda v: isinstance(v, list) and len(v) <= 64 and all(isinstance(x, str) for x in v),
             'brightness_auto': lambda v: isinstance(v, bool),
             'brightness': lambda v: isinstance(v, int) and BRIGHTNESS_MIN <= v <= 255,
         }
         if key not in valid or not valid[key](value):
             raise ValueError('bad setting %s=%r' % (key, value))
-        if key in ('page_order', 'page_hidden'):       # stay on the same page when tabs move or hide
+        if key in ('page_order', 'page_hidden', 'page_shown'):    # stay on the same page when tabs move or hide
             current = page_key(self.ordered_pages()[self.page]) if self.page < len(self.ordered_pages()) else None
             self.settings[key] = value
             keys = [page_key(p) for p in self.ordered_pages()]
@@ -1184,8 +1186,33 @@ class Pad:
         ordered = [p for _, p in sorted(enumerate(entries), key=lambda e: (rank.get(page_key(e[1]), len(rank)), e[0]))]
         if hidden:
             return ordered
-        shown = [p for p in ordered if page_key(p) not in (self.settings.get('page_hidden') or [])]
+        hidden = self.hidden_keys()
+        shown = [p for p in ordered if page_key(p) not in hidden]
         return shown or ordered[:1]
+
+    def hidden_keys(self):
+        """Pages hidden in Settings → Tabs, and pages whose feature has no config, unless
+        they were turned on there."""
+        return set(self.settings.get('page_hidden') or []) | (self.auto_hidden - set(self.settings.get('page_shown') or []))
+
+    def refresh_hidden(self):
+        """Hide the pages whose panels all say their config is missing (no calendars.txt,
+        github.txt, plex.txt or truenas.txt, Hue not paired), staying on the same page.
+        'unknown' (no agent yet) doesn't count, so nothing hides before the agent says so."""
+        none = {'agenda': self.agenda.state == 'none', 'lights': self.hue.published.get('state') == 'none',
+                'github': self.github.published.get('state') == 'none', 'plex': self.plex.published.get('state') == 'none',
+                'truenas': self.truenas.published.get('state') == 'none'}
+        auto = set(page_key(p) for p in self.config.get('pages', [])
+                   if p.get('widgets') and all(none.get(w) for w in p['widgets']))
+        if auto == self.auto_hidden:
+            return
+        with self.lock:
+            pages = self.ordered_pages()
+            current = page_key(pages[self.page]) if self.page < len(pages) else None
+            self.auto_hidden = auto
+            keys = [page_key(p) for p in self.ordered_pages()]
+            self.page = keys.index(current) if current in keys else 0
+        self.publish_state()
 
     def page_choice(self, slot):
         """(name, page) a choice slot shows: the one picked in Settings, else its default
@@ -1209,7 +1236,8 @@ class Pad:
                 'mode': self.mode, 'message': self.message,
                 'os': self.host_os(), 'os_mode': self.settings['os_mode'], 'os_detected': self.os_detected,
                 'settings': self.settings, 'layout': self.layout_name(), 'dial_invert': self.dial_invert(),
-                'locked': self.host.locked, 'clock': self.host.clock(), 'agent': self.agent_status()}
+                'locked': self.host.locked, 'clock': self.host.clock(), 'agent': self.agent_status(),
+                'hidden': sorted(self.hidden_keys()), 'unconfigured': sorted(self.auto_hidden)}
 
     def agent_status(self):
         """The agent's version against the repo's (agents.json, written by deploy.sh):
@@ -1865,6 +1893,7 @@ def main():
             pad.audio.expire()
             pad.plex.expire()
             pad.truenas.expire()
+            pad.refresh_hidden()
             pad.agenda.refresh()
     finally:
         pad.hid.close()
