@@ -335,6 +335,14 @@
   .guard.ready .guard-btn { animation: armed 1.2s ease-in-out infinite; }
   @keyframes armed { 50% { filter: brightness(1.3); } }
   .gh-when { flex: none; margin-left: 10px; font: 500 calc(12px * var(--ts)) GeistMono, monospace; color: var(--muted); }
+  /* the Code page reads from across the desk too: a step above the shared row sizes */
+  .gh h3 { font-size: calc(12.5px * var(--ts)); }
+  .gh-row { min-height: 62px; }
+  .gh .ev-title { font-size: calc(18px * var(--ts)); }
+  .gh .ev-sub { font-size: calc(14px * var(--ts)); }
+  .gh-when { font-size: calc(13.5px * var(--ts)); }
+  .gh-st { width: 36px; height: 36px; }
+  .gh-st svg { width: 20px; height: 20px; }
   .ev-sub .good { color: var(--good); font-weight: 600; }
   .ev-sub .bad { color: var(--bad); font-weight: 600; }
   /* widget "plex": a Plex server's streams, load, bandwidth and libraries */
