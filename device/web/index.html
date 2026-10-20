@@ -385,7 +385,7 @@
   .nas-pools { flex: none; min-width: 200px; max-width: 52%; padding: 10px 14px 0; }
   .nas-cols { flex: 1; min-height: 0; display: flex; overflow-x: auto; }
   .nas-cols::-webkit-scrollbar { display: none; }
-  .nas-col { flex: 1; min-width: 86px; display: flex; flex-direction: column; align-items: center; padding-top: 4px; }
+  .nas-col { flex: 1; min-width: 100px; display: flex; flex-direction: column; align-items: center; padding-top: 4px; }
   .nas-col + .nas-col { margin-left: 10px; }
   .nas-pct { font-size: calc(26px * var(--ts)); font-weight: 700; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
   .nas-pct small { font-size: .55em; font-weight: 600; color: var(--muted); margin-left: 1px; }
@@ -397,7 +397,8 @@
   .nas-pct.bad { color: var(--bad); }
   .nas-name { max-width: 100%; font-size: calc(17px * var(--ts)); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .nas-col .px-tag { margin-top: 4px; }
-  .nas-free { margin-top: 4px; font: 500 calc(12.5px * var(--ts)) GeistMono, monospace; color: var(--muted); white-space: nowrap; }
+  .nas-free { max-width: 100%; margin-top: 4px; font: 500 calc(12px * var(--ts)) GeistMono, monospace; color: var(--muted);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .nas-scan { color: var(--acc); }
   .nas-sys { flex: none; margin-top: 10px; padding: 8px 0 10px; border-top: 1px solid var(--line); font: 500 calc(12.5px * var(--ts)) GeistMono, monospace;
     color: var(--muted); line-height: 1.5; }
@@ -707,7 +708,7 @@
     <div class="sec" id="sec-tabs">
       <div class="card"><h3>Tab order</h3><div class="ag-list" id="taborder"></div></div>
       <div class="card"><h3>Order</h3>
-        <div class="ag-empty">Move a page up or down with the arrows; the eye shows or hides its tab. Hidden pages are skipped by the back button too. This is saved on the Car Thing and kept across restarts; pages added to config.json later appear at the end.</div>
+        <div class="ag-empty">Move a page up or down with the arrows; the eye shows or hides its tab. Hidden pages are skipped by the back button too. Live pages you haven’t set up yet (no config file on the computer) start hidden; the eye shows them anyway. This is saved on the Car Thing and kept across restarts; pages added to config.json later appear at the end.</div>
         <div class="action"><div class="btn" data-tabs-reset="1">Reset</div><small>Back to config.json: every tab, in its order</small></div></div>
     </div>
     <div class="sec" id="sec-device">
