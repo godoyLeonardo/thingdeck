@@ -1324,9 +1324,8 @@ function renderNowPlaying(page, g) {
   } else {
     // A clock means the computer agent is running; without it there's no track info at all.
     top = '<div class="np-art">' + icon('note') + '</div><div class="np-info np-empty">' +
-      '<div class="np-title">Nothing playing</div><div class="np-album">' +
-      (st.clock ? 'Play something on the computer to see it here.'
-                : 'Install the computer agent to see what’s playing (see README).') + '</div></div>';
+      '<div class="np-title">Nothing playing</div>' +
+      (st.clock ? '' : '<div class="np-album">Install the computer agent to see what’s playing (see README).</div>') + '</div>';
   }
   // The tiles become round buttons inside the card: the wide one (play/pause) largest, its
   // neighbours a step smaller than the outer ones.
