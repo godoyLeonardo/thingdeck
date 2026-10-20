@@ -203,13 +203,15 @@ BYMONTH, BYSETPOS), EXDATE, RDATE, RECURRENCE-ID (moved or cancelled occurrences
 and events the calendar's owner declined (a Google feed's name is the owner's address).
 One-off events that ended before today are skipped while reading: a 4 MB feed takes
 about 2 s on the Car Thing. `Agenda` lists the events from local midnight
-to 14 days later, recomputes every 5 minutes and when the UTC offset changes, and
+to 28 days later (`AGENDA_WEEKS`, the most the page shows), recomputes every 5 minutes and when the UTC offset changes, and
 sends `agenda` events. All-day and floating times use the computer's UTC offset.
 An `agenda` event also has `calendars`: a name for each calendar, by the events' `cal`
 index (its `X-WR-CALNAME`, "Calendar 2" without one, and the number added to a name used
 twice). With two names or more, the page shows tabs above the agenda: All and each name.
 The tab is the setting `calendar` (a name, or `null` for All) in `state.json`. A name
-that is not in `calendars` shows All. The tabs filter only the page: reminders come from
+that is not in `calendars` shows All. On the left of the bar, − and + set how many weeks
+the page shows, 1 to 4 (2 when none is saved), for each tab: the setting `calendar_weeks`,
+`{"<name>" or "" for All: weeks}`. The page filters the 4 weeks the device sends. The tabs filter only the page: reminders come from
 every calendar.
 
 **Join:** the UI posts `POST /api/calendar/open` with an event id; only events with

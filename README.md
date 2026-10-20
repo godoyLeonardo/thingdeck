@@ -167,13 +167,14 @@ them to the Car Thing **over the USB cable** (`adb forward`; no network):
   colors, with round media controls under the progress bar. When nothing is playing
   it says so; the controls work either way.
 - **Calendar:** the Calendar page shows today, tomorrow and the rest of the next two weeks
-  from your calendars (see [Adding your calendar](#adding-your-calendar)): repeating
+  (− and + at the top left show 1 to 4 weeks) from your calendars (see [Adding your calendar](#adding-your-calendar)): repeating
   events, moved or cancelled occurrences and time zones included, meetings you
   declined left out. The next event is highlighted with a countdown. Events with a
   Google Meet, Zoom or Teams link get a Join button that opens the link on the computer.
   Tap an event for its details: date, time and length, place, calendar and notes.
   With two calendars or more, tabs at the top show **All** or one calendar. The Car
-  Thing keeps the tab you pick; if that calendar is gone, it shows All.
+  Thing keeps the tab you pick, and the number of weeks for each tab. If the picked
+  calendar is gone, it shows All.
   Five minutes before any timed event in any calendar, a reminder card comes up on any page with a
   countdown and **Dismiss**, plus **Join meeting** for a meeting with a link or
   **Details** for anything else; it stays until two minutes after the start.
