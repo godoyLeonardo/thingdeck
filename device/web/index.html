@@ -175,6 +175,12 @@
     --media: #a6d65a; --key: #5fa8ff; --type: #ffd84d; --nav: #c58cff; --mouse: #45d1c5; --bad: #ff3b30; --warn: #ffb627;
     --on-acc: #150707;
   }
+  :root[data-theme="command"] {
+    --bg: #000000; --panel: #0a0806; --tile: #120d08; --tile-hi: #1e150c; --line: #3a2610; --edge: #1a120a;
+    --text: #ffc27a; --muted: #b07a3c; --faint: #4a2f14; --toast: #1e150c; --veil: rgba(0,0,0,.92); --standby: #000000;
+    --media: #3ddc84; --key: #ff9a1f; --type: #ffd23f; --nav: #ff6b3d; --mouse: #4cd9c9; --bad: #ff2a2a; --warn: #ffb000;
+    --on-acc: #000000;
+  }
   * { box-sizing: border-box; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); overflow: hidden;
     font-family: Geist, 'Circular Sp UI v3 T', 'Noto Sans', sans-serif; touch-action: none; cursor: none; }
@@ -1120,7 +1126,8 @@ var THEMES = {
   latte:       { name: 'Latte',        bg: '#e6e9ef', tile: '#eff1f5', text: '#4c4f69', acc: '#8839ef', light: true },
   githublight: { name: 'GitHub Light', bg: '#f6f8fa', tile: '#ffffff', text: '#1f2328', acc: '#0969da', light: true },
   ultraviolet: { name: 'Ultraviolet',  bg: '#140c1f', tile: '#22163a', text: '#ece6f5', acc: '#9be22d' },
-  crimson:     { name: 'Crimson',      bg: '#150707', tile: '#2a0e0e', text: '#f6ece8', acc: '#ff7a1a' }
+  crimson:     { name: 'Crimson',      bg: '#150707', tile: '#2a0e0e', text: '#f6ece8', acc: '#ff7a1a' },
+  command:     { name: 'Command',      bg: '#000000', tile: '#120d08', text: '#ffc27a', acc: '#ff7a00' }
 };
 var ACCENTS = {   // [on dark themes, on light themes]
   green: ['#1ed760', '#12a150'], blue: ['#5b9cff', '#2f6fe0'], purple: ['#a78bfa', '#7c5cdb'],
