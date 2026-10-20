@@ -222,6 +222,24 @@
   .ev-join .emoji { font-size: 20px; }
   .ev-join.down, .ev-join.fire { filter: brightness(1.2); }
   .agenda.cols { display: flex; padding: 0; }
+  /* The bar above the agenda: how many weeks it shows, then tabs for All and each calendar (with
+     two calendars or more; they scroll sideways). The weeks go on the left, away from the dial. */
+  .cal-wrap { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+  .cal-bar { flex: none; display: flex; align-items: center; margin-bottom: 8px; }
+  .cal-tabs { flex: 0 1 auto; min-width: 0; display: flex; overflow-x: auto; }
+  .cal-tabs::-webkit-scrollbar { display: none; }
+  .cal-tab { flex: none; height: 36px; line-height: 36px; padding: 0 16px; border-radius: 18px; background: var(--tile);
+    font-size: calc(14.5px * var(--ts)); font-weight: 600; color: var(--muted); white-space: nowrap; }
+  .cal-tab + .cal-tab { margin-left: 6px; }
+  .cal-tab.on { background: var(--acc-soft); color: var(--acc); }
+  .ev-cal { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin: 0 7px 2px 0; vertical-align: middle; }
+  .cal-tab.down { filter: brightness(1.3); }
+  .cal-weeks { flex: none; display: flex; align-items: center; margin-right: 10px; }
+  .cal-weeks b { min-width: 84px; text-align: center; font-size: calc(14.5px * var(--ts)); font-weight: 600; }
+  .cal-weeks .cal-tab { width: 42px; padding: 0; text-align: center; font-size: calc(19px * var(--ts)); color: var(--text); }
+  .cal-weeks .cal-tab.off { opacity: .35; }
+  .card .cal-bar { margin: 2px 0 6px; }
+  .card .cal-tab { background: var(--tile-hi); }
   .ag-col { flex: 1; min-width: 0; padding: 10px 6px 4px 14px; }
   .ag-col + .ag-col { margin-left: 8px; }
   .cols .ev { min-height: 58px; }
@@ -390,7 +408,7 @@
   .plex .m-detail { font-size: calc(13.5px * var(--ts)); }
   .plex .m-value { font-size: calc(34px * var(--ts)); }
   /* the NAS page: a narrow card of pools as vertical tanks, then disks, alerts and apps */
-  .nas-pools { flex: none; min-width: 200px; max-width: 52%; padding: 10px 14px 0; }
+  .nas-pools { flex: none; min-width: 200px; max-width: 52%; padding: 10px 14px 10px; }
   .nas-cols { flex: 1; min-height: 0; display: flex; overflow-x: auto; }
   .nas-cols::-webkit-scrollbar { display: none; }
   .nas-col { flex: 1; min-width: 100px; display: flex; flex-direction: column; align-items: center; padding-top: 4px; }
@@ -408,7 +426,7 @@
   .nas-free { max-width: 100%; margin-top: 4px; font: 500 calc(12px * var(--ts)) GeistMono, monospace; color: var(--muted);
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .nas-scan { color: var(--acc); }
-  .nas-sys { flex: none; margin-top: 10px; padding: 8px 0 10px; border-top: 1px solid var(--line); font: 500 calc(12.5px * var(--ts)) GeistMono, monospace;
+  .nas-sys { flex: none; margin-top: 6px; padding: 8px 0 4px; border-top: 1px solid var(--line); font: 500 calc(12.5px * var(--ts)) GeistMono, monospace;
     color: var(--muted); line-height: 1.5; }
   .nas-sys div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .px-num.warn, .m-value.warn { color: var(--warn); }
@@ -417,6 +435,13 @@
   .nas-alert { font-size: calc(13px * var(--ts)); color: var(--muted); line-height: 1.3; margin-bottom: 10px;
     display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
   .nas .mcard .m-detail { margin-bottom: 10px; }
+  .nas .monitor.px-side { grid-template-rows: repeat(3, minmax(0, 1fr)); }     /* Alerts, Apps and Jobs next to the disks */
+  .nas .m-value { font-size: calc(24px * var(--ts)); }
+  .nas .nas-alert { -webkit-line-clamp: 2; line-height: 1.25; margin-bottom: 4px; }
+  .nas .mcard .nas-job { margin-bottom: 0; }
+  .nas-jobs .np-bar { height: 4px; margin: 5px 0 10px; flex: none; }
+  .px-jobs .ag-day { margin-top: 12px; }
+  .px-jobs .ag-empty { margin-top: 2px; }
   .monitor { flex: 1; min-width: 0; display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: minmax(0, 1fr); grid-gap: 8px; }
   .monitor.half { grid-template-columns: 1fr 1fr; grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); }
   .mcard { background: var(--tile); border-radius: 16px; padding: 10px 12px 0; display: flex; flex-direction: column;
@@ -609,7 +634,14 @@
   .seg div { padding: 0 12px; height: 34px; line-height: 34px; border-radius: 8px; font-size: calc(14px * var(--ts)); font-weight: 500; color: var(--muted); }
   .seg div.on { background: var(--acc-soft); color: var(--acc); }
   .slider { display: flex; align-items: center; min-height: 46px; transition: opacity .15s; }
-  .slider.dim { opacity: .45; }
+  .stepper { display: flex; align-items: center; flex: none; }
+  .stepper .btn { flex: none; width: 48px; font-size: calc(20px * var(--ts)); }
+  .stepper .btn.off { opacity: .35; }
+  .stepper .btn.down { background: var(--acc-soft); color: var(--acc); }
+  .stepper.small .btn { width: 36px; font-size: calc(17px * var(--ts)); }
+  .stepper.small b { min-width: 58px; }
+  .stepper > span { margin: 0 6px; color: var(--muted); }
+  .stepper b { min-width: 96px; text-align: center; font: 500 calc(14px * var(--ts)) GeistMono, monospace; }
   .slider span { font-size: calc(16px * var(--ts)); width: 26px; text-align: center; }
   input[type=range] { -webkit-appearance: none; flex: 1; height: 40px; background: transparent; margin: 0 8px; }
   input[type=range]::-webkit-slider-runnable-track { height: 8px; border-radius: 4px; background: var(--line); }
@@ -716,8 +748,8 @@
     <div class="sec" id="sec-tabs">
       <div class="card"><h3>Tab order</h3><div class="ag-list" id="taborder"></div></div>
       <div class="card"><h3>Order</h3>
-        <div class="ag-empty">Move a page up or down with the arrows; the eye shows or hides its tab. Hidden pages are skipped by the back button too. Live pages you haven’t set up yet (no config file on the computer) start hidden; the eye shows them anyway. This is saved on the Car Thing and kept across restarts; pages added to config.json later appear at the end.</div>
-        <div class="action"><div class="btn" data-tabs-reset="1">Reset</div><small>Back to config.json: every tab, in its order</small></div></div>
+        <div class="ag-empty">The arrows move a tab. The eye shows or hides it.</div>
+        <div class="action"><div class="btn" data-tabs-reset="1">Reset</div></div></div>
     </div>
     <div class="sec" id="sec-device">
       <div class="card"><h3>Device</h3><div class="kv" id="kv"></div></div>
@@ -733,6 +765,8 @@
       <div class="row"><label>Brightness<small id="bnow"></small></label>
         <div class="seg"><div data-set="brightness_auto" data-val="true">Auto</div><div data-set="brightness_auto" data-val="false">Manual</div></div></div>
       <div class="slider" id="bslider"><span>☀</span><input type="range" id="bright" min="5" max="255" step="1"><span>☀️</span></div>
+      <div class="row" id="bstops"><label>Darker / brighter<small>light stops</small></label>
+        <div class="stepper"><div class="btn" data-set="brightness_stops" id="bdown">−</div><b id="bstopsv"></b><div class="btn" data-set="brightness_stops" id="bup">+</div></div></div>
       <h3 style="margin-top:10px">Input</h3>
       <div class="row"><label>Host OS<small id="osdet"></small></label>
         <div class="seg"><div data-set="os_mode" data-val="&quot;auto&quot;">Auto</div><div data-set="os_mode" data-val="&quot;windows&quot;">Windows</div><div data-set="os_mode" data-val="&quot;mac&quot;">macOS</div><div data-set="os_mode" data-val="&quot;linux&quot;">Linux</div></div></div>
@@ -746,6 +780,11 @@
       <h3 style="margin-top:10px">Clock</h3>
       <div class="row"><label>Format<small>time comes from the computer</small></label>
         <div class="seg"><div data-set="clock_24h" data-val="true">24h</div><div data-set="clock_24h" data-val="false">12h</div></div></div>
+      <div class="row"><label>Darker at night<small id="nnow">light stops</small></label>
+        <div class="stepper"><div class="btn" data-set="night_stops" id="ndown">−</div><b id="nstopsv"></b><div class="btn" data-set="night_stops" id="nup">+</div></div></div>
+      <div class="row" id="nhours"><label>Hours</label>
+        <div class="stepper small"><div class="btn" data-set="night_from" id="nfromd">−</div><b id="nfrom"></b><div class="btn" data-set="night_from" id="nfromu">+</div>
+          <span>to</span><div class="btn" data-set="night_to" id="ntod">−</div><b id="nto"></b><div class="btn" data-set="night_to" id="ntou">+</div></div></div>
     </div>
     </div>
   </div>
@@ -1056,6 +1095,14 @@ function buildAppearance() {
 
 // ---- settings tab
 var showSettings = false, settingsSec = 'general', info = null, dragging = false, infoTimer = null, builtFor = '';
+function fmtStops(n) {
+  return (n > 0 ? '+' : n < 0 ? '−' : '') + Math.abs(n) + (Math.abs(n) === 1 ? ' stop' : ' stops');
+}
+function fmtMinutes(m) {      // a time of day, in the clock format picked
+  var h = Math.floor(m / 60), mm = (m % 60 < 10 ? '0' : '') + m % 60;
+  if (st.settings && st.settings.clock_24h === false) return ((h + 11) % 12 + 1) + (m % 60 ? ':' + mm : '') + ' ' + (h < 12 ? 'AM' : 'PM');
+  return (h < 10 ? '0' : '') + h + ':' + mm;
+}
 function renderSettings() {
   var s = st.settings || {};
   if (builtFor !== s.theme) { builtFor = s.theme; buildAppearance(); }   // swatches show the theme's tints
@@ -1072,16 +1119,39 @@ function renderSettings() {
     var key = opts[i].getAttribute('data-set');
     opts[i].classList.toggle('on', JSON.stringify(current[key]) === opts[i].getAttribute('data-val'));
   }
-  $('bslider').classList.toggle('dim', !!s.brightness_auto);
+  // Auto: the offset in stops instead of the slider. The buttons carry the value they set.
+  var stops = s.brightness_stops || 0, STOPS = 3;
+  $('bslider').style.display = s.brightness_auto ? 'none' : '';
+  $('bstops').style.display = s.brightness_auto ? '' : 'none';
+  $('bdown').setAttribute('data-val', JSON.stringify(Math.max(-STOPS, stops - 0.5)));
+  $('bup').setAttribute('data-val', JSON.stringify(Math.min(STOPS, stops + 0.5)));
+  $('bdown').classList.toggle('off', stops <= -STOPS);
+  $('bup').classList.toggle('off', stops >= STOPS);
+  $('bstopsv').textContent = fmtStops(stops);
+  // Darker at night: 0 (off) to -3 stops, and its hours, one hour per tap.
+  var night = s.night_stops || 0, from = s.night_from == null ? 22 * 60 : s.night_from, to = s.night_to == null ? 7 * 60 : s.night_to;
+  $('ndown').setAttribute('data-val', JSON.stringify(Math.max(-STOPS, night - 0.5)));
+  $('nup').setAttribute('data-val', JSON.stringify(Math.min(0, night + 0.5)));
+  $('ndown').classList.toggle('off', night <= -STOPS);
+  $('nup').classList.toggle('off', night >= 0);
+  $('nstopsv').textContent = night ? fmtStops(night) : 'Off';
+  $('nnow').textContent = !night ? 'light stops' : st.night ? 'on now' : 'off until ' + fmtMinutes(from);
+  $('nhours').style.display = night ? '' : 'none';
+  [['nfromd', from, -60], ['nfromu', from, 60], ['ntod', to, -60], ['ntou', to, 60]].forEach(function (b) {
+    $(b[0]).setAttribute('data-val', JSON.stringify((b[1] + b[2] + 1440) % 1440));
+  });
+  $('nfrom').textContent = fmtMinutes(from);
+  $('nto').textContent = fmtMinutes(to);
   if (!draggingHue) {
     $('hue').value = typeof s.accent === 'number' ? s.accent : hexHue(themeAccent(current.theme, current.accent));
   }
   if (!dragging) {
-    $('bright').value = s.brightness_auto && info ? info.brightness_now : s.brightness;
+    $('bright').value = s.brightness;
   }
   $('osdet').textContent = { windows: 'detected: Windows', other: 'detected: Linux or macOS' }[st.os_detected] || 'not detected yet';
   renderTabOrder(s);
-  $('bnow').textContent = s.brightness_auto ? 'light sensor' : Math.round((s.brightness || 0) / 2.55) + '%';
+  $('bnow').textContent = (s.brightness_auto ? 'light sensor' + (info ? ' · ' + Math.round(info.brightness_now / 2.55) + '%' : '')
+    : Math.round((s.brightness || 0) / 2.55) + '%') + (st.night ? ' · night' : '');
   if (info) {
     var up = Math.floor(info.uptime), h = Math.floor(up / 3600), m = Math.floor(up % 3600 / 60);
     $('kv').innerHTML =
@@ -1143,6 +1213,7 @@ function pollInfo() {
   }).catch(function () {});
 }
 function openSettings(open) {
+  if (open !== showSettings) post('/api/view', { settings: open });     // a page move from Settings goes to the first page
   showSettings = open;
   clearInterval(infoTimer);
   if (open) { pollInfo(); infoTimer = setInterval(pollInfo, 5000); }
@@ -1324,9 +1395,8 @@ function renderNowPlaying(page, g) {
   } else {
     // A clock means the computer agent is running; without it there's no track info at all.
     top = '<div class="np-art">' + icon('note') + '</div><div class="np-info np-empty">' +
-      '<div class="np-title">Nothing playing</div><div class="np-album">' +
-      (st.clock ? 'Play something on the computer to see it here.'
-                : 'Install the computer agent to see what’s playing (see README).') + '</div></div>';
+      '<div class="np-title">Nothing playing</div>' +
+      (st.clock ? '' : '<div class="np-album">Install the computer agent to see what’s playing (see README).</div>') + '</div>';
   }
   // The tiles become round buttons inside the card: the wide one (play/pause) largest, its
   // neighbours a step smaller than the outer ones.
@@ -1412,8 +1482,9 @@ function renderWidgets(page, g) {
     g.style.gridTemplateColumns = 'minmax(0, 1fr)';  // long lines cut off instead of widening the page
     g.style.gridTemplateRows = 'minmax(0, 1fr)';     // the lists scroll inside instead of growing the page
     g.innerHTML = '<div class="dash-wrap"><div class="dash">' + page.widgets.map(function (w) {
-      if (w === 'agenda' && page.widgets.length === 1) return '<div class="agenda cols" id="agenda"></div>';   // a column per day
-      if (w === 'agenda') return '<div class="card agenda"><h3>Agenda</h3><div class="ag-list" id="agenda"></div></div>';
+      if (w === 'agenda' && page.widgets.length === 1)      // a column per day
+        return '<div class="cal-wrap">' + CAL_BAR + '<div class="agenda cols" id="agenda"></div></div>';
+      if (w === 'agenda') return '<div class="card agenda"><h3>Agenda</h3>' + CAL_BAR + '<div class="ag-list" id="agenda"></div></div>';
       if (w === 'monitor') return '<div class="monitor' + (page.widgets.length > 1 ? ' half' : '') + '" id="monitor"></div>';
       if (w === 'github') return '<div class="gh-wrap"><div class="gh-pull" id="ghpull"></div><div class="gh" id="github"></div></div>';
       if (w === 'lights') return '<div class="lights" id="lights"></div>';
@@ -1499,7 +1570,8 @@ function untilText(ms) {
 }
 // One event. In the list the time is its own column; in a day column (cols) it goes
 // above the title, which leaves the narrow column's width to the title.
-function eventHTML(e, isNext, cols) {
+// dot: the calendar's dot before the title (in All, with two calendars or more), or ''.
+function eventHTML(e, isNext, cols, dot) {
   var now = Date.now(), when = e.all_day ? 'All day' : fmtClock(e.start) + (cols ? ' – ' + fmtClock(e.end) : '');
   var status = !isNext ? '' : e.start <= now ? '<b><i class="live"></i>Now</b>' : e.start - now < 12 * 3600000 ? '<b>In ' + untilText(e.start) + '</b>' : '';
   var sub = cols ? [status, esc(e.where)] : [status, e.all_day ? '' : 'until ' + fmtClock(e.end), esc(e.where)];
@@ -1507,7 +1579,7 @@ function eventHTML(e, isNext, cols) {
   return '<div class="ev' + (isNext ? ' next' : '') + '" data-ev="' + esc(e.id) + '">' +
     (cols ? '' : '<div class="ev-time">' + (e.all_day ? '<small>All day</small>' : when) + '</div>') +
     '<div class="ev-main">' + (cols ? '<div class="ev-when">' + when + '</div>' : '') +
-      '<div class="ev-title">' + esc(e.title) + '</div>' + (sub ? '<div class="ev-sub">' + sub + '</div>' : '') + '</div>' +
+      '<div class="ev-title">' + (dot || '') + esc(e.title) + '</div>' + (sub ? '<div class="ev-sub">' + sub + '</div>' : '') + '</div>' +
     (e.link ? '<div class="ev-join" data-join="' + esc(e.id) + '">' + icon('camera') + '</div>' : '') + '</div>';
 }
 // Event details: the list has the basics; the notes and calendar name come on request.
@@ -1627,22 +1699,77 @@ function chooseAudio(id) {
   renderAudioSheet();
   updateAudioPill();
 }
+// The calendar picked in the tabs above the agenda (setting "calendar"), or null for all. All also
+// when none is saved, or when the saved name is no longer one of the calendars.
+function pickedCalendar() {
+  var names = agenda.calendars || [], name = st.settings && st.settings.calendar;
+  return names.length > 1 && names.indexOf(name) >= 0 ? name : null;
+}
+// How many weeks the agenda shows, 1 to 4, per tab (setting "calendar_weeks", by the calendar's
+// name or '' for All); 2 when none is saved. The device sends 4 weeks of events.
+var CAL_WEEKS = 4, WEEK_WORDS = ['', 'one', 'two', 'three', 'four'];
+// A color per calendar, by its index, from the theme: a dot on its tab, and on its events in All.
+var CAL_COLORS = ['var(--key)', 'var(--media)', 'var(--nav)', 'var(--type)', 'var(--mouse)', 'var(--warn)', 'var(--bad)'];
+function calDot(i) { return '<i class="ev-cal" style="background:' + CAL_COLORS[i % CAL_COLORS.length] + '"></i>'; }
+var CAL_BAR = '<div class="cal-bar" id="calbar"><div class="cal-weeks" id="calweeks"></div><div class="cal-tabs" id="caltabs"></div></div>';
+function calendarWeeks(picked) {
+  var n = ((st.settings && st.settings.calendar_weeks) || {})[picked || ''];
+  return n >= 1 && n <= CAL_WEEKS ? n : 2;
+}
+function stepWeeks(delta) {
+  var picked = pickedCalendar(), names = agenda.calendars || [], weeks = {}, old = st.settings.calendar_weeks || {};
+  for (var k in old) weeks[k] = old[k];
+  weeks[picked || ''] = Math.max(1, Math.min(CAL_WEEKS, calendarWeeks(picked) + delta));
+  var keys = Object.keys(weeks);
+  if (keys.length > 32) keys.forEach(function (k) { if (k && names.indexOf(k) < 0) delete weeks[k]; });   // the device keeps 64 at most
+  st.settings.calendar_weeks = weeks;      // show it now; the saved state follows
+  updateAgenda();
+  post('/api/settings', { calendar_weeks: weeks });
+}
+function updateCalBar() {
+  var bar = $('calbar');
+  if (!bar) return;
+  bar.style.display = agenda.state === 'ok' ? '' : 'none';
+  var names = agenda.calendars || [], picked = pickedCalendar(), weeks = calendarWeeks(picked), tabs = $('caltabs');
+  tabs.style.display = names.length > 1 ? '' : 'none';
+  if (names.length > 1) {
+    var html = '<div class="cal-tab' + (picked == null ? ' on' : '') + '" data-cal="-1">All</div>' + names.map(function (n, i) {
+      return '<div class="cal-tab' + (n === picked ? ' on' : '') + '" data-cal="' + i + '">' + calDot(i) + esc(n) + '</div>';
+    }).join('');
+    if (redraw(tabs, html)) {
+      var on = tabs.querySelector('.on');
+      if (on) on.scrollIntoView({ inline: 'nearest', block: 'nearest' });
+    }
+  }
+  redraw($('calweeks'), '<div class="cal-tab' + (weeks <= 1 ? ' off' : '') + '" data-weeks="-1">−</div>' +
+    '<b>' + weeks + (weeks === 1 ? ' week' : ' weeks') + '</b>' +
+    '<div class="cal-tab' + (weeks >= CAL_WEEKS ? ' off' : '') + '" data-weeks="1">+</div>');
+}
+function pickCalendar(i) {
+  var name = i >= 0 ? (agenda.calendars || [])[i] : null;
+  if (st.settings) st.settings.calendar = name;      // show it now; the saved state follows
+  updateAgenda();
+  post('/api/settings', { calendar: name });
+}
 function updateAgenda() {
   var box = $('agenda');
   if (!box) return;
-  var cols = box.classList.contains('cols');
-  var now = Date.now(), today = dayNumber(now), events = (agenda.events || []).filter(function (e) { return e.end > now; });
-  var html = '', day = null, next = null;
+  updateCalBar();
+  var cols = box.classList.contains('cols'), picked = pickedCalendar(), names = agenda.calendars || [], weeks = calendarWeeks(picked);
+  var now = Date.now(), today = dayNumber(now), events = (agenda.events || []).filter(function (e) {
+    return e.end > now && (picked == null || names[e.cal] === picked) && dayNumber(Math.max(e.start, now)) - today < weeks * 7;
+  });
+  var html = '', day = null, next = null, dots = picked == null && names.length > 1;
   for (var i = 0; i < events.length && !next; i++) if (!events[i].all_day) next = events[i];
   if (cols && events.length) {
-    // Today | Tomorrow | the rest of the week, each a card that scrolls on its own.
+    // Today | Tomorrow | the rest of the weeks shown, each a card that scrolls on its own.
     var parts = ['', '', ''], laterDay = null;
     events.forEach(function (e) {
       var d = dayNumber(Math.max(e.start, now)), c = Math.min(2, d - today);
       if (c === 2 && d !== laterDay) { laterDay = d; parts[2] += '<div class="ag-day">' + dayLabel(Math.max(e.start, now)) + '</div>'; }
-      parts[c] += eventHTML(e, e === next, true);
+      parts[c] += eventHTML(e, e === next, true, dots ? calDot(e.cal) : '');
     });
-    var titles = ['Today', 'Tomorrow', 'Later this week'];
+    var titles = ['Today', 'Tomorrow', weeks === 1 ? 'Later this week' : 'Next ' + WEEK_WORDS[weeks] + ' weeks'];
     html = parts.map(function (p, c) {
       return '<div class="card ag-col"><h3>' + titles[c] + '</h3><div class="ag-list">' +
         (p || '<div class="ag-empty">' + (c === 0 ? 'Nothing else today' : 'Nothing planned') + '</div>') + '</div></div>';
@@ -1651,12 +1778,12 @@ function updateAgenda() {
   if (!cols) events.forEach(function (e) {
     var d = dayNumber(Math.max(e.start, now));
     if (d !== day) { day = d; html += '<div class="ag-day">' + dayLabel(Math.max(e.start, now)) + '</div>'; }
-    html += eventHTML(e, e === next, false);
+    html += eventHTML(e, e === next, false, dots ? calDot(e.cal) : '');
   });
   if (!events.length) {
     if (agenda.state === 'none') html = stateCard('Calendar', 'No calendar yet', 'Put your Google Calendar’s secret iCal address in calendars.txt on the computer (see README).');
     else if (agenda.error) html = stateCard('Calendar', 'Couldn’t get the calendar', agenda.error);
-    else if (agenda.state === 'ok') html = stateCard('Calendar', 'Nothing coming up', 'No events in the next 7 days.');
+    else if (agenda.state === 'ok') html = stateCard('Calendar', 'Nothing coming up', 'No events' + (picked ? ' in ' + picked : '') + ' in the next ' + weeks * 7 + ' days.');
     else html = agentCard('Calendar', 'your calendar');
   }
   if (box.innerHTML !== html) {
@@ -1680,7 +1807,10 @@ function stateCard(label, title, text, opts) {
     (opts.button || '') + '</div>';
 }
 // The usual "no agent yet / waiting for it" pair, for a page whose data comes from the agent.
+// An agent that is out of date can be too old to send this page's data, so say that instead of waiting.
 function agentCard(label, what, cls) {
+  if (st.agent && st.agent.outdated)
+    return stateCard(label, 'The computer agent is out of date', 'Run ./deploy.sh all on the computer to update it and see ' + what + ' here.', { cls: cls });
   return st.clock ? stateCard(label, 'Waiting for ' + what + '…', 'It usually takes a few seconds after the computer connects.', { waiting: true, cls: cls })
     : stateCard(label, 'No computer agent', 'Install it on the computer to see ' + what + ' here (see README).', { cls: cls });
 }
@@ -1994,7 +2124,7 @@ function plexLibrary(l) {
   return '<div class="px-lib"><div class="ev-main"><div class="ev-title">' + esc(l.title || '') + '</div>' +
     '<div class="ev-sub">' + esc(sub) + '</div></div><div class="px-num">' + fmtCount(l.count) + '</div></div>';
 }
-function plexActivity(a) {       // a library scan or another server task, with its progress
+function plexActivity(a) {       // a library scan or a scheduled task, with its progress
   return '<div class="px-lib"><div class="ev-main"><div class="ev-title">' + esc(a.title || '') + '</div>' +
     '<div class="ev-sub">' + esc(a.sub || '') + '</div>' +
     '<div class="np-bar"><i style="width:' + Math.max(0, Math.min(100, a.progress || 0)) + '%"></i></div></div></div>';
@@ -2014,20 +2144,24 @@ function updatePlex() {
   }
   if (!$('pxs')) {
     box.className = 'plex';
-    box.innerHTML = '<div class="card px-streams" id="pxs"></div><div class="monitor half px-side" id="pxside"></div>';
+    box.innerHTML = '<div class="card px-streams" id="pxs"><h3 id="pxh"></h3><div class="ag-list"><div id="pxsl"></div>' +
+      '<div class="px-jobs" id="pxj"></div></div></div><div class="monitor half px-side" id="pxside"></div>';
     box._html = null;
   }
   var server = p.server || {}, sessions = p.sessions || [], load = p.load, net = p.net;
   var version = (server.version || '').split('.').slice(0, 3).join('.');
   var last = function (a) { return a && a.length ? a[a.length - 1] : null; };
   var plain = function (html) { return html.replace(/<\/?small>/g, ' ').trim(); };
-  redraw($('pxs'), '<h3>' + esc(server.name || 'Plex') + ' · ' +
+  redraw($('pxh'), esc(server.name || 'Plex') + ' · ' +
     (sessions.length ? sessions.length + (sessions.length === 1 ? ' stream' : ' streams') : 'idle') +
     (server.transcodes ? ' · ' + server.transcodes + ' transcoding' : '') +
-    '<span>' + esc(server.update ? 'Update ' + server.update : version) + '</span></h3><div class="ag-list">' +
-    (sessions.length ? sessions.map(plexRow).join('')
-      : '<div class="ag-empty"><b>Nothing streaming</b>' + (server.update ? esc('Plex ' + server.update + ' is out') : '') + '</div>') +
-    '</div>');
+    '<span>' + esc(server.update ? 'Update ' + server.update : version) + '</span>');
+  redraw($('pxsl'), sessions.length ? sessions.map(plexRow).join('')
+    : '<div class="ag-empty"><b>Nothing streaming</b>' + (server.update ? esc('Plex ' + server.update + ' is out') : '') + '</div>');
+  // Library scans and the scheduled tasks (Settings → Scheduled Tasks in Plex) while they run.
+  var jobs = p.activities || [];
+  redraw($('pxj'), '<div class="ag-day">Jobs' + (jobs.length ? ' · ' + jobs.length + ' running' : '') + '</div>' +
+    (jobs.length ? jobs.map(plexActivity).join('') : '<div class="ag-empty">None running</div>'));
   var bars = $('pxs').querySelectorAll('.px-row .np-bar i');
   sessions.forEach(function (s, i) {
     if (bars[i]) bars[i].style.width = (s.duration_ms ? Math.min(100, (s.position_ms || 0) / s.duration_ms * 100) : 0) + '%';
@@ -2045,7 +2179,7 @@ function updatePlex() {
     bw = mcard('Bandwidth', fmtRate(last(total)), 'WAN ' + plain(fmtRate(last(net.wan))),
       spark(total, max, 'v', true, total.length) + spark(net.wan, max, 'tx', false, total.length));
   }
-  var libs = (p.activities || []).map(plexActivity).join('') + (p.libraries || []).map(plexLibrary).join('');
+  var libs = (p.libraries || []).map(plexLibrary).join('');
   redraw($('pxside'), cpu + bw + '<div class="mcard px-libs"><div class="m-label">Libraries</div><div class="ag-list">' +
     (libs || '<div class="ag-empty">Counting…</div>') + '</div></div>');
 }
@@ -2062,16 +2196,37 @@ function fmtUptime(s) {
   var d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600);
   return d ? d + ' d ' + h + ' h' : h + ' h ' + Math.floor(s % 3600 / 60) + ' min';
 }
-// A pool as a tank: how full on top, the level, then its name, health and free space.
-function nasPool(p) {
+// A pool as a tank: how full on top, the level, then its name, health, free space, size and a scrub in progress.
+// scanRow: some pool scrubs, so each column keeps that line and the tanks stay the same height.
+function nasPool(p, scanRow) {
   var used = p.size ? p.used / p.size * 100 : 0, level = used >= 90 ? ' bad' : used >= 80 ? ' warn' : '';
   var status = String(p.status || '?'), tag = status === 'ONLINE' && p.healthy ? 'dp' : status === 'DEGRADED' || !p.healthy ? 'tc' : 'bad';
   return '<div class="nas-col"><div class="nas-pct' + level + '">' + Math.round(used) + '<small>%</small></div>' +
     '<div class="nas-tank' + level + '"><i style="height:' + used.toFixed(1) + '%"></i></div>' +
     '<div class="nas-name">' + esc(p.name || '') + '</div>' +
     '<div class="px-tag ' + tag + '">' + esc(p.healthy || status !== 'ONLINE' ? status : 'UNHEALTHY') + '</div>' +
-    '<div class="nas-free">' + (p.scan ? '<span class="nas-scan">' + esc((p.scan.kind || 'scan').toLowerCase()) + ' ' + Math.round(p.scan.percent || 0) + '%</span>'
-      : fmtBytes(p.free) + ' free') + '</div></div>';
+    '<div class="nas-free">' + fmtBytes(p.free) + ' free</div><div class="nas-free">of ' + fmtBytes(p.size) + '</div>' +
+    (p.scan ? '<div class="nas-free nas-scan">' + esc((p.scan.kind || 'scan').toLowerCase()) + ' ' + Math.round(p.scan.percent || 0) + '%</div>'
+      : scanRow ? '<div class="nas-free">&nbsp;</div>' : '') + '</div>';
+}
+// TrueNAS job methods by name. The scrub and app jobs add their pool or app; others show the method.
+var NAS_JOBS = {
+  'pool.scrub.run': 'Scrub', 'pool.scrub.scrub': 'Scrub', 'pool.snapshottask.run': 'Snapshot task',
+  'replication.run': 'Replication', 'cloudsync.sync': 'Cloud sync', 'cloud_backup.sync': 'Cloud backup',
+  'rsynctask.run': 'Rsync task', 'cronjob.run': 'Cron job', 'app.upgrade': 'Update', 'app.update': 'Update',
+  'app.create': 'Install', 'app.delete': 'Remove', 'app.start': 'Start', 'app.stop': 'Stop', 'app.redeploy': 'Redeploy',
+  'app.pull_images': 'Pull images:', 'catalog.sync': 'Sync app catalog', 'update.download': 'Download update',
+  'update.update': 'Install update', 'certificate.renew_certs': 'Renew certificates'
+};
+function nasJobName(j) {
+  var method = String(j.method || 'job'), name = NAS_JOBS[method];
+  if (!name) return method.replace(/[._]/g, ' ');
+  return name + (j.target && /^(pool\.scrub|app)\./.test(method) ? ' ' + j.target : '');
+}
+// The scheduled task that runs next (the device works it out from the schedules), by kind.
+var NAS_TASKS = { scrub: 'Scrub', snapshot: 'Snapshot', replication: 'Replication', cloudsync: 'Cloud sync', rsync: 'Rsync' };
+function nasTaskName(t) {
+  return t.kind === 'cron' ? t.name || 'Cron job' : (NAS_TASKS[t.kind] || t.kind) + (t.name ? ' ' + t.name : '');
 }
 function updateNas() {
   var box = $('nas');
@@ -2089,13 +2244,15 @@ function updateNas() {
     box.innerHTML = '<div class="card nas-pools" id="nasp"></div><div class="monitor half px-side" id="nasside"></div>';
     box._html = null;
   }
-  var sys = n.system || {}, pools = n.pools || [], disks = n.disks || [], alerts = n.alerts || [], apps = n.apps || [];
+  var sys = n.system || {}, pools = n.pools || [], disks = n.disks || [], alerts = n.alerts || [], apps = n.apps || [], jobs = n.jobs || [];
   var line = function (parts) { parts = parts.filter(function (x) { return x; }); return parts.length ? '<div>' + parts.join(' · ') + '</div>' : ''; };
   redraw($('nasp'), '<h3>' + esc(sys.host || 'TrueNAS') + '</h3><div class="nas-cols">' +
-    (pools.map(nasPool).join('') || '<div class="ag-empty">No pools</div>') + '</div>' +
-    '<div class="nas-sys">' + line([sys.version ? 'TrueNAS ' + esc(String(sys.version).replace(/^TrueNAS-/, '')) : '']) +
-      line([sys.uptime ? 'up ' + fmtUptime(sys.uptime) : '', sys.cores ? sys.cores + ' cores' : '']) +
-      line([sys.memory ? fmtBytes(sys.memory) + ' RAM' : '', sys.load && sys.load.length ? 'load ' + Number(sys.load[0]).toFixed(1) : '']) + '</div>');
+    (pools.map(function (p) { return nasPool(p, pools.some(function (q) { return q.scan; })); }).join('') ||
+      '<div class="ag-empty">No pools</div>') + '</div>');
+  // The server under the disks: version, uptime, cores, memory and load.
+  var sysInfo = '<div class="nas-sys">' + line([sys.version ? 'TrueNAS ' + esc(String(sys.version).replace(/^TrueNAS-/, '')) : '']) +
+    line([sys.uptime ? 'up ' + fmtUptime(sys.uptime) : '', sys.load && sys.load.length ? 'load ' + Number(sys.load[0]).toFixed(1) : '']) +
+    line([sys.cores ? sys.cores + ' cores' : '', sys.memory ? fmtBytes(sys.memory) + ' RAM' : '']) + '</div>';
   var hot = disks.filter(function (d) { return d.temp != null; });
   var temps = hot.map(function (d) {
     var nvme = /^nvme/.test(d.name), cls = d.temp >= (nvme ? 70 : 55) ? ' bad' : d.temp >= (nvme ? 60 : 45) ? ' warn' : '';  // SSDs run warmer
@@ -2111,8 +2268,15 @@ function updateNas() {
   var appCard = '<div class="mcard"><div class="m-label">Apps</div><div class="m-value">' + running + '<small>/ ' + apps.length + ' up</small></div>' +
     '<div class="m-detail">' + (stopped.length ? esc(stopped[0].name) + ' ' + esc(String(stopped[0].state).toLowerCase())
       : updates ? updates + (updates === 1 ? ' update' : ' updates') : 'Up to date') + '</div></div>';
+  var job = jobs[0], pct = job && job.percent != null ? Math.max(0, Math.min(100, job.percent)) : null;
+  var jobCard = '<div class="mcard nas-jobs"><div class="m-label">Jobs</div><div class="m-value">' + jobs.length + '<small> running</small></div>' +
+    (job ? '<div class="m-detail nas-job">' + esc(nasJobName(job)) + (pct != null ? ' · ' + Math.round(pct) + '%' : '') + '</div>' +
+      '<div class="np-bar"><i style="width:' + (pct || 0) + '%"></i></div>'
+      : n.next ? '<div class="m-detail nas-job">Next: ' + esc(nasTaskName(n.next)) + '</div>' +
+        '<div class="m-detail">' + esc(dayLabel(n.next.at) + ' ' + fmtClock(n.next.at)) + '</div>'
+      : '<div class="m-detail">None now</div>') + '</div>';
   redraw($('nasside'), '<div class="mcard px-libs"><div class="m-label">Disks</div><div class="ag-list">' +
-    (temps || '<div class="ag-empty">No temperatures</div>') + '</div></div>' + alertCard + appCard);
+    (temps || '<div class="ag-empty">No temperatures</div>') + '</div>' + sysInfo + '</div>' + alertCard + appCard + jobCard);
 }
 
 // ---- feedback
@@ -2233,12 +2397,12 @@ function scrollTabs() {
   else t.scrollTo({ left: 0, behavior: 'smooth' });
 }
 $('tabs').addEventListener('scroll', tabFades);
-var startInBar = false, startOnSlider = false;     // drags on the bottom bar or a slider don't change pages
+var startInBar = false, startOnSlider = false;     // drags on the bottom bar, the calendar tabs or a slider don't change pages
 document.addEventListener('pointerdown', function (e) {
   startX = e.clientX; startY = e.clientY;
-  startInBar = !!e.target.closest('#bar');
+  startInBar = !!e.target.closest('#bar, .cal-tabs');
   startOnSlider = !!e.target.closest('[data-hue-bar], [data-hue-lbar]');   // dragging a light's brightness, not swiping
-  downEl = e.target.closest('.tile[data-i], .preset[data-i], #dial, .tab, #status, [data-set], [data-sys], [data-sec], [data-media], [data-join], [data-guard], [data-kill], [data-ev], [data-sheet-close], [data-sheet-card], [data-audio], [data-audio-dev], [data-gh], #tabmore, [data-hue-room], [data-hue-toggle], [data-hue-ltoggle], [data-hue-scene], [data-hue-alloff], [data-hue-pair], [data-hue-bar], [data-hue-lbar], [data-tab-move], [data-tabs-reset], [data-tab-hide], [data-goto-media], [data-rm-join], [data-rm-dismiss]');
+  downEl = e.target.closest('.tile[data-i], .preset[data-i], #dial, .tab, #status, [data-set], [data-sys], [data-sec], [data-media], [data-join], [data-guard], [data-kill], [data-ev], [data-sheet-close], [data-sheet-card], [data-audio], [data-audio-dev], [data-gh], #tabmore, [data-hue-room], [data-hue-toggle], [data-hue-ltoggle], [data-hue-scene], [data-hue-alloff], [data-hue-pair], [data-hue-bar], [data-hue-lbar], [data-tab-move], [data-tabs-reset], [data-tab-hide], [data-goto-media], [data-rm-join], [data-rm-dismiss], [data-cal], [data-weeks]');
   if (downEl) downEl.classList.add('down');
 });
 document.addEventListener('pointercancel', function () { if (downEl) downEl.classList.remove('down'); downEl = null; });
@@ -2267,6 +2431,8 @@ document.addEventListener('pointerup', function (e) {
   else if (el.hasAttribute('data-tabs-reset')) post('/api/settings', { page_order: [], page_hidden: [], page_shown: [] });
   else if (el.hasAttribute('data-tab-hide')) toggleTab(el.getAttribute('data-tab-hide'));
   else if (el.hasAttribute('data-goto-media')) gotoMedia();
+  else if (el.hasAttribute('data-cal')) pickCalendar(parseInt(el.getAttribute('data-cal'), 10));
+  else if (el.hasAttribute('data-weeks')) stepWeeks(parseInt(el.getAttribute('data-weeks'), 10));
   else if (el.hasAttribute('data-rm-join')) {
     var ev = reminderEvent;
     fire(el);
@@ -2369,10 +2535,13 @@ function connect() {
       updateAgenda();
     } else if (m.type === 'toast') {
       toast(d.text, d.level);
+    } else if (m.type === 'view') {
+      if (!d.settings && showSettings) openSettings(false);
     }
   };
 }
 load().then(function () { if (st.message) toast(st.message, st.mode === 'error' ? 'fail' : 'warn'); });
+post('/api/view', { settings: false });      // a reload starts outside Settings
 connect();
 </script>
 </body>

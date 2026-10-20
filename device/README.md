@@ -80,8 +80,8 @@ The result picks per-OS action overrides, and it can pick a per-OS layout
 
 When the HID function is not `connected` (host suspended or gone), the UI shows
 the standby screen after 3 s, and hardware input is ignored. After the same 3 s
-the backlight drops to its minimum (`BRIGHTNESS_MIN`, with the light-sensor service
-stopped); the brightness setting is applied again when the host is back.
+the backlight drops to its minimum (`BRIGHTNESS_MIN`, and auto brightness pauses);
+the brightness setting is applied again when the host is back.
 
 **After resume.** The host resets the bus. `adbd` then closes and reopens its
 FunctionFS files, and with configfs that unbinds the whole gadget. Nothing in the
@@ -184,7 +184,7 @@ it goes to the first page with `"nowplaying": true`.
 ### Calendar and system stats
 
 A page with `"widgets"` shows live panels instead of tiles: `["agenda"]` (Calendar)
-lays the coming days out as Today / Tomorrow / Later this week columns,
+lays the coming days out as Today / Tomorrow / Next two weeks columns,
 `["monitor"]` (Status) shows CPU, memory, GPU and network cards, and
 `["agenda", "monitor"]` puts a list and a 2×2 grid side by side.
 
@@ -194,17 +194,27 @@ clears them. The reply carries a meeting link to open (`open`) and whether the
 service needs the calendars again (`need_calendar`, e.g. after a restart), so the
 agent needs no second request.
 
-**Calendars:** the agent downloads the addresses in `calendars.txt` every 5 minutes
-and posts the iCal text as it is to `POST /api/calendar` when it changes
-(`?none=1`: no `calendars.txt`; `?error=`: a download failed). `ics.py` reads it
-here, so the logic exists once for every OS: VTIMEZONE observances (DST included),
-RRULE (DAILY/WEEKLY/MONTHLY/YEARLY with COUNT, UNTIL, INTERVAL, BYDAY, BYMONTHDAY,
-BYMONTH, BYSETPOS), EXDATE, RDATE, RECURRENCE-ID (moved or cancelled occurrences),
-and events the calendar's owner declined (a Google feed's name is the owner's address).
-One-off events that ended before today are skipped while reading: a 4 MB feed takes
-about 2 s on the Car Thing. `Agenda` lists the events from local midnight
-to 7 days later, recomputes every 5 minutes and when the UTC offset changes, and
-sends `agenda` events. All-day and floating times use the computer's UTC offset.
+**Calendars:** the agent downloads the addresses in `calendars.txt` every 5 minutes and
+posts the iCal text as it is to `POST /api/calendar` when it changes (`?none=1`: no
+`calendars.txt`; `?error=`: a download failed). `ics.py` reads it here, so the logic
+exists once for every OS: VTIMEZONE observances (DST included), RRULE
+(DAILY/WEEKLY/MONTHLY/YEARLY with COUNT, UNTIL, INTERVAL, BYDAY, BYMONTHDAY, BYMONTH,
+BYSETPOS), EXDATE, RDATE, RECURRENCE-ID (moved or cancelled occurrences), and events the
+calendar's owner declined (a Google feed's name is the owner's address). One-off events
+that ended before today are skipped while reading: a 4 MB feed takes about 2 s on the
+Car Thing. `Agenda` lists the events from local midnight to 28 days later
+(`AGENDA_WEEKS`, the most the page shows), recomputes every 5 minutes and when the UTC
+offset changes, and sends `agenda` events. All-day and floating times use the computer's
+UTC offset. An `agenda` event also has `calendars`: a name for each calendar, by the
+events' `cal` index (its `X-WR-CALNAME`, "Calendar 2" without one, and the number added
+to a name used twice). With two names or more, the page shows tabs above the agenda: All
+and each name. The tab is the setting `calendar` (a name, or `null` for All) in
+`state.json`. A name that is not in `calendars` shows All. On the left of the bar, − and
++ set how many weeks the page shows, 1 to 4 (2 when none is saved), for each tab: the
+setting `calendar_weeks`, `{"<name>" or "" for All: weeks}`. The page filters the 4
+weeks the device sends. Each calendar has a color by its index (`CAL_COLORS`, the
+theme's own colors): a dot on its tab, and before the title of its events in All. The
+tabs filter only the page: reminders come from every calendar.
 
 **Join:** the UI posts `POST /api/calendar/open` with an event id; only events with
 a Meet, Zoom or Teams link have one. The link goes out once, in the reply to the
@@ -249,8 +259,21 @@ number (0–359), drawn light on dark themes and dark on light ones.
 ### Brightness
 
 `/sys/class/backlight/aml-bl/brightness` is **inverted**: 0–255, and higher means
-dimmer. Auto mode keeps the stock `sp-als-backlight` light-sensor service running.
-Manual mode stops it and writes `260 - level`.
+dimmer, so a level is written as `260 - level`. The stock `sp-als-backlight` service
+has no offset, so it stays stopped while the pad runs. When the pad service stops in
+auto mode (not in standby), it starts the stock service again, so the screen still
+follows the light; the next start stops it again. In auto mode, `Pad.follow_sensor` reads
+the TMD2772 light sensor (`in_intensity0_raw`) every 0.5 s. It uses the stock curve,
+fitted to that service's log: level 25 in the dark, `63.3 + 19.3 ln(raw - 12.2)` above a
+reading of 12, and 210 at most. It multiplies the level by 2 for each stop of the offset
+(`brightness_stops`, -3 to +3 in half stops; Settings → General). Then it fades a
+fifth of the way to that level on each reading, as the stock service did.
+
+At night the level drops by `night_stops` more (0, off, to -3), in auto and in manual
+mode: from `night_from` to `night_to`, minutes of the day by the computer's clock
+(22:00 to 07:00 by default; the hours can cross midnight). The same loop checks it every
+0.5 s, and the state's `night` says when it is on. Before the agent has set the clock,
+it is never night.
 
 ### GitHub
 
@@ -312,12 +335,14 @@ because Plex items can have keys that differ only in case (`guid` and `Guid`).
 `ConvertFrom-Json` in Windows PowerShell refuses those keys.
 
 Every 3 s while the Plex page is on screen (every 30 s otherwise, see [What updates
-when](#what-updates-when)) the agent reads `/`, `/status/sessions`, `/activities`,
-and the server's own history of load and bandwidth (`/statistics/resources` and
-`/statistics/bandwidth`, Plex Pass only). Then it posts the result to `POST /api/plex`. Every 5 minutes it
-counts the items of each library and reads `/updater/status`. A count is one request
-with `X-Plex-Container-Size=0`, which gives `totalSize` and no items. When the server
-does not answer, the agent tries again after 30 s, so the other pages do not wait.
+when](#what-updates-when)) the agent reads `/`, `/status/sessions`, `/activities`
+(library scans and scheduled tasks while they run, shown as Jobs under the streams), and
+the server's own history of load and bandwidth (`/statistics/resources` and
+`/statistics/bandwidth`, Plex Pass only). Then it posts the result to `POST /api/plex`.
+Every 5 minutes it counts the items of each library and reads `/updater/status`. A count
+is one request with `X-Plex-Container-Size=0`, which gives `totalSize` and no items.
+When the server does not answer, the agent tries again after 30 s, so the other pages do
+not wait.
 
 The bandwidth history has one row per device and sample, at uneven times. The agent
 adds up the rows per 6 s, LAN and WAN apart, and sends bytes per second.
@@ -334,13 +359,16 @@ changes the progress bars in place.
 
 ### TrueNAS
 
-The agent reads the TrueNAS server in `truenas.txt` (address, then an API key)
-through its JSON-RPC 2.0 API over a WebSocket, `wss://<address>/api/current`
-(TrueNAS 25.04+; the REST API is deprecated there). Each read opens one connection,
-calls `auth.login_with_api_key`, then `system.info`, `pool.query` (only the fields it
-shows, through `select`), `disk.temperatures`, `alert.list` and `app.query`, and
-closes it. Replies are matched by `id`, so notifications in between are skipped. A
-failing call other than `system.info` only leaves its part empty.
+The agent reads the TrueNAS server in `truenas.txt` (address, then an API key) through
+its JSON-RPC 2.0 API over a WebSocket, `wss://<address>/api/current` (TrueNAS 25.04+;
+the REST API is deprecated there). Each read opens one connection, calls
+`auth.login_with_api_key`, then `system.info`, `pool.query` (only the fields it shows,
+through `select`), `disk.temperatures`, `alert.list`, `app.query` and `core.get_jobs`
+(the `RUNNING` jobs; without `select`, because TrueNAS fails on it for jobs), and the
+scheduled tasks (`pool.scrub.query`, `pool.snapshottask.query`, `replication.query`,
+`cloudsync.query`, `rsynctask.query`, `cronjob.query`), and closes it. Replies are
+matched by `id`, so notifications in between are skipped. A failing call other than
+`system.info` only leaves its part empty.
 
 It is always TLS: TrueNAS revokes an API key that arrives over plain HTTP. The
 certificate is usually self-signed, so the agents accept it for that address only (the
@@ -349,12 +377,19 @@ Windows uses .NET's `ClientWebSocket`; Python has no WebSocket client, so
 `nowplaying.py` has a small one (masked text frames, ping/pong, fragments).
 
 Every 10 s while the NAS page is on screen, 60 s otherwise and after an error, the
-agent posts `POST /api/truenas` with `{state, system, pools, disks, alerts, apps}`.
+agent posts `POST /api/truenas` with `{state, system, pools, disks, alerts, apps, jobs}`.
+A job is `{method, target, percent, text, started}`. The page names it from the method
+(`pool.scrub.scrub` is "Scrub" plus the pool), so the names exist once for both agents.
+`tasks` holds the enabled tasks with a schedule, `{kind, name, schedule, threshold}`, and
+each pool has `scrubbed`, the end of its last scrub. `HostTrueNAS` works out the next run
+(`cron_next`: cron fields, `begin`/`end`, the computer's UTC offset) and publishes the
+first one as `next`, `{kind, name, at}`. A scrub skips runs until its last scrub ended
+more than `threshold` - 1 days before, as TrueNAS does.
 It sends only changes, plus one at least every 30 s. Alerts leave out dismissed and
 INFO ones. A call waits at most 5 s, because the Windows agent's main loop waits on it.
 `HostTrueNAS` keeps the last update and clears it after 150 s without one. The widget
 `"truenas"` shows pools as tanks (80% yellow, 90% red), disk temperatures (45/55 °C,
-NVMe 60/70 °C), alerts and apps.
+NVMe 60/70 °C), alerts, apps and running jobs.
 
 ### Tab order
 
@@ -402,8 +437,12 @@ Top level:
 | `grid` | Tile grid `[columns, rows]`, default `[4, 2]`; pages can override it |
 | `hardware` | `knob`, `back`, `menu`: `{"tap": action, "hold": action}`; `dial_invert` |
 | `dial_modes` | `[{"name", "cw", "ccw", "press"}]` |
-| `presets` | Default 4 top-button actions |
+| `presets` | Default 4 top-button actions (first page `{"page": 0}`, `"prev"`, `"next"`, last page `{"page": -1}`); 2 and 3 have a `hold` for the previous and next track |
 | `pages` | `[{"name", "presets"?, "grid"?, "nowplaying"?, "header"?, "widgets"?, "kill"?, "audio"?, "tiles": [...]}]` |
+
+A preset can also have `hold`, an action with its own `label`, for a press of 0.45 s or
+longer (`HOLD_SECONDS`). A preset with `hold` fires its own action on release; one
+without it fires on press.
 
 Tiles and presets are actions plus `label`, optional `icon` (an emoji) or `symbol`
 (a built-in icon drawn in the current icon style, or as an emoji in the emoji style),
@@ -453,11 +492,12 @@ page, or `adb shell`).
 |---|---|---|---|
 | GET | `/api/ping` | | Health check (used by `shim.html`) |
 | GET | `/api/state` | | Config, state, presets, now playing, stats, agenda, audio, github, hue, plex, truenas |
-| GET | `/api/events` | | SSE stream: `state`, `config`, `fired`, `turn`, `hw`, `toast`, `nowplaying`, `stats`, `agenda`, `audio`, `github`, `hue`, `hue_dial`, `plex`, `truenas` |
+| GET | `/api/events` | | SSE stream: `state`, `config`, `fired`, `turn`, `hw`, `toast`, `nowplaying`, `stats`, `agenda`, `audio`, `github`, `hue`, `hue_dial`, `plex`, `truenas`, `view` |
 | GET | `/api/info` | | Uptime, temperature, memory, load, brightness |
 | POST | `/api/tap` | `{"page", "index"}` | Run a tile |
 | POST | `/api/preset` | `{"index"}` | Run a preset |
 | POST | `/api/page`, `/api/dial`, `/api/os` | `{"page"}` / `{"dial"}` / `{"os"}` | Switch page / dial mode / host OS |
+| POST | `/api/view` | `{"settings"}` | The page shows Settings or not. From Settings, `"next"` goes to the first page and `"prev"` to the last; any page move closes Settings (event `view`) |
 | POST | `/api/settings` | `{"theme": "nord", …}` | Change settings (saved in `state.json`) |
 | POST | `/api/host` | `{"time_ms", "utc_offset_min", "locked"}` | Heartbeat from the host agent: sets the clock, lock state |
 | POST | `/api/nowplaying` | `{"title", "artist", "album", "album_artist", "track_number", "app", "playing", "position_ms", "duration_ms", "shuffle", "repeat", "art_key", "art"?, "art_type"?}` | From the host agent; `{"title": null}` clears. Replies `{"need_art": bool}` |
@@ -476,7 +516,7 @@ page, or `adb shell`).
 | POST | `/api/hue/select` | `{"id"}` | Make a room the target of the Lights dial mode |
 | POST | `/api/plex` | `{"state", "server"?, "sessions"?, "load"?, "net"?, "libraries"?, "activities"?, "posters"?, "error"?}` | From the host agent every 3 s. Replies `{"need_art": [keys]}` |
 | GET | `/api/plex/art?k=…` | | A stream's poster |
-| POST | `/api/truenas` | `{"state", "system"?, "pools"?, "disks"?, "alerts"?, "apps"?, "error"?}` | From the host agent every 10 s on screen, 60 s otherwise |
+| POST | `/api/truenas` | `{"state", "system"?, "pools"?, "disks"?, "alerts"?, "apps"?, "jobs"?, "error"?}` | From the host agent every 10 s on screen, 60 s otherwise |
 | GET | `/api/commands` | | For the host agent: queued commands (`{"hue": [...], "github_refresh": bool}`, emptied on read) and the panels on screen (`"visible"`) |
 | POST | `/api/github/refresh` | | Ask the agent to read GitHub now (pull down on the Code page) |
 | POST | `/api/run` | any action | Run an action |

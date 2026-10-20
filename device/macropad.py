@@ -9,7 +9,9 @@ import base64
 import collections
 import datetime
 import fcntl
+import glob
 import json
+import math
 import os
 import queue
 import select
@@ -32,6 +34,8 @@ FFS_DIR = '/dev/usb-ffs/hid'
 WEBAPP_DIR = '/usr/share/qt-superbird-app/webapp'
 BACKLIGHT = '/sys/class/backlight/aml-bl/brightness'
 BRIGHTNESS_MIN = 5          # brightness levels run 5..255 (Settings slider)
+BRIGHTNESS_STOPS = 3        # auto brightness offset: -3..+3 stops in half stops (a stop doubles or halves the light)
+LIGHT_SENSOR = '/sys/bus/iio/devices/iio:device*/in_intensity0_raw'    # the TMD2772 ambient light sensor
 THEMES = ('dark', 'black', 'light', 'nord', 'dracula', 'catppuccin', 'gruvbox', 'tokyonight', 'solarized')
 ACCENTS = ('theme', 'green', 'blue', 'purple', 'orange', 'pink', 'red')   # palettes: web/index.html; or a hue 0-359
 OS_MODES = ('auto', 'windows', 'mac', 'linux')
@@ -406,8 +410,12 @@ class HostLink:
             self.utc_offset = offset * 60
             changed = True
         agent = body.get('agent')
-        if isinstance(agent, dict) and agent != self.agent:
-            self.agent = {'os': str(agent.get('os')), 'version': str(agent.get('version'))}
+        # An agent older than the version check sends none: keep a version of None, so the
+        # page says it is out of date instead of waiting for data that agent never sends.
+        agent = ({'os': str(agent.get('os')), 'version': str(agent.get('version'))} if isinstance(agent, dict)
+                 else {'os': None, 'version': None})
+        if agent != self.agent:
+            self.agent = agent
             changed = True
         locked = bool(body.get('locked'))
         if locked != self.locked:
@@ -703,8 +711,9 @@ class HostHue:
         self.ui.publish('hue_dial', {'room': room['id']})
 
 
-AGENDA_DAYS = 7         # today and the next days
-AGENDA_MAX = 80         # events sent to the UI
+AGENDA_WEEKS = 4        # the most the Calendar page shows (its weeks button: 1 to 4)
+AGENDA_DAYS = AGENDA_WEEKS * 7      # today and the next days
+AGENDA_MAX = 300        # events sent to the UI
 EPOCH = datetime.datetime(1970, 1, 1)
 
 
@@ -772,10 +781,19 @@ class Agenda:
                                'all_day': ev['all_day'], 'title': ev['title'], 'where': ev['where'],
                                'link': bool(ev['link']), 'cal': ev['cal']})
         self.links, self.details = links, details
-        data = {'state': self.state, 'error': self.error, 'events': events}
+        data = {'state': self.state, 'error': self.error, 'events': events, 'calendars': self.calendar_names()}
         if data != self.published:
             self.published = data
             self.ui.publish('agenda', data)
+
+    def calendar_names(self):
+        """A name for each calendar, by the events' 'cal' index, for the Calendar page's tabs:
+        its X-WR-CALNAME, "Calendar 2" without one, and the number added to a name used twice."""
+        names = []
+        for i, name in enumerate(self.calendar.names if self.calendar is not None else []):
+            name = name or 'Calendar %d' % (i + 1)
+            names.append('%s (%d)' % (name, i + 1) if name in names else name)
+        return names
 
     def open(self, eid):
         link = self.links.get(eid)
@@ -894,15 +912,85 @@ class HostPlex:
 
 
 TRUENAS_TTL = 150       # seconds without an update before the TrueNAS data counts as gone (off screen: every 60 s)
-TRUENAS_FIELDS = ('system', 'pools', 'disks', 'alerts', 'apps')
+TRUENAS_FIELDS = ('system', 'pools', 'disks', 'alerts', 'apps', 'jobs')
+CRON_NAMES = {name: i for names in (('sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'),
+                                     ('', 'jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'))
+              for i, name in enumerate(names) if name}
+
+
+def cron_values(field, lo, hi):
+    """The values one cron field allows: *, 5, 1-5, */15, 5/10, lists of those, and day or month names."""
+    values = set()
+    for part in str(field).lower().split(','):
+        part, _, step = part.partition('/')
+        step = int(step) if step else 1
+        if part in ('*', ''):
+            first, last = lo, hi
+        elif '-' in part:
+            first, last = (int(CRON_NAMES.get(x, x)) for x in part.split('-', 1))
+        else:
+            first = int(CRON_NAMES.get(part, part))
+            last = hi if step > 1 else first
+        values.update(range(first, last + 1, step))
+    return values
+
+
+def cron_next(schedule, after):
+    """The first time after `after` (a naive local datetime) that a TrueNAS schedule
+    {minute, hour, dom, month, dow, begin?, end?} runs, within a year; None if never.
+    As in cron, a day matches both dom and dow, or either one when both are set."""
+    minutes = sorted(cron_values(schedule.get('minute', '00'), 0, 59))
+    hours = sorted(cron_values(schedule.get('hour', '*'), 0, 23))
+    doms, months = cron_values(schedule.get('dom', '*'), 1, 31), cron_values(schedule.get('month', '*'), 1, 12)
+    dows = {d % 7 for d in cron_values(schedule.get('dow', '*'), 0, 7)}          # 0 and 7 are Sunday
+    either = str(schedule.get('dom', '*')) != '*' and str(schedule.get('dow', '*')) != '*'
+    begin, end = (tuple(int(x) for x in str(schedule.get(k) or v).split(':')[:2]) for k, v in (('begin', '00:00'), ('end', '23:59')))
+    for i in range(366):
+        day = after.date() + datetime.timedelta(days=i)
+        dom_ok, dow_ok = day.day in doms, (day.weekday() + 1) % 7 in dows
+        if day.month not in months or not ((dom_ok or dow_ok) if either else (dom_ok and dow_ok)):
+            continue
+        for h in hours:
+            for m in minutes:
+                at = datetime.datetime(day.year, day.month, day.day, h, m)
+                if at > after and begin <= (h, m) <= end:
+                    return at
+    return None
+
+
+def next_task(tasks, pools, utc_offset):
+    """The scheduled task that runs next: {kind, name, at (ms)}, or None. A scrub runs only when
+    the pool's last scrub ended more than `threshold` - 1 days before, as in TrueNAS's
+    plugins/zpool/scrub_impl.py."""
+    offset = datetime.timedelta(seconds=utc_offset or 0)
+    now = datetime.datetime.utcfromtimestamp(time.time()) + offset
+    scrubbed = {p.get('name'): p.get('scrubbed') for p in pools or []}
+    best = None
+    for task in tasks or []:
+        try:
+            at = cron_next(task.get('schedule') or {}, now)
+            last = scrubbed.get(task.get('name')) if task.get('kind') == 'scrub' else None
+            for _ in range(60):                  # a weekly scrub with a 35-day threshold skips a few weeks
+                if at is None or last is None or (at - offset - EPOCH).total_seconds() * 1000 - last > (int(task.get('threshold') or 0) - 1) * 86400000:
+                    break
+                at = cron_next(task['schedule'], at)
+        except (ValueError, TypeError, AttributeError) as e:
+            log('truenas: cannot read the schedule of %r: %s' % (task.get('name'), e))
+            continue
+        if at is not None and (best is None or at < best[0]):
+            best = (at, task)
+    if best is None:
+        return None
+    return {'kind': best[1].get('kind'), 'name': best[1].get('name'), 'at': int((best[0] - offset - EPOCH).total_seconds() * 1000)}
 
 
 class HostTrueNAS:
     """A TrueNAS server on the local network, through the host agent: pools, disk
-    temperatures, alerts and apps, every 10 s while its page is on screen."""
+    temperatures, alerts, apps and running jobs, every 10 s while its page is on screen,
+    and the scheduled task that runs next."""
 
-    def __init__(self, ui):
-        self.ui = ui
+    def __init__(self, ui, host):
+        self.ui, self.host = ui, host
         self.published = {'state': 'unknown'}
         self.updated = None
 
@@ -910,6 +998,8 @@ class HostTrueNAS:
         data = {k: body[k] for k in TRUENAS_FIELDS if k in body}
         data['state'] = str(body.get('state') or 'error')
         data['error'] = str(body['error']) if body.get('error') else None
+        if data['state'] == 'ok':
+            data['next'] = next_task(body.get('tasks'), body.get('pools'), self.host.utc_offset)
         self.published, self.updated = data, time.monotonic()
         self.ui.publish('truenas', data)
 
@@ -956,6 +1046,15 @@ def write_backlight(level):
         log('brightness:', e)
 
 
+def sensor_level(raw):
+    """The brightness level the stock sp-als-backlight service sets for a light sensor
+    reading, fitted to its log (within 1 level): 25 in the dark, then up with the log of
+    the reading, 210 at most."""
+    if raw <= 12:
+        return 25.0
+    return min(210.0, 63.3 + 19.3 * math.log(raw - 12.2))
+
+
 # ------------------------------------------------------------------ the pad
 
 class Pad:
@@ -970,7 +1069,7 @@ class Pad:
         self.audio = HostAudio(self.ui)
         self.hue = HostHue(self.ui)
         self.plex = HostPlex(self.ui)
-        self.truenas = HostTrueNAS(self.ui)
+        self.truenas = HostTrueNAS(self.ui, self.host)
         self.hid = Hid(lambda status: self.on_usb_status(status))
         self.config = {}
         self.config_mtime = 0
@@ -983,13 +1082,16 @@ class Pad:
         # Device settings changed from the Settings tab; kept in state.json.
         # None means "use config.json".
         self.settings = {'os_mode': 'auto', 'layout': None, 'dial_invert': None,
-                         'brightness_auto': True, 'brightness': 180,
+                         'brightness_auto': True, 'brightness': 180, 'brightness_stops': 0, 'calendar': None,
+                         'calendar_weeks': {}, 'night_stops': 0, 'night_from': 22 * 60, 'night_to': 7 * 60,
                          'theme': 'dark', 'accent': 'theme',
                          'clock_24h': True, 'icon_style': None,
                          'icon_color': None, 'page_order': [], 'page_hidden': [], 'page_shown': []}
-        self._als_running = None    # stock light-sensor service state, as last set by us
+        self._stock_stopped = False    # the stock light-sensor service, stopped by us
+        self._auto_level = None        # auto brightness: the level now, None to jump to the sensor's
         self._dimmed = False
         self._dim_timer = None
+        self.settings_open = False     # the screen shows Settings (the page says so, POST /api/view)
         self.lock = threading.RLock()
         self.hid.on_report_request = self.detect_os
         self.load_saved()
@@ -1043,6 +1145,15 @@ class Pad:
             'page_shown': lambda v: isinstance(v, list) and len(v) <= 64 and all(isinstance(x, str) for x in v),
             'brightness_auto': lambda v: isinstance(v, bool),
             'brightness': lambda v: isinstance(v, int) and BRIGHTNESS_MIN <= v <= 255,
+            'brightness_stops': lambda v: type(v) in (int, float) and abs(v) <= BRIGHTNESS_STOPS and v * 2 == int(v * 2),
+            # Darker at night: 0 (off) to -3 stops, from night_from to night_to (minutes of the day).
+            'night_stops': lambda v: type(v) in (int, float) and -BRIGHTNESS_STOPS <= v <= 0 and v * 2 == int(v * 2),
+            'night_from': lambda v: type(v) is int and 0 <= v < 1440,
+            'night_to': lambda v: type(v) is int and 0 <= v < 1440,
+            'calendar': lambda v: v is None or (isinstance(v, str) and len(v) <= 200),     # the Calendar page's tab; None: all
+            # Weeks the Calendar page shows, per tab: a calendar's name, or '' for All.
+            'calendar_weeks': lambda v: isinstance(v, dict) and len(v) <= 64 and all(
+                isinstance(k, str) and len(k) <= 200 and type(n) is int and 1 <= n <= AGENDA_WEEKS for k, n in v.items()),
         }
         if key not in valid or not valid[key](value):
             raise ValueError('bad setting %s=%r' % (key, value))
@@ -1052,25 +1163,86 @@ class Pad:
             keys = [page_key(p) for p in self.ordered_pages()]
             self.page = keys.index(current) if current in keys else 0
         self.settings[key] = value
-        if key.startswith('brightness'):
+        if key.startswith(('brightness', 'night')):
             self.apply_brightness()
         self.save()
         self.publish_state()
 
     def apply_brightness(self):
-        """Apply the brightness setting (not while dimmed for standby)."""
+        """Apply the brightness setting (not while dimmed for standby). In auto, follow_sensor
+        jumps to the new level on its next reading."""
         if self._dimmed:
             return
-        self._light_sensor(self.settings['brightness_auto'])
+        self._stop_stock_sensor()
+        self._auto_level = None
         if not self.settings['brightness_auto']:
-            write_backlight(self.settings['brightness'])
+            write_backlight(self.manual_level())
 
-    def _light_sensor(self, on):
-        # The stock sp-als-backlight service drives the backlight from the light
-        # sensor; manual levels need it stopped. supervisorctl is slow, so only on a switch.
-        if on != self._als_running:
-            subprocess.call(['supervisorctl', 'start' if on else 'stop', 'backlight'], stdout=subprocess.DEVNULL)
-            self._als_running = on
+    def night_active(self):
+        """Whether it is night now (Settings → General), by the computer's clock: never before
+        the agent has set the time."""
+        start, end = self.settings['night_from'], self.settings['night_to']
+        if not self.settings['night_stops'] or start == end or self.host.utc_offset is None or time.time() < VALID_TIME:
+            return False
+        minute = int((time.time() + self.host.utc_offset) // 60 % 1440)
+        return start <= minute < end if start < end else minute >= start or minute < end
+
+    def night_stops(self):
+        return self.settings['night_stops'] if self.night_active() else 0
+
+    def manual_level(self):
+        """The slider's level, darker at night."""
+        return max(BRIGHTNESS_MIN, round(self.settings['brightness'] * 2 ** self.night_stops()))
+
+    def _stop_stock_sensor(self):
+        # The stock sp-als-backlight service drives the backlight from the light sensor, but
+        # it has no offset, so follow_sensor does its job. supervisorctl is slow: only once.
+        if not self._stock_stopped:
+            subprocess.call(['supervisorctl', 'stop', 'backlight'], stdout=subprocess.DEVNULL)
+            self._stock_stopped = True
+
+    def release_backlight(self):
+        """On the way out, give auto brightness back to the stock service, so the screen still
+        follows the light while this service is down. A manual or standby level stays as it is."""
+        if self._stock_stopped and self.settings['brightness_auto'] and not self._dimmed:
+            self._stock_stopped = False          # follow_sensor stops writing
+            try:
+                subprocess.call(['supervisorctl', 'start', 'backlight'], stdout=subprocess.DEVNULL, timeout=5)
+            except subprocess.TimeoutExpired:
+                log('could not start the stock light-sensor service')
+
+    def follow_sensor(self):
+        """The backlight, every 0.5 s. Auto: the stock service's level for the light sensor,
+        times 2 for each stop of the offset and of the night; it moves a fifth of the way there
+        on each reading, so it fades the way the stock service did and a passing shadow
+        doesn't flicker it. Manual: the slider's level, darker at night."""
+        paths = glob.glob(LIGHT_SENSOR)
+        if not paths:
+            log('no light sensor: auto brightness stays where it is')
+        written, night = None, None
+        while True:
+            time.sleep(0.5)
+            if self.night_active() != night:
+                night = self.night_active()
+                self.publish_state()             # Settings shows when it is night
+            if self._dimmed or not self._stock_stopped:
+                written = None
+                continue
+            if not self.settings['brightness_auto']:
+                level = self.manual_level()
+            else:
+                try:
+                    with open(paths[0]) as f:
+                        raw = int(f.read())
+                except (IndexError, OSError, ValueError):
+                    continue
+                stops = self.settings['brightness_stops'] + self.night_stops()
+                target = max(BRIGHTNESS_MIN, min(255.0, sensor_level(raw) * 2 ** stops))
+                level = target if self._auto_level is None else self._auto_level + (target - self._auto_level) / 5
+                self._auto_level = level
+            if round(level) != written and not self._dimmed and self._stock_stopped:
+                written = round(level)
+                write_backlight(written)
 
     # -- standby dimming: minimum brightness while the computer sleeps or is gone
     def on_usb_status(self, status):
@@ -1091,7 +1263,7 @@ class Pad:
     def _dim(self):
         if self.standby() and not self._dimmed:
             self._dimmed = True
-            self._light_sensor(False)
+            self._stop_stock_sensor()
             write_backlight(BRIGHTNESS_MIN)
             log('standby: brightness at minimum')
 
@@ -1226,11 +1398,13 @@ class Pad:
                 'os': self.host_os(), 'os_mode': self.settings['os_mode'], 'os_detected': self.os_detected,
                 'settings': self.settings, 'layout': self.layout_name(), 'dial_invert': self.dial_invert(),
                 'locked': self.host.locked, 'clock': self.host.clock(), 'agent': self.agent_status(),
-                'hidden': sorted(self.hidden_keys()), 'unconfigured': sorted(self.auto_hidden)}
+                'hidden': sorted(self.hidden_keys()), 'unconfigured': sorted(self.auto_hidden),
+                'night': self.night_active()}
 
     def agent_status(self):
         """The agent's version against the repo's (agents.json, written by deploy.sh):
-        {os, version, expected, outdated}, or None before the agent's first heartbeat."""
+        {os, version, expected, outdated}, or None before the agent's first heartbeat.
+        An agent that sends no version is out of date."""
         agent = self.host.agent
         if not agent:
             return None
@@ -1239,7 +1413,8 @@ class Pad:
                 expected = json.load(f).get(agent['os'])
         except (OSError, ValueError):
             expected = None
-        return dict(agent, expected=expected, outdated=bool(expected) and expected != agent['version'])
+        outdated = agent['version'] is None or bool(expected) and expected != agent['version']
+        return dict(agent, expected=expected, outdated=outdated)
 
     def publish_state(self):
         self.ui.publish('state', self.state())
@@ -1338,6 +1513,9 @@ class Pad:
             n = len(self.pages())
             if not n:
                 return
+            if self.settings_open and ref in ('next', 'prev'):
+                ref = 0 if ref == 'next' else -1      # Settings (⚙) is the tab after the last page
+            leaving, self.settings_open = self.settings_open, False
             if ref == 'next':
                 self.page = (self.page + 1) % n
             elif ref == 'prev':
@@ -1346,6 +1524,8 @@ class Pad:
                 idx = self._resolve(self.pages(), ref)
                 if idx is not None:
                     self.page = idx
+        if leaving:
+            self.ui.publish('view', {'settings': False})      # the page closes Settings, also on the same page
         self.publish_state()
 
     def set_dial(self, ref):
@@ -1387,13 +1567,20 @@ class Pad:
                 self.flash('tile', index, tiles[index].get('label'))
                 self.run(tiles[index])
 
-    def press_preset(self, index):
+    def press_preset(self, index, hold=False):
+        """A top button: its action, or with hold=True its "hold" action (pressed HOLD_SECONDS or longer)."""
         if self.standby():
             return
         preset = self.presets()[index] if 0 <= index < 4 else None
-        if preset:
-            self.flash('preset', index, preset.get('label'))
-            self.run(preset)
+        action = preset.get('hold') if preset and hold else preset
+        if action:
+            self.flash('preset', index, action.get('label') or preset.get('label'))
+            self.run(action)
+
+    def preset_holds(self, index):
+        """Whether a top button has a "hold" action: then its tap fires on release."""
+        preset = self.presets()[index] if 0 <= index < 4 else None
+        return bool(preset and preset.get('hold'))
 
     def turn(self, steps):
         if self.standby():
@@ -1461,7 +1648,7 @@ def input_loop(pad, keys_path, rotary_path):
             fds[os.open(path, os.O_RDONLY)] = path
     presets = {KEY_1: 0, KEY_2: 1, KEY_3: 2, KEY_4: 3}
     named = {KEY_ESC: 'back', KEY_M: 'menu', KEY_ENTER: 'knob'}
-    down = {}   # code -> (deadline, hold fired)
+    down = {}   # code -> (deadline, hold fired), for buttons with a hold action
 
     def has_hold(code):
         return code in named and pad.config.get('hardware', {}).get(named[code], {}).get('hold')
@@ -1476,7 +1663,10 @@ def input_loop(pad, keys_path, rotary_path):
         for code, (deadline, fired) in list(down.items()):
             if not fired and now >= deadline:
                 down[code] = (deadline, True)
-                pad.hardware(named[code], 'hold')
+                if code in presets:
+                    pad.press_preset(presets[code], hold=True)
+                else:
+                    pad.hardware(named[code], 'hold')
         for fd in ready:
             data = os.read(fd, EVENT_SIZE * 32)
             for off in range(0, len(data) - EVENT_SIZE + 1, EVENT_SIZE):
@@ -1486,7 +1676,14 @@ def input_loop(pad, keys_path, rotary_path):
                 elif etype == EV_KEY and value in (0, 1):
                     if code in presets:
                         if value == 1:
-                            pad.press_preset(presets[code])
+                            if pad.preset_holds(presets[code]):
+                                down[code] = (now + HOLD_SECONDS, False)
+                            else:
+                                pad.press_preset(presets[code])
+                        elif code in down:
+                            _, fired = down.pop(code)
+                            if not fired:
+                                pad.press_preset(presets[code])
                     elif code in named:
                         if value == 1:
                             if has_hold(code):
@@ -1622,6 +1819,8 @@ class Handler(BaseHTTPRequestHandler):
             pad.press_preset(int(body.get('index', -1)))
         elif path == '/api/page':
             pad.set_page(body.get('page', 'next'))
+        elif path == '/api/view':
+            pad.settings_open = bool(body.get('settings'))
         elif path == '/api/dial':
             pad.set_dial(body.get('dial', 'next'))
         elif path == '/api/settings':
@@ -1841,8 +2040,8 @@ def gadget(*args):
 def main():
     pad = Pad()
     serve_ui(pad)
-    if not pad.settings['brightness_auto']:
-        pad.apply_brightness()
+    pad.apply_brightness()
+    threading.Thread(target=pad.follow_sensor, daemon=True).start()
     if pad.config.get('kiosk', True) and '--no-kiosk' not in sys.argv:
         threading.Thread(target=take_over_kiosk, daemon=True).start()
 
@@ -1885,6 +2084,7 @@ def main():
             pad.refresh_hidden()
             pad.agenda.refresh()
     finally:
+        pad.release_backlight()
         pad.hid.close()
 
 

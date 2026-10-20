@@ -13,9 +13,10 @@ as soon as you plug it in.
   and hides any you don't use; live pages you haven't set up (no config file yet)
   start hidden and can be turned on there. On live pages, the top bar also shows the song
   playing (tap it for Media).
-- **4 top buttons:** presets, media keys by default (a page can set its own). Live
-  pages show a big clock and the date at the top instead of their labels, and the
-  buttons still work; a tile page of your own shows the labels.
+- **4 top buttons:** presets, by default first page, page left, page right and last
+  page; hold 2 or 3 for the previous or next track (a page can set its own). Live pages
+  show a big clock and the date at the top instead of their labels, and the buttons
+  still work; a tile page of your own shows the labels.
 - **Dial:** volume, Hue lights (the room you last tapped), scroll, zoom, scrub (arrow keys),
   browser tabs, undo/redo. The menu (M) button switches dial mode.
 - **Windows, macOS and Linux:** each tile can have per-OS shortcuts. The pad
@@ -23,8 +24,9 @@ as soon as you plug it in.
   [Host OS](#host-os)).
 - **Keyboard layouts:** typed text is translated for the host layout
   (Latin American and US are included).
-- **Settings** (the ⚙ tab): brightness (light sensor or manual), host OS, layout,
-  dial direction, clock format, themes and icons,
+- **Settings** (the ⚙ tab): brightness (light sensor, darker or brighter in stops, or
+  manual, and darker at night between two hours), host OS, layout, dial direction,
+  clock format, themes and icons,
   tab order and hidden tabs, device info, and Reconnect / Restart / Reboot.
   Settings are saved on the Car Thing and survive power cycles.
 - **Themes:** Dark, Black, Light, and the editor color schemes Nord, Dracula,
@@ -35,7 +37,7 @@ as soon as you plug it in.
   playing with its cover, Philips Hue lights, your calendar with Join buttons,
   CPU/memory/GPU/network graphs, a kill switch for the app in focus, GitHub Actions
   runs and pull requests, the streams and load of your Plex server, your TrueNAS
-  pools, disks, alerts and apps, a volume bar,
+  pools, disks, alerts, apps and running jobs, a volume bar,
   an audio device picker, a clock and a lock screen (see [Computer agent](#computer-agent)).
 - **Standby screen** while the computer sleeps; the pad reconnects by itself
   when it wakes up.
@@ -50,8 +52,8 @@ The Car Thing's screen is 800×480. These use made-up demo data; to retake them,
 
 | | |
 |---|---|
-| ![Media page: the song playing, its cover and progress, media controls, and the audio output in the header](docs/screenshots/media.png) | ![Calendar page: today, tomorrow and later this week, with Join buttons on meetings](docs/screenshots/calendar.png) |
-| **Media:** what's playing, with controls and the audio output | **Calendar:** the coming week; a meeting in progress pulses |
+| ![Media page: the song playing, its cover and progress, media controls, and the audio output in the header](docs/screenshots/media.png) | ![Calendar page: tabs for All and each calendar, then today, tomorrow and the next two weeks, with Join buttons on meetings](docs/screenshots/calendar.png) |
+| **Media:** what's playing, with controls and the audio output | **Calendar:** the next two weeks; a meeting in progress pulses |
 | ![Status page: CPU, memory, GPU and network graphs, and the covered kill switch for the focused app](docs/screenshots/status.png) | ![Code page: the latest GitHub Actions runs and your open pull requests](docs/screenshots/code.png) |
 | **Status:** live stats and the kill switch | **Code:** GitHub Actions runs and your pull requests |
 | ![Event details card with time, length, notes and a Join meeting button](docs/screenshots/event.png) | ![Audio device picker with output and input lists](docs/screenshots/audio.png) |
@@ -60,8 +62,8 @@ The Car Thing's screen is 800×480. These use made-up demo data; to retake them,
 | **Volume bar:** shows when the volume changes | **Lock screen:** while the computer is locked |
 | ![Lights page: Philips Hue rooms and zones tinted with their light color, with switches and brightness bars](docs/screenshots/lights.png) | ![A room card: brightness, warm-to-cool white, scenes and its lights](docs/screenshots/room.png) |
 | **Lights:** Philips Hue rooms and zones, with the song playing in the top bar | **A room:** brightness, white, scenes, each light |
-| ![Plex page: three streams with posters and transcode tags, the server's CPU and bandwidth graphs, and the libraries](docs/screenshots/plex.png) | ![NAS page: TrueNAS pools as tanks that fill up, disk temperatures, alerts and apps](docs/screenshots/nas.png) |
-| **Plex:** streams and how each is sent, server load, libraries | **NAS:** TrueNAS pools, disks, alerts and apps |
+| ![Plex page: two streams with posters and transcode tags, a running job, the server's CPU and bandwidth graphs, and the libraries](docs/screenshots/plex.png) | ![NAS page: TrueNAS pools as tanks that fill up, disk temperatures, alerts, apps and running jobs](docs/screenshots/nas.png) |
+| **Plex:** streams and how each is sent, running jobs, server load, libraries | **NAS:** TrueNAS pools, disks, alerts, apps and jobs |
 | ![Settings, General: brightness, host OS, keyboard layout, dial direction and clock format](docs/screenshots/general.png) | ![Settings, Appearance: themes, accent colors, the hue slider and icon options](docs/screenshots/settings.png) |
 | **Settings → General:** brightness, host OS, layout | **Settings → Appearance** |
 | ![Settings, Tabs: the pages in order with up and down arrows](docs/screenshots/tabs.png) | ![A meeting reminder over the Media page: a countdown with Join meeting and Dismiss](docs/screenshots/reminder.png) |
@@ -112,11 +114,11 @@ them.
 
 | Control | Default |
 |---|---|
-| Buttons 1–4 (top edge) | Presets: previous, play/pause, next, mute |
+| Buttons 1–4 (top edge) | Presets: first page, page left, page right, last page · hold 2: previous track, hold 3: next track |
 | Dial turn | Current dial mode (Volume, Lights, Scroll, Zoom, Scrub, Tabs, Undo/Redo) |
 | Dial press | Dial mode action (mute, middle click, reset zoom, …) |
 | Dial hold | Play/Pause |
-| Back button | Next page, wrapping from the last back to the first · hold: first page |
+| Back button | Next page, wrapping from the last back to the first (from Settings: the first) · hold: first page |
 | Menu button (M) | Next dial mode · hold: back to Volume |
 | Swipe left/right on the page | Change page |
 | Bottom bar | Tap a tab (with more than seven, drag the bar or tap › / ‹ for the rest) |
@@ -165,15 +167,19 @@ them to the Car Thing **over the USB cable** (`adb forward`; no network):
   plays in, playing/paused and a live progress bar, on a card tinted with the cover's
   colors, with round media controls under the progress bar. When nothing is playing
   it says so; the controls work either way.
-- **Calendar:** the Calendar page shows today, tomorrow and the rest of the week
-  from your calendars (see [Adding your calendar](#adding-your-calendar)): repeating
-  events, moved or cancelled occurrences and time zones included, meetings you
-  declined left out. The next event is highlighted with a countdown. Events with a
-  Google Meet, Zoom or Teams link get a Join button that opens the link on the computer.
-  Tap an event for its details: date, time and length, place, calendar and notes.
-  Five minutes before any timed event, a reminder card comes up on any page with a
-  countdown and **Dismiss**, plus **Join meeting** for a meeting with a link or
-  **Details** for anything else; it stays until two minutes after the start.
+- **Calendar:** the Calendar page shows today, tomorrow and the rest of the next two
+  weeks (− and + at the top left show 1 to 4 weeks) from your calendars (see [Adding
+  your calendar](#adding-your-calendar)): repeating events, moved or cancelled
+  occurrences and time zones included, meetings you declined left out. The next event is
+  highlighted with a countdown. Events with a Google Meet, Zoom or Teams link get a Join
+  button that opens the link on the computer. Tap an event for its details: date, time
+  and length, place, calendar and notes. With two calendars or more, tabs at the top
+  show **All** or one calendar. The Car Thing keeps the tab you pick, and the number of
+  weeks for each tab. If the picked calendar is gone, it shows All. In All, a colored
+  dot shows each event's calendar, in the color of its tab. Five minutes before any
+  timed event in any calendar, a reminder card comes up on any page with a countdown and
+  **Dismiss**, plus **Join meeting** for a meeting with a link or **Details** for
+  anything else; it stays until two minutes after the start.
 - **Status:** the Status page shows CPU, memory, GPU and network speed, each with
   a graph of the last two minutes. The GPU needs an NVIDIA card (`nvidia-smi`), or
   an AMD one on Linux; CPU temperature shows on Linux.
@@ -203,17 +209,21 @@ them to the Car Thing **over the USB cable** (`adb forward`; no network):
   list to fetch it right away (see [Adding GitHub](#adding-github)).
 - **Plex:** the streams on your Plex Media Server. Each stream shows its poster, the
   user and player, the progress and the quality. A tag shows how the server sends it:
-  direct play, direct stream, or transcode (HW for a hardware transcode). Next to the
-  streams are graphs of the server's CPU and bandwidth, and the size of each library,
-  with any library scan in progress. The graphs need Plex Pass. The page refreshes
-  every 3 seconds while it's on screen, every 30 seconds otherwise (see
-  [Connecting Plex](#connecting-plex)).
+  direct play, direct stream, or transcode (HW for a hardware transcode). Under the
+  streams are the jobs that run now, with their progress: library scans and the
+  scheduled tasks (Settings → Scheduled Tasks in Plex). Next to the streams are graphs
+  of the server's CPU and bandwidth, and the size of each library. The graphs need Plex
+  Pass. The page refreshes every 3 seconds while it's on screen, every 30 seconds
+  otherwise (see [Connecting Plex](#connecting-plex)).
 - **NAS (TrueNAS):** each pool as a tank that fills up (yellow from 80%, red from 90%)
-  with its health and free space, the temperature of every disk (NVMe drives have
-  their own, higher limits), the server's alerts, and how many apps run and how many
-  have updates. Below the pools: the TrueNAS version, uptime, cores, memory and load.
-  It refreshes every 10 seconds while on screen, every minute otherwise (see
-  [Connecting TrueNAS](#connecting-truenas)).
+  with its health, free space and size, the temperature of every disk (NVMe drives have
+  their own, higher limits), the server's alerts, how many apps run and how many have
+  updates, and the jobs that run now (a scrub, a snapshot, replication or cloud sync
+  task, an app update), with the first one's progress. When no job runs, it shows the
+  next scheduled task and when it runs (a scrub waits for its threshold). Below the
+  disks: the TrueNAS version, uptime, load, cores and memory. It refreshes every 10
+  seconds while on screen, every minute otherwise (see [Connecting
+  TrueNAS](#connecting-truenas)).
 - **Volume and audio devices:** when the volume or mute changes (the dial, the Mute
   tile, your keyboard), a volume bar shows at the top for a moment. The Media page
   header shows the current output; tap it to pick the output and input devices.
@@ -357,12 +367,12 @@ API key. It needs TrueNAS 25.04 or later (the WebSocket API).
    1-AbCdEf…
    ```
 
-The NAS page shows up within a minute; no restart needed. The agent always connects
-over HTTPS: TrueNAS revokes a key that is ever sent over plain HTTP. It accepts the
-server's self-signed certificate for that address only. The agent only reads (system
-info, pools, disk temperatures, alerts, apps). The key carries the rights of the user
-who made it, so for read-only access, make it as a user in the read-only
-administrators group. Keep `truenas.txt` to yourself.
+The NAS page shows up within a minute; no restart needed. The agent always connects over
+HTTPS: TrueNAS revokes a key that is ever sent over plain HTTP. It accepts the server's
+self-signed certificate for that address only. The agent only reads (system info, pools,
+disk temperatures, alerts, apps, running jobs). The key carries the rights of the user
+who made it, so for read-only access, make it as a user in the read-only administrators
+group. Keep `truenas.txt` to yourself.
 
 ## When the computer sleeps
 
