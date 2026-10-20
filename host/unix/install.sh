@@ -71,7 +71,7 @@ Darwin)
   <array><string>$(command -v python3)</string><string>$DIR/nowplaying.py</string></array>
   <key>EnvironmentVariables</key>
   <dict>
-    <key>PATH</key><string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    <key>PATH</key><string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
     <key>ADB</key><string>$(command -v adb)</string>
   </dict>
   <key>RunAtLoad</key><true/>
