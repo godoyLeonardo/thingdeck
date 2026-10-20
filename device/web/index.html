@@ -2138,7 +2138,10 @@ document.addEventListener('contextmenu', function (e) { e.preventDefault(); });
 function connect() {
   var es = new EventSource('/api/events');
   es.onopen = function () { $('offline').className = ''; load(); };
-  es.onerror = function () { $('offline').className = 'show'; };
+  es.onerror = function () {
+    $('offline').className = 'show';
+    if (es.readyState === 2) setTimeout(connect, 2000);   // the browser gave up (no retry after some errors): start over
+  };
   es.onmessage = function (e) {
     var m = JSON.parse(e.data), d = m.data;
     if (m.type === 'state') {
