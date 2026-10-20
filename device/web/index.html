@@ -381,18 +381,27 @@
   .plex h3, .plex .m-label { font-size: calc(12.5px * var(--ts)); }
   .plex .m-detail { font-size: calc(13.5px * var(--ts)); }
   .plex .m-value { font-size: calc(34px * var(--ts)); }
-  /* the NAS page: Plex's layout, with pools on the left */
-  .nas-pool { padding: 7px 0 9px; }
-  .nas-row { display: flex; align-items: center; }
-  .nas-row .ev-title { flex: 1; min-width: 0; font-size: calc(18px * var(--ts)); }
-  .nas-pool .np-bar { height: 8px; border-radius: 4px; margin: 7px 0 5px; }
-  .nas-pool .np-bar i { transition: none; }
-  .np-bar.warn i { background: var(--warn); }
-  .np-bar.bad i { background: var(--bad); }
-  .nas-pool .ev-sub { font-size: calc(13.5px * var(--ts)); }
-  .nas-scan { color: var(--acc); margin-left: 6px; }
-  .nas-sys { flex: none; padding: 8px 0 10px; border-top: 1px solid var(--line); font: 500 calc(12.5px * var(--ts)) GeistMono, monospace;
-    color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* the NAS page: a narrow card of pools as vertical tanks, then disks, alerts and apps */
+  .nas-pools { flex: none; min-width: 200px; max-width: 52%; padding: 10px 14px 0; }
+  .nas-cols { flex: 1; min-height: 0; display: flex; overflow-x: auto; }
+  .nas-cols::-webkit-scrollbar { display: none; }
+  .nas-col { flex: 1; min-width: 86px; display: flex; flex-direction: column; align-items: center; padding-top: 4px; }
+  .nas-col + .nas-col { margin-left: 10px; }
+  .nas-pct { font-size: calc(26px * var(--ts)); font-weight: 700; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .nas-pct small { font-size: .55em; font-weight: 600; color: var(--muted); margin-left: 1px; }
+  .nas-tank { position: relative; flex: 1; min-height: 40px; width: 54px; margin: 6px 0 8px; border-radius: 12px; background: var(--line); overflow: hidden; }
+  .nas-tank i { position: absolute; left: 0; right: 0; bottom: 0; background: var(--acc); }
+  .nas-tank.warn i, .nas-pct.warn { background: var(--warn); }
+  .nas-tank.bad i { background: var(--bad); }
+  .nas-pct.warn { background: none; color: var(--warn); }
+  .nas-pct.bad { color: var(--bad); }
+  .nas-name { max-width: 100%; font-size: calc(17px * var(--ts)); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .nas-col .px-tag { margin-top: 4px; }
+  .nas-free { margin-top: 4px; font: 500 calc(12.5px * var(--ts)) GeistMono, monospace; color: var(--muted); white-space: nowrap; }
+  .nas-scan { color: var(--acc); }
+  .nas-sys { flex: none; margin-top: 10px; padding: 8px 0 10px; border-top: 1px solid var(--line); font: 500 calc(12.5px * var(--ts)) GeistMono, monospace;
+    color: var(--muted); line-height: 1.5; }
+  .nas-sys div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .px-num.warn, .m-value.warn { color: var(--warn); }
   .px-num.bad, .m-value.bad { color: var(--bad); }
   .m-value.good { color: var(--good); }
@@ -2071,14 +2080,16 @@ function fmtUptime(s) {
   var d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600);
   return d ? d + ' d ' + h + ' h' : h + ' h ' + Math.floor(s % 3600 / 60) + ' min';
 }
+// A pool as a tank: how full on top, the level, then its name, health and free space.
 function nasPool(p) {
-  var used = p.size ? p.used / p.size * 100 : 0;
+  var used = p.size ? p.used / p.size * 100 : 0, level = used >= 90 ? ' bad' : used >= 80 ? ' warn' : '';
   var status = String(p.status || '?'), tag = status === 'ONLINE' && p.healthy ? 'dp' : status === 'DEGRADED' || !p.healthy ? 'tc' : 'bad';
-  var scan = p.scan ? '<span class="nas-scan">' + esc((p.scan.kind || 'scan').toLowerCase()) + ' ' + Math.round(p.scan.percent || 0) + '%</span>' : '';
-  return '<div class="nas-pool"><div class="nas-row"><div class="ev-title">' + esc(p.name || '') + '</div>' +
-    '<div class="px-tag ' + tag + '">' + esc(p.healthy || status !== 'ONLINE' ? status : 'UNHEALTHY') + '</div></div>' +
-    '<div class="np-bar' + (used >= 90 ? ' bad' : used >= 80 ? ' warn' : '') + '"><i style="width:' + used.toFixed(1) + '%"></i></div>' +
-    '<div class="ev-sub">' + fmtBytes(p.used) + ' of ' + fmtBytes(p.size) + ' · ' + Math.round(used) + '% used · ' + fmtBytes(p.free) + ' free' + scan + '</div></div>';
+  return '<div class="nas-col"><div class="nas-pct' + level + '">' + Math.round(used) + '<small>%</small></div>' +
+    '<div class="nas-tank' + level + '"><i style="height:' + used.toFixed(1) + '%"></i></div>' +
+    '<div class="nas-name">' + esc(p.name || '') + '</div>' +
+    '<div class="px-tag ' + tag + '">' + esc(p.healthy || status !== 'ONLINE' ? status : 'UNHEALTHY') + '</div>' +
+    '<div class="nas-free">' + (p.scan ? '<span class="nas-scan">' + esc((p.scan.kind || 'scan').toLowerCase()) + ' ' + Math.round(p.scan.percent || 0) + '%</span>'
+      : fmtBytes(p.free) + ' free') + '</div></div>';
 }
 function updateNas() {
   var box = $('nas');
@@ -2093,17 +2104,16 @@ function updateNas() {
   }
   if (!$('nasp')) {
     box.className = 'plex nas';
-    box.innerHTML = '<div class="card px-streams" id="nasp"></div><div class="monitor half px-side" id="nasside"></div>';
+    box.innerHTML = '<div class="card nas-pools" id="nasp"></div><div class="monitor half px-side" id="nasside"></div>';
     box._html = null;
   }
   var sys = n.system || {}, pools = n.pools || [], disks = n.disks || [], alerts = n.alerts || [], apps = n.apps || [];
-  redraw($('nasp'), '<h3>' + esc(sys.host || 'TrueNAS') + ' · ' + pools.length + (pools.length === 1 ? ' pool' : ' pools') +
-    (sys.uptime ? '<span>up ' + fmtUptime(sys.uptime) + '</span>' : '') + '</h3><div class="ag-list">' +
+  var line = function (parts) { parts = parts.filter(function (x) { return x; }); return parts.length ? '<div>' + parts.join(' · ') + '</div>' : ''; };
+  redraw($('nasp'), '<h3>' + esc(sys.host || 'TrueNAS') + '</h3><div class="nas-cols">' +
     (pools.map(nasPool).join('') || '<div class="ag-empty">No pools</div>') + '</div>' +
-    '<div class="nas-sys">' + [sys.version ? 'TrueNAS ' + esc(String(sys.version).replace(/^TrueNAS-/, '')) : '',
-      sys.cores ? sys.cores + ' cores' : '', sys.memory ? fmtBytes(sys.memory) + ' RAM' : '',
-      sys.load && sys.load.length ? 'load ' + sys.load.map(function (v) { return Number(v).toFixed(1); }).join(' ') : '']
-      .filter(function (x) { return x; }).join(' · ') + '</div>');
+    '<div class="nas-sys">' + line([sys.version ? 'TrueNAS ' + esc(String(sys.version).replace(/^TrueNAS-/, '')) : '']) +
+      line([sys.uptime ? 'up ' + fmtUptime(sys.uptime) : '', sys.cores ? sys.cores + ' cores' : '']) +
+      line([sys.memory ? fmtBytes(sys.memory) + ' RAM' : '', sys.load && sys.load.length ? 'load ' + Number(sys.load[0]).toFixed(1) : '']) + '</div>');
   var hot = disks.filter(function (d) { return d.temp != null; });
   var temps = hot.map(function (d) {
     var nvme = /^nvme/.test(d.name), cls = d.temp >= (nvme ? 70 : 55) ? ' bad' : d.temp >= (nvme ? 60 : 45) ? ' warn' : '';  // SSDs run warmer
