@@ -130,7 +130,7 @@ def ics_time(dt):
 
 
 def calendar(reminder=False):
-    """A week of events around now; with reminder, one that starts in 3:16."""
+    """A week of events around now in two calendars, Work and Personal; with reminder, one that starts in 3:16."""
     now = datetime.datetime.now().astimezone()
     day = now.replace(hour=0, minute=0, second=0, microsecond=0)
     at = lambda days, h, m: day + datetime.timedelta(days=days, hours=h, minutes=m)
@@ -148,17 +148,23 @@ def calendar(reminder=False):
         soon = now + datetime.timedelta(minutes=3, seconds=16)
         events.append(('Design review', soon, soon + datetime.timedelta(minutes=30), 'Room 4B',
                        'https://meet.google.com/rev-iewd-sgn', ''))
-    lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//thingdeck//demo//EN', 'X-WR-CALNAME:Work']
-    for i, (title, begin, end, place, notes, rule) in enumerate(events):
-        lines += ['BEGIN:VEVENT', 'UID:demo-%d@thingdeck' % i, 'SUMMARY:' + title]
-        if begin is None:      # all day, the day after tomorrow
-            lines += ['DTSTART;VALUE=DATE:' + (day + datetime.timedelta(days=2)).strftime('%Y%m%d'),
-                      'DTEND;VALUE=DATE:' + (day + datetime.timedelta(days=3)).strftime('%Y%m%d')]
-        else:
-            lines += ['DTSTART:' + ics_time(begin), 'DTEND:' + ics_time(end)]
-        lines += (['LOCATION:' + place] if place else []) + (['DESCRIPTION:' + notes] if notes else []) + \
-                 (['RRULE:' + rule] if rule else []) + ['END:VEVENT']
-    return ('\r\n'.join(lines + ['END:VCALENDAR']) + '\r\n').encode('utf-8')
+    personal = ('Lunch with Ana', 'Team offsite', 'Dentist')
+    lines = []
+    for name in ('Work', 'Personal'):         # the agent sends the calendars one after the other
+        lines += ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//thingdeck//demo//EN', 'X-WR-CALNAME:' + name]
+        for i, (title, begin, end, place, notes, rule) in enumerate(events):
+            if (title in personal) != (name == 'Personal'):
+                continue
+            lines += ['BEGIN:VEVENT', 'UID:demo-%d@thingdeck' % i, 'SUMMARY:' + title]
+            if begin is None:      # all day, the day after tomorrow
+                lines += ['DTSTART;VALUE=DATE:' + (day + datetime.timedelta(days=2)).strftime('%Y%m%d'),
+                          'DTEND;VALUE=DATE:' + (day + datetime.timedelta(days=3)).strftime('%Y%m%d')]
+            else:
+                lines += ['DTSTART:' + ics_time(begin), 'DTEND:' + ics_time(end)]
+            lines += (['LOCATION:' + place] if place else []) + (['DESCRIPTION:' + notes] if notes else []) + \
+                     (['RRULE:' + rule] if rule else []) + ['END:VEVENT']
+        lines.append('END:VCALENDAR')
+    return ('\r\n'.join(lines) + '\r\n').encode('utf-8')
 
 
 COVER = png(sunset())
