@@ -3,7 +3,8 @@
 
 Sends the Car Thing the computer's time (for its clock) and lock state, system stats
 (CPU, memory, GPU, network), the focused app, the volume and audio devices, the
-calendars listed in calendars.txt, the Plex server in plex.txt, and what it is playing, over USB through
+calendars listed in calendars.txt, the Plex server in plex.txt, the TrueNAS server in truenas.txt,
+and what it is playing, over USB through
 `adb forward`. It also opens meeting links, kills the focused app and switches audio
 devices when the Car Thing asks. What is playing comes from:
   Linux  playerctl (any MPRIS player: Spotify, browsers, VLC, ...)
@@ -934,6 +935,190 @@ class PlexLink:
         self.need = [str(k) for k in reply.get('need_art') or []]
 
 
+# ------------------------------------------------------------------ TrueNAS
+
+# A TrueNAS server on the local network: pools, disk temperatures, alerts and apps, through
+# its JSON-RPC API over a WebSocket (wss://server/api/current). truenas.txt next to
+# calendars.txt holds the address on the first line and an API key on the second. Always
+# over TLS: TrueNAS revokes a key that is ever sent over plain http.
+TRUENAS_FILE = os.path.join(os.path.dirname(CALENDAR_FILE), 'truenas.txt')
+TRUENAS_CALLS = [
+    ('system.info', []),
+    ('pool.query', [[], {'select': ['name', 'status', 'healthy', 'size', 'allocated', 'free', 'scan']}]),
+    ('disk.temperatures', [[]]),
+    ('alert.list', []),
+    ('app.query', [[], {'select': ['name', 'state', 'upgrade_available']}]),
+]
+
+
+class WebSocket:
+    """Just enough of a WebSocket client for TrueNAS: text frames, masked as a client must."""
+
+    def __init__(self, host, path, timeout=5):
+        name, _, port = host.partition(':')
+        tls = ssl.create_default_context()
+        tls.check_hostname = False              # a TrueNAS certificate is usually self-signed;
+        tls.verify_mode = ssl.CERT_NONE         # this is used for that one address only
+        self.sock = tls.wrap_socket(socket.create_connection((name, int(port or 443)), timeout=timeout), server_hostname=name)
+        key = base64.b64encode(os.urandom(16)).decode()
+        self.sock.sendall(('GET %s HTTP/1.1\r\nHost: %s\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n'
+                           'Sec-WebSocket-Key: %s\r\nSec-WebSocket-Version: 13\r\n\r\n' % (path, host, key)).encode())
+        head = b''
+        while b'\r\n\r\n' not in head:
+            chunk = self.sock.recv(4096)
+            if not chunk:
+                raise OSError('TrueNAS closed the connection')
+            head += chunk
+        head, self.buf = head.split(b'\r\n\r\n', 1)
+        if b' 101 ' not in head.split(b'\r\n', 1)[0]:
+            raise OSError('no WebSocket at %s%s: %s' % (host, path, head.split(b'\r\n', 1)[0].decode('latin-1')))
+
+    def _read(self, n):
+        while len(self.buf) < n:
+            chunk = self.sock.recv(65536)
+            if not chunk:
+                raise OSError('TrueNAS closed the connection')
+            self.buf += chunk
+        data, self.buf = self.buf[:n], self.buf[n:]
+        return data
+
+    def _frame(self, opcode, payload):
+        mask = os.urandom(4)
+        n = len(payload)
+        head = bytes([0x80 | opcode]) + (bytes([0x80 | n]) if n < 126 else
+                                         bytes([0xFE]) + n.to_bytes(2, 'big') if n < 65536 else
+                                         bytes([0xFF]) + n.to_bytes(8, 'big'))
+        self.sock.sendall(head + mask + bytes(b ^ mask[i % 4] for i, b in enumerate(payload)))
+
+    def send(self, text):
+        self._frame(0x1, text.encode('utf-8'))
+
+    def receive(self):
+        message = b''
+        while True:
+            b0, b1 = self._read(2)
+            n = b1 & 0x7F
+            if n == 126:
+                n = int.from_bytes(self._read(2), 'big')
+            elif n == 127:
+                n = int.from_bytes(self._read(8), 'big')
+            payload = self._read(n)
+            opcode = b0 & 0x0F
+            if opcode == 0x8:
+                raise OSError('TrueNAS closed the connection')
+            if opcode == 0x9:
+                self._frame(0xA, payload)      # pong
+                continue
+            if opcode in (0x0, 0x1, 0x2):
+                message += payload
+                if b0 & 0x80:
+                    return message.decode('utf-8')
+
+    def close(self):
+        try:
+            self._frame(0x8, b'')
+            self.sock.close()
+        except OSError:
+            pass
+
+
+class TrueNasLink:
+    """Reads the server every 10 s while its page is on screen, else every 60 s (60 s after an
+    error), and sends the Car Thing what changed, at least every 30 s."""
+
+    def __init__(self):
+        self.host = self.key = None
+        self.next = 0.0
+        self.sent, self.sent_at, self.error = None, 0.0, None
+
+    def load(self):
+        try:
+            with open(TRUENAS_FILE) as f:
+                lines = [l.strip() for l in f if l.strip() and not l.strip().startswith('#')]
+        except OSError:
+            lines = []
+        host = re.sub(r'/.*$', '', re.sub(r'^[a-z]+://', '', lines[0])) if lines else None
+        self.host, self.key = host, (lines[1] if len(lines) > 1 else None)
+
+    def call_all(self):
+        """Log in with the key and run TRUENAS_CALLS: {method: result or None}."""
+        ws = WebSocket(self.host, '/api/current')
+        try:
+            results = {}
+            for i, (method, params) in enumerate([('auth.login_with_api_key', [self.key])] + TRUENAS_CALLS):
+                ws.send(json.dumps({'jsonrpc': '2.0', 'id': i + 1, 'method': method, 'params': params}))
+                while True:          # skip notifications and other replies
+                    reply = json.loads(ws.receive())
+                    if reply.get('id') == i + 1:
+                        break
+                if i == 0:
+                    if reply.get('result') is not True:
+                        raise ValueError('TrueNAS refused the API key: check the second line of truenas.txt')
+                    continue
+                if 'error' in reply:
+                    error = reply['error'] or {}
+                    reason = (error.get('data') or {}).get('reason') or error.get('message')
+                    if method == 'system.info':
+                        raise ValueError('TrueNAS: %s' % reason)
+                    log('truenas %s: %s' % (method, reason))
+                results[method] = reply.get('result')
+            return results
+        finally:
+            ws.close()
+
+    def read(self):
+        self.load()
+        if not self.host:
+            return {'state': 'none'}
+        if not self.key:
+            raise ValueError('No API key: put one on the second line of truenas.txt')
+        r = self.call_all()
+        info = r.get('system.info') or {}
+        temps = r.get('disk.temperatures') or {}
+        disks = [{'name': name, 'temp': t if isinstance(t, (int, float)) else (t or {}).get('temp')}
+                 for name, t in sorted(temps.items())]
+        pools = []
+        for p in r.get('pool.query') or []:
+            scan = p.get('scan') or {}
+            pools.append({'name': p.get('name'), 'status': p.get('status'), 'healthy': bool(p.get('healthy')),
+                          'size': p.get('size'), 'used': p.get('allocated'), 'free': p.get('free'),
+                          'scan': {'kind': scan.get('function'), 'percent': scan.get('percentage')}
+                          if scan.get('state') == 'SCANNING' else None})
+        return {
+            'state': 'ok',
+            'system': {'host': info.get('hostname'), 'version': info.get('version'), 'uptime': int(info.get('uptime_seconds') or 0),
+                       'memory': info.get('physmem'), 'cores': info.get('cores'), 'load': list(info.get('loadavg') or [])},
+            'pools': pools,
+            'disks': disks,
+            'alerts': [{'level': a.get('level'), 'text': re.sub(r'<[^>]+>', '', a.get('formatted') or '').strip()}
+                       for a in r.get('alert.list') or [] if not a.get('dismissed') and a.get('level') != 'INFO'],
+            'apps': [{'name': a.get('name'), 'state': a.get('state'), 'update': bool(a.get('upgrade_available'))}
+                     for a in r.get('app.query') or []],
+        }
+
+    def update(self):
+        if time.monotonic() < self.next:
+            return
+        self.next = time.monotonic() + (10 if 'truenas' in visible else 60)
+        try:
+            state = self.read()
+        except (OSError, ValueError, KeyError, TypeError, AttributeError) as e:
+            self.next = time.monotonic() + 60           # server unreachable: retry in a minute, don't stall the loop
+            message = str(e)
+            if 'truenas.txt' not in message and not message.startswith('TrueNAS'):
+                message = '%s: %s' % (self.host, message)
+            state = {'state': 'error', 'error': message}
+        if state.get('error') != self.error:
+            self.error = state.get('error')
+            if self.error:
+                log('truenas:', self.error)
+        key = json.dumps(state, sort_keys=True)
+        if key == self.sent and time.monotonic() - self.sent_at < 30:
+            return
+        send('truenas', state)
+        self.sent, self.sent_at = key, time.monotonic()
+
+
 def fetch_calendars():
     """(ics text, error text), or None when there is no calendars.txt."""
     try:
@@ -1026,6 +1211,10 @@ def main():
             print(json.dumps(PlexLink().read(), indent=2, ensure_ascii=False))
         except (OSError, ValueError, KeyError, TypeError) as e:
             print('plex:', e)
+        try:
+            print(json.dumps(TrueNasLink().read(), indent=2, ensure_ascii=False))
+        except (OSError, ValueError, KeyError, TypeError, AttributeError) as e:
+            print('truenas:', e)
         return
     log('started (adb: %s, port %d)' % (ADB, PORT))
     tunnel = False
@@ -1036,6 +1225,7 @@ def main():
     audio = AudioLink()
     hue = HueLink()
     plex = PlexLink()
+    truenas = TrueNasLink()
     calendars, calendars_fetched, fetched_hash, calendar_hash = None, None, None, None
     github, github_fetched, github_busy = GitHub(), None, False
     while True:
@@ -1068,6 +1258,8 @@ def main():
             # Panels that just came on screen: read their data now.
             if 'lights' in hue.opened:
                 hue.fetched = 0.0
+            if 'truenas' in hue.opened:
+                truenas.next = 0.0
             if 'plex' in hue.opened:
                 plex.next = 0.0
             if 'monitor' in hue.opened:
@@ -1129,6 +1321,7 @@ def main():
             audio.update()
             hue.update()
             plex.update()
+            truenas.update()
         except (OSError, ValueError) as e:
             log('update failed:', e)
             tunnel = False
