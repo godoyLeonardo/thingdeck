@@ -357,13 +357,15 @@ NVMe 60/70 °C), alerts and apps.
 
 ### Tab order
 
-`state.json` keeps `page_order`, a list of page keys (a page's `name`, or a choice
-slot's `id`), and `page_hidden`, the keys of hidden pages. `Pad.ordered_pages()`
+`state.json` keeps `page_order`, a list of page keys (a page's `name`), and
+`page_hidden`, the keys of hidden pages. `Pad.ordered_pages()`
 (and `orderedEntries()` in the UI) sorts `config.json`'s pages by the order and
 leaves out hidden ones (at least one always stays); pages the order doesn't name keep
 their config order after the named ones, so new pages appear at the end. Page
 indexes, the tabs, swipes and `{"page": "next"}` (the back button, wrapping around)
-all work on the shown pages. Changing either setting keeps the current page.
+all work on the shown pages. Changing either setting keeps the current page. When
+`config.json` loads, keys of pages it no longer has are dropped from `page_order`,
+`page_hidden` and `page_shown`.
 
 **Pages that aren't set up** hide on their own: `Pad.refresh_hidden()` (every 2 s) hides
 a page whose widgets all report `none` (no `calendars.txt`, `github.txt`, `plex.txt` or
@@ -400,13 +402,13 @@ Top level:
 | `hardware` | `knob`, `back`, `menu`: `{"tap": action, "hold": action}`; `dial_invert` |
 | `dial_modes` | `[{"name", "cw", "ccw", "press"}]` |
 | `presets` | Default 4 top-button actions |
-| `pages` | `[{"name", "presets"?, "grid"?, "nowplaying"?, "header"?, "widgets"?, "kill"?, "audio"?, "tiles": [...]}]`, or a choice slot (below) |
+| `pages` | `[{"name", "presets"?, "grid"?, "nowplaying"?, "header"?, "widgets"?, "kill"?, "audio"?, "tiles": [...]}]` |
 
 Tiles and presets are actions plus `label`, optional `icon` (an emoji) or `symbol`
 (a built-in icon drawn in the current icon style, or as an emoji in the emoji style),
 `hint` (small text; generated if missing) and `color`. In the media card's control
 row, `"wide": true` makes a tile double width. A tile's own `color` also colors its
-symbol whatever the icon color setting (the default config keeps red for hanging up).
+symbol whatever the icon color setting (red for a hang-up tile, say).
 
 Symbols: `play pause prev next stop mute note` (media), `windows desktop snip
 clipboard folder smile activity lock search`, `command terminal files target pencil
@@ -440,16 +442,6 @@ objects. When the host matches, the override replaces the action, keeping
   "linux": { "label": "Overview", "key": "win" } }
 ```
 
-**Choice slots:** a page entry with `choices` holds alternative pages for one
-tab. Settings → General → Pages picks one (saved as `page_choices` in
-`state.json`). "Auto" uses `default`, which can be a name or a per-OS map with an
-`other` fallback:
-
-```json
-{ "id": "calls", "label": "Calls page",
-  "default": { "windows": "Discord", "other": "Meetings" },
-  "choices": [ { "name": "Meetings", "tiles": [...] }, { "name": "Discord", "tiles": [...] } ] }
-```
 
 ## HTTP API
 

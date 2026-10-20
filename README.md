@@ -5,17 +5,17 @@ Stream Deck. It needs **no app on the computer**. The computer sees a standard
 USB keyboard, media keys and mouse wheel, so it works on Windows, macOS and Linux
 as soon as you plug it in.
 
-- **Touchscreen:** pages of large tiles (Desktop, Shell, and a calls page: Discord
-  or Meetings), each sending a shortcut, a media key, typed text or a sequence of
-  steps, plus live pages filled by the computer agent: Media, Lights (Philips Hue),
-  Calendar, Status, Code (GitHub), Plex and NAS (TrueNAS). Up to seven tabs share the bottom bar;
+- **Touchscreen:** live pages filled by the computer agent: Media, Lights (Philips
+  Hue), Calendar, Status, Code (GitHub), Plex and NAS (TrueNAS). You can add pages of
+  your own large tiles in `config.json`, each sending a shortcut, a media key, typed
+  text or a sequence of steps (see [Customizing](#customizing)). Up to seven tabs share the bottom bar;
   with more, it shows four at a time and scrolls. Settings → Tabs sets their order
   and hides any you don't use; live pages you haven't set up (no config file yet)
   start hidden and can be turned on there. On live pages, the top bar also shows the song
   playing (tap it for Media).
-- **4 top buttons:** presets that change with the page. Tile pages show their
-  labels under the buttons; live pages show a big clock and the date there instead,
-  and the buttons still work.
+- **4 top buttons:** presets, media keys by default (a page can set its own). Live
+  pages show a big clock and the date at the top instead of their labels, and the
+  buttons still work; a tile page of your own shows the labels.
 - **Dial:** volume, Hue lights (the room you last tapped), scroll, zoom, scrub (arrow keys),
   browser tabs, undo/redo. The menu (M) button switches dial mode.
 - **Windows, macOS and Linux:** each tile can have per-OS shortcuts. The pad
@@ -24,7 +24,7 @@ as soon as you plug it in.
 - **Keyboard layouts:** typed text is translated for the host layout
   (Latin American and US are included).
 - **Settings** (the ⚙ tab): brightness (light sensor or manual), host OS, layout,
-  dial direction, clock format, calls page (Discord or Meetings), themes and icons,
+  dial direction, clock format, themes and icons,
   tab order and hidden tabs, device info, and Reconnect / Restart / Reboot.
   Settings are saved on the Car Thing and survive power cycles.
 - **Themes:** Dark, Black, Light, and the editor color schemes Nord, Dracula,
@@ -59,12 +59,12 @@ The Car Thing's screen is 800×480. These use made-up demo data.
 | **Volume bar:** shows when the volume changes | **Lock screen:** while the computer is locked |
 | ![Lights page: Philips Hue rooms and zones tinted with their light color, with switches and brightness bars](docs/screenshots/lights.png) | ![A room card: brightness, warm-to-cool white, scenes and its lights](docs/screenshots/room.png) |
 | **Lights:** Philips Hue rooms and zones, with the song playing in the top bar | **A room:** brightness, white, scenes, each light |
-| ![Desktop page: a grid of shortcut tiles with line icons](docs/screenshots/desktop.png) | ![Settings, Appearance: themes, accent colors, the hue slider and icon options](docs/screenshots/settings.png) |
-| **Desktop:** a tile page | **Settings → Appearance** |
-| ![Settings, Tabs: the pages in order with up and down arrows](docs/screenshots/tabs.png) | ![Plex page: three streams with posters and transcode tags, the server's CPU and bandwidth graphs, and the libraries](docs/screenshots/plex.png) |
-| **Settings → Tabs:** the order, and which tabs show | **Plex:** streams and how each is sent, server load, libraries |
-| ![NAS page: TrueNAS pools as tanks that fill up, disk temperatures, alerts and apps](docs/screenshots/nas.png) | ![A meeting reminder over the Code page: a countdown with Join meeting and Dismiss](docs/screenshots/reminder.png) |
-| **NAS:** TrueNAS pools, disks, alerts and apps | **Meeting reminder:** 5 minutes before, on any page |
+| ![Plex page: three streams with posters and transcode tags, the server's CPU and bandwidth graphs, and the libraries](docs/screenshots/plex.png) | ![NAS page: TrueNAS pools as tanks that fill up, disk temperatures, alerts and apps](docs/screenshots/nas.png) |
+| **Plex:** streams and how each is sent, server load, libraries | **NAS:** TrueNAS pools, disks, alerts and apps |
+| ![Settings, Appearance: themes, accent colors, the hue slider and icon options](docs/screenshots/settings.png) | ![Settings, Tabs: the pages in order with up and down arrows](docs/screenshots/tabs.png) |
+| **Settings → Appearance** | **Settings → Tabs:** the order, and which tabs show |
+| ![A meeting reminder over the Media page: a countdown with Join meeting and Dismiss](docs/screenshots/reminder.png) | |
+| **Meeting reminder:** 5 minutes before, on any page | |
 
 ## Requirements
 
@@ -109,7 +109,7 @@ them.
 
 | Control | Default |
 |---|---|
-| Buttons 1–4 (top edge) | Page presets (media keys on most pages) |
+| Buttons 1–4 (top edge) | Presets: previous, play/pause, next, mute |
 | Dial turn | Current dial mode (Volume, Lights, Scroll, Zoom, Scrub, Tabs, Undo/Redo) |
 | Dial press | Dial mode action (mute, middle click, reset zoom, …) |
 | Dial hold | Play/Pause |
@@ -124,9 +124,9 @@ All of these can be changed in `device/config.json`.
 
 ## Host OS
 
-Shortcuts differ per OS, so tiles can carry `"windows"`, `"mac"` and `"linux"`
-overrides. The defaults use standard shortcuts: Mission Control and Spotlight on
-macOS, GNOME's on Linux.
+Shortcuts differ per OS, so any action (a tile, a preset, a dial mode) can carry
+`"windows"`, `"mac"` and `"linux"` overrides. The default dial modes use ⌘ on macOS
+(zoom, reopen tab, undo/redo).
 
 Over USB, Windows identifies itself, but macOS and Linux look the same. So:
 
@@ -139,17 +139,10 @@ Over USB, Windows identifies itself, but macOS and Linux look the same. So:
 The choice is saved on the Car Thing. If you move between a Mac and a Linux
 machine, switch it in Settings.
 
-## Calls page
-
-The last tab is either **Discord** (mute, deafen, answer/decline, quick switcher,
-back to voice, inbox, mark read) or **Meetings** (Teams, Zoom and Meet mic/camera).
-Pick it under Settings → General → Pages → Calls page. **Auto** shows Discord on
-Windows and Meetings on macOS and Linux. Discord uses its default shortcuts;
-mute and deafen work even when Discord isn't focused.
 
 ## Keyboard layout
 
-The pad sends key *positions*, so typed text (the Shell tiles, for example) has
+The pad sends key *positions*, so typed text (a tile with `"type"`, for example) has
 to match the layout the computer uses. Set it under Settings → General → Keyboard
 layout:
 
@@ -381,7 +374,9 @@ picked it up after 20 seconds, the Car Thing reboots.
 
 ## Customizing
 
-Edit `device/config.json` and run `./deploy.sh config`. A tile looks like:
+Edit `device/config.json` and run `./deploy.sh config`. To add a page of tiles, add
+`{ "name": "Shortcuts", "tiles": [...] }` to `pages` (up to 8 tiles show at once,
+in a 4×2 grid). A tile looks like:
 
 ```json
 { "label": "Snip", "symbol": "snip", "key": "win+shift+s",
@@ -406,13 +401,12 @@ switching, per-OS overrides) is in [device/README.md](device/README.md#configjso
 
 ## Known limitations
 
-- **Linux overrides assume GNOME** (Fedora Workstation, Ubuntu). On KDE a few
-  desktop shortcuts need adjusting.
-- **Hue and Plex go through the computer:** with the computer off or asleep, the
-  Lights and Plex pages cannot reach the bridge or the server.
+
+- **Hue, Plex and TrueNAS go through the computer:** with the computer off or asleep,
+  the Lights, Plex and NAS pages cannot reach the bridge or the servers.
 - **The live pages, the clock and the lock screen need the agent** on each
   computer. Without it, there's no clock, the Media page shows its controls and a hint, and
-  Calendar, Status, Code and Plex say the agent is missing. The macOS and Linux agents are
+  Calendar, Status, Code, Plex and NAS say the agent is missing. The macOS and Linux agents are
   untested on real machines so far.
 - **No Windows CPU temperature:** Windows only gives it to programs running as
   administrator with a hardware driver, so the Status page leaves it out there.
