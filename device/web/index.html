@@ -140,14 +140,13 @@
   /* tile grid */
   #grid { flex: 1; display: grid; grid-gap: 8px; padding: 8px 0; min-height: 0; transition: opacity .12s, transform .12s; }
   /* now playing (Media page) */
-  /* One card for the whole page, tinted with the cover's color (--npc: "r, g, b", set from JS
-     once the cover loads), with round controls inside it. */
-  .np-top { position: relative; overflow: hidden; display: flex; min-height: 0; background: var(--tile); border-radius: 16px;
-    padding: 16px; border: 2px solid var(--npline, transparent); transition: border-color .6s; }
+  /* One card for the whole page: the cover's color (--npc: "r, g, b", set from JS once the
+     cover loads) fades in from the top left, behind the cover; text and controls keep the
+     accent (--npacc), so the two never fight. */
+  .np-top { position: relative; overflow: hidden; display: flex; min-height: 0; background: var(--tile); border-radius: 16px; padding: 16px; }
   .np-glow { position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; opacity: 0; transition: opacity .6s;
-    background: radial-gradient(circle at 0% 0%, rgba(var(--npc), .9) 0%, transparent 70%),
-                radial-gradient(circle at 100% 100%, rgba(var(--npc), .5) 0%, transparent 60%); }
-  .np-top.tinted .np-glow { opacity: .32; }
+    background: linear-gradient(135deg, rgba(var(--npc), .5) 0%, rgba(var(--npc), .2) 30%, rgba(var(--npc), 0) 60%); }
+  .np-top.tinted .np-glow { opacity: 1; }
   .np-art { position: relative; flex: none; width: 286px; height: 286px; border-radius: 12px; overflow: hidden; background: var(--tile-hi);
     display: flex; align-items: center; justify-content: center; font-size: 72px; color: var(--muted); align-self: center; }
   .np-art img { width: 100%; height: 100%; object-fit: cover; }
@@ -160,12 +159,13 @@
   .np-album { font-size: calc(16px * var(--ts)); color: var(--muted); margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .np-progress { margin-top: auto; }
   .np-bar { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
-  .np-top .np-bar { background: rgba(var(--npc, 125, 132, 146), .25); }
+  .np-top .np-bar { background: rgba(var(--npacc, 125, 132, 146), .2); }
   .np-bar i { display: block; height: 100%; width: 0; background: var(--acc); transition: width .5s linear; }
   .np-times { display: flex; justify-content: space-between; font: 500 calc(13px * var(--ts)) GeistMono, monospace; color: var(--muted); margin-top: 6px; }
   .np-controls { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; }
   .tile.round { flex: none; width: 54px; height: 54px; padding: 0; border-radius: 50%; align-items: center; justify-content: center;
-    background: rgba(var(--npc, 125, 132, 146), .2); }
+    background: rgba(var(--npacc, 125, 132, 146), .16); }
+  .tile.round:not(.wide) .icon.sym { color: var(--acc); }
   .tile.round.big { width: 64px; height: 64px; }
   .tile.round.wide { width: 80px; height: 80px; background: var(--acc); color: var(--on-acc); }
   .tile.round.wide .icon.sym { color: var(--on-acc); }
@@ -1285,7 +1285,7 @@ function npPosition() {
 // position update. Without anything playing it shows a placeholder, same layout.
 function renderNowPlaying(page, g) {
   var key = np ? [np.art, np.title, np.artist, np.album, np.app] : ['none', !!st.clock];
-  key = key.concat([st.page, st.os, iconStyle()]).join('|');
+  key = key.concat([st.page, st.os, iconStyle(), (st.settings || {}).accent, (st.settings || {}).theme]).join('|');   // the tint mixes in the accent
   if (g.getAttribute('data-np') === key) return updateNowPlaying();
   g.setAttribute('data-np', key);
   g.style.gridTemplateColumns = 'minmax(0, 1fr)';
@@ -1317,15 +1317,29 @@ function renderNowPlaying(page, g) {
     return '<div class="tile round' + size + '" data-i="' + i + '" style="--accent:' + kind(t) + '"' +
       (t.media === 'play_pause' ? ' data-playpause="1"' : '') + '>' + iconHTML(t) + '<div class="label">' + esc(t.label || '') + '</div></div>';
   }).join('');
-  var cached = np && np.art && coverTints[np.art];
+  var cached = np && np.art && coverStyle(np.art);
   g.innerHTML = '<div class="np-top' + (cached ? ' tinted' : '') + '"' + (cached ? ' style="' + cached + '"' : '') + '><div class="np-glow"></div>' +
     top.replace(/<\/div>$/, '<div class="np-controls">' + controls + '</div></div>');
   updateNowPlaying();
 }
 
-// The cover's color, for the card's glow and tint: the average of its colorful pixels (dark,
-// pale and grey ones say little about it), brightened so the glow shows on a dark card.
+// The cover's color, for the card's gradient: the average of its colorful pixels (dark,
+// pale and grey ones say little about it), brightened so it shows on a dark card. The
+// controls and the progress track take the accent instead.
 var coverTints = {};
+function accentRGB() {
+  var probe = document.createElement('i');
+  probe.style.color = 'var(--acc)';
+  document.body.appendChild(probe);
+  var m = getComputedStyle(probe).color.match(/\d+/g);
+  probe.remove();
+  return m ? m.slice(0, 3).map(Number) : [125, 132, 146];
+}
+function coverStyle(key) {
+  var cover = coverTints[key];
+  if (!cover) return null;
+  return '--npc: ' + cover.join(', ') + '; --npacc: ' + accentRGB().join(', ');
+}
 function tintCover(img) {
   var key = np && np.art, card = img.closest('.np-top');
   if (!key || !card) return;
@@ -1341,10 +1355,9 @@ function tintCover(img) {
     }
     var rgb = sum.map(function (v) { return v / weight; });
     var top = Math.max.apply(null, rgb) || 1, lift = Math.max(1, 200 / top);   // brightest channel to at least 200
-    rgb = rgb.map(function (v) { return Math.round(Math.min(255, v * lift)); }).join(', ');
-    coverTints[key] = '--npc: ' + rgb + '; --npline: rgba(' + rgb + ', .35)';
+    coverTints[key] = rgb.map(function (v) { return Math.round(Math.min(255, v * lift)); });
   }
-  card.setAttribute('style', coverTints[key]);
+  card.setAttribute('style', coverStyle(key));
   card.classList.add('tinted');
 }
 function updateNowPlaying() {
