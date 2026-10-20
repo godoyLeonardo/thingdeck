@@ -37,7 +37,7 @@ BRIGHTNESS_MIN = 5          # brightness levels run 5..255 (Settings slider)
 BRIGHTNESS_STOPS = 3        # auto brightness offset: -3..+3 stops in half stops (a stop doubles or halves the light)
 LIGHT_SENSOR = '/sys/bus/iio/devices/iio:device*/in_intensity0_raw'    # the TMD2772 ambient light sensor
 THEMES = ('dark', 'black', 'light', 'nord', 'dracula', 'catppuccin', 'gruvbox', 'tokyonight', 'solarized',
-          'onedark')
+          'onedark', 'monokai')
 ACCENTS = ('theme', 'green', 'blue', 'purple', 'orange', 'pink', 'red')   # palettes: web/index.html; or a hue 0-359
 OS_MODES = ('auto', 'windows', 'mac', 'linux')
 ICON_STYLES = ('solid', 'outline', 'emoji')   # icon sets: web/index.html
