@@ -2146,7 +2146,7 @@ function connect() {
       var choicesChanged = JSON.stringify((d.settings || {}).page_choices) !== JSON.stringify((st.settings || {}).page_choices);
       st = d;
       if (pageChanged && showSettings) openSettings(false);
-      if (d.message) toast(d.message, d.mode === 'error' ? 'fail' : 'warn');
+      if (pageChanged || osChanged || choicesChanged) load(); else render();   // presets come per page, OS and choice
       if (d.agent && d.agent.outdated && !agentWarned) {     // once per page load
         agentWarned = true;
         toast('The computer agent is out of date: run ./deploy.sh all', 'warn');
