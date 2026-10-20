@@ -51,7 +51,7 @@ The Car Thing's screen is 800×480. These use made-up demo data; to retake them,
 
 | | |
 |---|---|
-| ![Media page: the song playing, its cover and progress, media controls, and the audio output in the header](docs/screenshots/media.png) | ![Calendar page: today, tomorrow and the next two weeks, with Join buttons on meetings](docs/screenshots/calendar.png) |
+| ![Media page: the song playing, its cover and progress, media controls, and the audio output in the header](docs/screenshots/media.png) | ![Calendar page: tabs for All and each calendar, then today, tomorrow and the next two weeks, with Join buttons on meetings](docs/screenshots/calendar.png) |
 | **Media:** what's playing, with controls and the audio output | **Calendar:** the next two weeks; a meeting in progress pulses |
 | ![Status page: CPU, memory, GPU and network graphs, and the covered kill switch for the focused app](docs/screenshots/status.png) | ![Code page: the latest GitHub Actions runs and your open pull requests](docs/screenshots/code.png) |
 | **Status:** live stats and the kill switch | **Code:** GitHub Actions runs and your pull requests |
@@ -172,7 +172,9 @@ them to the Car Thing **over the USB cable** (`adb forward`; no network):
   declined left out. The next event is highlighted with a countdown. Events with a
   Google Meet, Zoom or Teams link get a Join button that opens the link on the computer.
   Tap an event for its details: date, time and length, place, calendar and notes.
-  Five minutes before any timed event, a reminder card comes up on any page with a
+  With two calendars or more, tabs at the top show **All** or one calendar. The Car
+  Thing keeps the tab you pick; if that calendar is gone, it shows All.
+  Five minutes before any timed event in any calendar, a reminder card comes up on any page with a
   countdown and **Dismiss**, plus **Join meeting** for a meeting with a link or
   **Details** for anything else; it stays until two minutes after the start.
 - **Status:** the Status page shows CPU, memory, GPU and network speed, each with

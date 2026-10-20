@@ -205,6 +205,12 @@ One-off events that ended before today are skipped while reading: a 4 MB feed ta
 about 2 s on the Car Thing. `Agenda` lists the events from local midnight
 to 14 days later, recomputes every 5 minutes and when the UTC offset changes, and
 sends `agenda` events. All-day and floating times use the computer's UTC offset.
+An `agenda` event also has `calendars`: a name for each calendar, by the events' `cal`
+index (its `X-WR-CALNAME`, "Calendar 2" without one, and the number added to a name used
+twice). With two names or more, the page shows tabs above the agenda: All and each name.
+The tab is the setting `calendar` (a name, or `null` for All) in `state.json`. A name
+that is not in `calendars` shows All. The tabs filter only the page: reminders come from
+every calendar.
 
 **Join:** the UI posts `POST /api/calendar/open` with an event id; only events with
 a Meet, Zoom or Teams link have one. The link goes out once, in the reply to the

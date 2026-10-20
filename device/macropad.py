@@ -780,10 +780,19 @@ class Agenda:
                                'all_day': ev['all_day'], 'title': ev['title'], 'where': ev['where'],
                                'link': bool(ev['link']), 'cal': ev['cal']})
         self.links, self.details = links, details
-        data = {'state': self.state, 'error': self.error, 'events': events}
+        data = {'state': self.state, 'error': self.error, 'events': events, 'calendars': self.calendar_names()}
         if data != self.published:
             self.published = data
             self.ui.publish('agenda', data)
+
+    def calendar_names(self):
+        """A name for each calendar, by the events' 'cal' index, for the Calendar page's tabs:
+        its X-WR-CALNAME, "Calendar 2" without one, and the number added to a name used twice."""
+        names = []
+        for i, name in enumerate(self.calendar.names if self.calendar is not None else []):
+            name = name or 'Calendar %d' % (i + 1)
+            names.append('%s (%d)' % (name, i + 1) if name in names else name)
+        return names
 
     def open(self, eid):
         link = self.links.get(eid)
@@ -1000,7 +1009,7 @@ class Pad:
         # Device settings changed from the Settings tab; kept in state.json.
         # None means "use config.json".
         self.settings = {'os_mode': 'auto', 'layout': None, 'dial_invert': None,
-                         'brightness_auto': True, 'brightness': 180, 'brightness_stops': 0,
+                         'brightness_auto': True, 'brightness': 180, 'brightness_stops': 0, 'calendar': None,
                          'theme': 'dark', 'accent': 'theme',
                          'clock_24h': True, 'icon_style': None,
                          'icon_color': None, 'page_order': [], 'page_hidden': [], 'page_shown': []}
@@ -1062,6 +1071,7 @@ class Pad:
             'brightness_auto': lambda v: isinstance(v, bool),
             'brightness': lambda v: isinstance(v, int) and BRIGHTNESS_MIN <= v <= 255,
             'brightness_stops': lambda v: type(v) in (int, float) and abs(v) <= BRIGHTNESS_STOPS and v * 2 == int(v * 2),
+            'calendar': lambda v: v is None or (isinstance(v, str) and len(v) <= 200),     # the Calendar page's tab; None: all
         }
         if key not in valid or not valid[key](value):
             raise ValueError('bad setting %s=%r' % (key, value))
