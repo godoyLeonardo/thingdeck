@@ -256,8 +256,9 @@ class Stats:
                 iface = line.split(':', 1)[1].strip()
         for line in (run(['netstat', '-ibn']) or '').splitlines()[1:]:
             cols = line.split()
+            # Counted from the end: the Address column is empty for a VPN's utun, shifting the rest.
             if len(cols) >= 10 and cols[0] == iface and cols[2].startswith('<Link'):
-                self.net_rate(stats, int(cols[6]), int(cols[9]))
+                self.net_rate(stats, int(cols[-5]), int(cols[-2]))
                 break
 
     def net_rate(self, stats, rx, tx):
