@@ -996,8 +996,8 @@ function Update-Plex {
     $script:plexNeed = @($reply.need_art | Where-Object { $_ })
 }
 
-# --- TrueNAS. A TrueNAS server on the local network: pools, disk temperatures, alerts and
-# apps, through its JSON-RPC API over a WebSocket (wss://server/api/current). truenas.txt
+# --- TrueNAS. A TrueNAS server on the local network: pools, disk temperatures, alerts,
+# apps and running jobs, through its JSON-RPC API over a WebSocket (wss://server/api/current). truenas.txt
 # next to the log holds the server's address on the first line and an API key on the second.
 # Always over https: TrueNAS revokes a key that is ever sent over plain http.
 $TrueNasFile = Join-Path (Split-Path $LogFile) 'truenas.txt'
@@ -1063,16 +1063,28 @@ function Read-TrueNasConfig {
     $script:nas = @{ host = $address; key = $(if ($lines.Count -gt 1) { $lines[1] } else { $null }) }
 }
 
+# The scheduled tasks, so the Car Thing can show the next one: query, kind, fields that name it.
+$TrueNasTasks = @(
+    @{ call = 'pool.scrub.query'; kind = 'scrub'; names = @('pool_name') }
+    @{ call = 'pool.snapshottask.query'; kind = 'snapshot'; names = @('dataset') }
+    @{ call = 'replication.query'; kind = 'replication'; names = @('name') }
+    @{ call = 'cloudsync.query'; kind = 'cloudsync'; names = @('description') }
+    @{ call = 'rsynctask.query'; kind = 'rsync'; names = @('desc', 'path') }
+    @{ call = 'cronjob.query'; kind = 'cron'; names = @('description', 'command') }
+)
+
 function Read-TrueNas {
     Read-TrueNasConfig
     if (-not $script:nas.host) { return @{ state = 'none' } }
     if (-not $script:nas.key) { throw 'No API key: put one on the second line of truenas.txt' }
-    $calls = 'system.info', 'pool.query', 'disk.temperatures', 'alert.list', 'app.query'
+    $calls = @('system.info', 'pool.query', 'disk.temperatures', 'alert.list', 'app.query', 'core.get_jobs') + @($TrueNasTasks | ForEach-Object { $_.call })
     $params = '[]',
         '[[], {"select": ["name", "status", "healthy", "size", "allocated", "free", "scan"]}]',
         '[[]]',
         '[]',
-        '[[], {"select": ["name", "state", "upgrade_available"]}]'
+        '[[], {"select": ["name", "state", "upgrade_available"]}]',
+        '[[["state", "=", "RUNNING"]]]'                    # no "select": TrueNAS fails on it for jobs
+    $params = @($params) + @($TrueNasTasks | ForEach-Object { '[]' })
     $replies = [ThingdeckNas]::Call($script:nas.host, $script:nas.key, $calls, $params) | ConvertFrom-Json
     $result = @{}
     for ($i = 0; $i -lt $calls.Count; $i++) {
@@ -1098,13 +1110,32 @@ function Read-TrueNas {
         pools = @(foreach ($p in $result['pool.query']) {
             [ordered]@{ name = $p.name; status = $p.status; healthy = [bool]$p.healthy
                 size = $p.size; used = $p.allocated; free = $p.free
-                scan = $(if ($p.scan -and $p.scan.state -eq 'SCANNING') { [ordered]@{ kind = $p.scan.function; percent = $p.scan.percentage } } else { $null }) }
+                scan = $(if ($p.scan -and $p.scan.state -eq 'SCANNING') { [ordered]@{ kind = $p.scan.function; percent = $p.scan.percentage } } else { $null })
+                # The last scrub's end, in ms
+                scrubbed = $(if ($p.scan -and $p.scan.function -eq 'SCRUB' -and $p.scan.state -eq 'FINISHED' -and $p.scan.end_time) { $p.scan.end_time.'$date' } else { $null }) }
         })
         disks = @($disks | Sort-Object { $_.name })
         alerts = @(foreach ($a in $result['alert.list']) {
             if (-not $a.dismissed -and $a.level -ne 'INFO') { [ordered]@{ level = $a.level; text = ($a.formatted -replace '<[^>]+>', '').Trim() } }
         })
         apps = @(foreach ($a in $result['app.query']) { [ordered]@{ name = $a.name; state = $a.state; update = [bool]$a.upgrade_available } })
+        # A running job: its method (the Car Thing names it), the pool or app it works on, and its progress.
+        jobs = @(foreach ($j in $result['core.get_jobs']) {
+            $first = @($j.arguments)[0]
+            [ordered]@{ method = $j.method; target = $(if ($first -is [string] -and $first.Length -le 64) { $first } else { $null })
+                percent = $j.progress.percent; text = $(if ($j.progress.description) { $j.progress.description } else { $null })
+                started = $j.time_started.'$date' }
+        })
+        # The enabled tasks with a schedule; the Car Thing works out when each runs next
+        # (a replication without "auto" runs only by hand).
+        tasks = @(foreach ($t in $TrueNasTasks) {
+            foreach ($x in $result[$t.call]) {
+                if ($x.enabled -and $x.auto -ne $false -and $x.schedule) {
+                    $name = "$(@($t.names | ForEach-Object { $x.$_ } | Where-Object { $_ })[0])"
+                    [ordered]@{ kind = $t.kind; name = $name.Substring(0, [Math]::Min(60, $name.Length)); schedule = $x.schedule; threshold = $x.threshold }
+                }
+            }
+        })
     }
 }
 

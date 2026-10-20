@@ -130,7 +130,7 @@ def ics_time(dt):
 
 
 def calendar(reminder=False):
-    """A week of events around now; with reminder, one that starts in 3:16."""
+    """A week of events around now in two calendars, Work and Personal; with reminder, one that starts in 3:16."""
     now = datetime.datetime.now().astimezone()
     day = now.replace(hour=0, minute=0, second=0, microsecond=0)
     at = lambda days, h, m: day + datetime.timedelta(days=days, hours=h, minutes=m)
@@ -148,17 +148,23 @@ def calendar(reminder=False):
         soon = now + datetime.timedelta(minutes=3, seconds=16)
         events.append(('Design review', soon, soon + datetime.timedelta(minutes=30), 'Room 4B',
                        'https://meet.google.com/rev-iewd-sgn', ''))
-    lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//thingdeck//demo//EN', 'X-WR-CALNAME:Work']
-    for i, (title, begin, end, place, notes, rule) in enumerate(events):
-        lines += ['BEGIN:VEVENT', 'UID:demo-%d@thingdeck' % i, 'SUMMARY:' + title]
-        if begin is None:      # all day, the day after tomorrow
-            lines += ['DTSTART;VALUE=DATE:' + (day + datetime.timedelta(days=2)).strftime('%Y%m%d'),
-                      'DTEND;VALUE=DATE:' + (day + datetime.timedelta(days=3)).strftime('%Y%m%d')]
-        else:
-            lines += ['DTSTART:' + ics_time(begin), 'DTEND:' + ics_time(end)]
-        lines += (['LOCATION:' + place] if place else []) + (['DESCRIPTION:' + notes] if notes else []) + \
-                 (['RRULE:' + rule] if rule else []) + ['END:VEVENT']
-    return ('\r\n'.join(lines + ['END:VCALENDAR']) + '\r\n').encode('utf-8')
+    personal = ('Lunch with Ana', 'Team offsite', 'Dentist')
+    lines = []
+    for name in ('Work', 'Personal'):         # the agent sends the calendars one after the other
+        lines += ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//thingdeck//demo//EN', 'X-WR-CALNAME:' + name]
+        for i, (title, begin, end, place, notes, rule) in enumerate(events):
+            if (title in personal) != (name == 'Personal'):
+                continue
+            lines += ['BEGIN:VEVENT', 'UID:demo-%d@thingdeck' % i, 'SUMMARY:' + title]
+            if begin is None:      # all day, the day after tomorrow
+                lines += ['DTSTART;VALUE=DATE:' + (day + datetime.timedelta(days=2)).strftime('%Y%m%d'),
+                          'DTEND;VALUE=DATE:' + (day + datetime.timedelta(days=3)).strftime('%Y%m%d')]
+            else:
+                lines += ['DTSTART:' + ics_time(begin), 'DTEND:' + ics_time(end)]
+            lines += (['LOCATION:' + place] if place else []) + (['DESCRIPTION:' + notes] if notes else []) + \
+                     (['RRULE:' + rule] if rule else []) + ['END:VEVENT']
+        lines.append('END:VCALENDAR')
+    return ('\r\n'.join(lines) + '\r\n').encode('utf-8')
 
 
 COVER = png(sunset())
@@ -225,16 +231,13 @@ def plex(with_posters):
             {'id': 's2', 'kind': 'episode', 'title': 'The Summit', 'sub': 'Ridgeline · S2 · E5', 'user': 'sam', 'player': 'Phone',
              'state': 'playing', 'position_ms': 1300000, 'duration_ms': 2700000, 'decision': 'transcode', 'hw': True,
              'quality': '1080p', 'kbps': 4200, 'local': False, 'art': 'summit'},
-            {'id': 's3', 'kind': 'track', 'title': 'Neon Skyline', 'sub': 'The Midnight Sample — Demo Tapes', 'user': 'jo',
-             'player': 'Desk speaker', 'state': 'paused', 'position_ms': 96000, 'duration_ms': 241000,
-             'decision': 'direct stream', 'hw': False, 'quality': 'FLAC', 'kbps': 950, 'local': True, 'art': 'neon'},
         ],
         'load': {'cpu': wave(24, 6, 60, 4), 'mem': wave(45, 2, 60, 9), 'plex_cpu': 14.2, 'plex_mem': 6.1},
         'net': {'lan': [int(x * 100000) for x in wave(36, 9, 60, 3)], 'wan': [int(x * 10000) for x in wave(34, 6, 60, 5)]},
         'libraries': [{'title': 'Movies', 'kind': 'movie', 'count': 412},
                       {'title': 'TV Shows', 'kind': 'show', 'count': 38, 'episodes': 1694},
                       {'title': 'Music', 'kind': 'artist', 'count': 120, 'albums': 236, 'tracks': 2810}],
-        'activities': [{'title': 'Scanning Movies', 'sub': '42 of 120 files', 'progress': 35}],
+        'activities': [{'title': 'Detecting intros', 'sub': 'Ridgeline · 14 of 40 episodes', 'progress': 35}],
         'server': {'name': 'home-server', 'version': '1.41.3.9314', 'update': None, 'transcodes': 1},
     }
     if with_posters:
@@ -257,6 +260,8 @@ TRUENAS = {
     'alerts': [{'level': 'WARNING', 'text': 'Pool backup state is DEGRADED: One or more devices has been removed.'}],
     'apps': [{'name': 'plex', 'state': 'RUNNING', 'update': False}, {'name': 'nextcloud', 'state': 'RUNNING', 'update': True},
              {'name': 'immich', 'state': 'RUNNING', 'update': False}, {'name': 'syncthing', 'state': 'STOPPED', 'update': False}],
+    'jobs': [{'method': 'pool.scrub.scrub', 'target': 'tank', 'percent': 42.0, 'text': None, 'started': None},
+             {'method': 'cloudsync.sync', 'target': None, 'percent': 71.0, 'text': 'Sending photos', 'started': None}],
 }
 
 
