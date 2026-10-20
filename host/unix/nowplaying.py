@@ -130,9 +130,40 @@ def mac_snapshot():
                 'playing': (as_int(float(rate) * 1000) or 0) > 0 if rate else False,
                 'position_ms': as_int(float(elapsed) * 1000) if elapsed else None,
                 'duration_ms': as_int(float(duration) * 1000) if duration else None,
-                'cover': mac_cover,
+                'cover': lambda: mac_cover() or itunes_cover(artist, album),
             }
     return mac_applescript_snapshot()
+
+
+# Players that give macOS no cover (Firefox, for one): the album's cover from Apple's iTunes
+# Search API, which is sent the artist and album. One request per album; a miss is retried
+# after 5 minutes, so being offline doesn't stall the loop.
+itunes_covers = {}      # (artist, album) -> (cover or None, monotonic time)
+
+
+def itunes_cover(artist, album):
+    if not artist or not album:
+        return None
+    key = (artist.lower(), album.lower())
+    cached = itunes_covers.get(key)
+    if cached and (cached[0] or time.monotonic() - cached[1] < 300):
+        return cached[0]
+    cover = None
+    try:
+        query = urllib.parse.urlencode({'term': '%s %s' % (artist, album), 'entity': 'album', 'limit': 10})
+        with urllib.request.urlopen('https://itunes.apple.com/search?' + query, timeout=5) as r:
+            results = json.loads(r.read().decode('utf-8')).get('results') or []
+        same_artist = [x for x in results if str(x.get('artistName', '')).lower() == key[0]]
+        match = next((x for x in same_artist if str(x.get('collectionName', '')).lower() == key[1]),
+                     same_artist[0] if same_artist else None)
+        if match and match.get('artworkUrl100'):
+            cover = read_url(match['artworkUrl100'].replace('100x100bb', '600x600bb'))
+    except (OSError, ValueError):
+        pass
+    itunes_covers[key] = (cover, time.monotonic())
+    while len(itunes_covers) > 20:
+        itunes_covers.pop(next(iter(itunes_covers)))
+    return cover
 
 
 def mac_cover():
@@ -175,7 +206,7 @@ def mac_applescript_snapshot():
     return {
         'title': title, 'artist': artist, 'album': album, 'app': app, 'playing': state == 'playing',
         'position_ms': as_int(position), 'duration_ms': as_int(duration) or None,
-        'cover': lambda: read_url(art_url),
+        'cover': lambda: read_url(art_url) or itunes_cover(artist, album),
     }
 
 

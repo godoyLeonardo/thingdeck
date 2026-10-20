@@ -251,7 +251,9 @@ login, survives unplugging and sleep, and needs `adb` (see [Requirements](#requi
   (`sudo dnf install playerctl`). Log: `journalctl --user -u thingdeck-agent`.
 - **macOS:** a LaunchAgent. `brew install nowplaying-cli` is recommended; recent
   macOS versions restrict it, in which case the agent asks Spotify or Music
-  directly (macOS asks once to allow that). Lights, Plex and NAS also need
+  directly (macOS asks once to allow that). When the player gives macOS no cover
+  (Firefox, for example), the agent looks the album up in Apple's iTunes Search API,
+  which is sent the artist and album name. Lights, Plex and NAS also need
   **Local Network** access: turn on Python under System Settings → Privacy &
   Security → Local Network. Without it, the agent's requests to the bridge and
   the servers fail with "No route to host".
