@@ -222,16 +222,22 @@
   .ev-join .emoji { font-size: 20px; }
   .ev-join.down, .ev-join.fire { filter: brightness(1.2); }
   .agenda.cols { display: flex; padding: 0; }
-  /* Tabs above the agenda: All and each calendar, with two calendars or more. They scroll sideways. */
+  /* The bar above the agenda: how many weeks it shows, then tabs for All and each calendar (with
+     two calendars or more; they scroll sideways). The weeks go on the left, away from the dial. */
   .cal-wrap { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
-  .cal-tabs { flex: none; display: flex; overflow-x: auto; margin-bottom: 8px; }
+  .cal-bar { flex: none; display: flex; align-items: center; margin-bottom: 8px; }
+  .cal-tabs { flex: 0 1 auto; min-width: 0; display: flex; overflow-x: auto; }
   .cal-tabs::-webkit-scrollbar { display: none; }
   .cal-tab { flex: none; height: 36px; line-height: 36px; padding: 0 16px; border-radius: 18px; background: var(--tile);
     font-size: calc(14.5px * var(--ts)); font-weight: 600; color: var(--muted); white-space: nowrap; }
   .cal-tab + .cal-tab { margin-left: 6px; }
   .cal-tab.on { background: var(--acc-soft); color: var(--acc); }
   .cal-tab.down { filter: brightness(1.3); }
-  .card .cal-tabs { margin: 2px 0 6px; }
+  .cal-weeks { flex: none; display: flex; align-items: center; margin-right: 10px; }
+  .cal-weeks b { min-width: 84px; text-align: center; font-size: calc(14.5px * var(--ts)); font-weight: 600; }
+  .cal-weeks .cal-tab { width: 42px; padding: 0; text-align: center; font-size: calc(19px * var(--ts)); color: var(--text); }
+  .cal-weeks .cal-tab.off { opacity: .35; }
+  .card .cal-bar { margin: 2px 0 6px; }
   .card .cal-tab { background: var(--tile-hi); }
   .ag-col { flex: 1; min-width: 0; padding: 10px 6px 4px 14px; }
   .ag-col + .ag-col { margin-left: 8px; }
@@ -1445,8 +1451,8 @@ function renderWidgets(page, g) {
     g.style.gridTemplateRows = 'minmax(0, 1fr)';     // the lists scroll inside instead of growing the page
     g.innerHTML = '<div class="dash-wrap"><div class="dash">' + page.widgets.map(function (w) {
       if (w === 'agenda' && page.widgets.length === 1)      // a column per day
-        return '<div class="cal-wrap"><div class="cal-tabs" id="caltabs"></div><div class="agenda cols" id="agenda"></div></div>';
-      if (w === 'agenda') return '<div class="card agenda"><h3>Agenda</h3><div class="cal-tabs" id="caltabs"></div><div class="ag-list" id="agenda"></div></div>';
+        return '<div class="cal-wrap">' + CAL_BAR + '<div class="agenda cols" id="agenda"></div></div>';
+      if (w === 'agenda') return '<div class="card agenda"><h3>Agenda</h3>' + CAL_BAR + '<div class="ag-list" id="agenda"></div></div>';
       if (w === 'monitor') return '<div class="monitor' + (page.widgets.length > 1 ? ' half' : '') + '" id="monitor"></div>';
       if (w === 'github') return '<div class="gh-wrap"><div class="gh-pull" id="ghpull"></div><div class="gh" id="github"></div></div>';
       if (w === 'lights') return '<div class="lights" id="lights"></div>';
@@ -1666,19 +1672,42 @@ function pickedCalendar() {
   var names = agenda.calendars || [], name = st.settings && st.settings.calendar;
   return names.length > 1 && names.indexOf(name) >= 0 ? name : null;
 }
-function updateCalTabs() {
-  var tabs = $('caltabs');
-  if (!tabs) return;
-  var names = agenda.calendars || [], picked = pickedCalendar();
+// How many weeks the agenda shows, 1 to 4, per tab (setting "calendar_weeks", by the calendar's
+// name or '' for All); 2 when none is saved. The device sends 4 weeks of events.
+var CAL_WEEKS = 4, WEEK_WORDS = ['', 'one', 'two', 'three', 'four'];
+var CAL_BAR = '<div class="cal-bar" id="calbar"><div class="cal-weeks" id="calweeks"></div><div class="cal-tabs" id="caltabs"></div></div>';
+function calendarWeeks(picked) {
+  var n = ((st.settings && st.settings.calendar_weeks) || {})[picked || ''];
+  return n >= 1 && n <= CAL_WEEKS ? n : 2;
+}
+function stepWeeks(delta) {
+  var picked = pickedCalendar(), names = agenda.calendars || [], weeks = {}, old = st.settings.calendar_weeks || {};
+  for (var k in old) weeks[k] = old[k];
+  weeks[picked || ''] = Math.max(1, Math.min(CAL_WEEKS, calendarWeeks(picked) + delta));
+  var keys = Object.keys(weeks);
+  if (keys.length > 32) keys.forEach(function (k) { if (k && names.indexOf(k) < 0) delete weeks[k]; });   // the device keeps 64 at most
+  st.settings.calendar_weeks = weeks;      // show it now; the saved state follows
+  updateAgenda();
+  post('/api/settings', { calendar_weeks: weeks });
+}
+function updateCalBar() {
+  var bar = $('calbar');
+  if (!bar) return;
+  bar.style.display = agenda.state === 'ok' ? '' : 'none';
+  var names = agenda.calendars || [], picked = pickedCalendar(), weeks = calendarWeeks(picked), tabs = $('caltabs');
   tabs.style.display = names.length > 1 ? '' : 'none';
-  if (names.length < 2) return;
-  var html = '<div class="cal-tab' + (picked == null ? ' on' : '') + '" data-cal="-1">All</div>' + names.map(function (n, i) {
-    return '<div class="cal-tab' + (n === picked ? ' on' : '') + '" data-cal="' + i + '">' + esc(n) + '</div>';
-  }).join('');
-  if (redraw(tabs, html)) {
-    var on = tabs.querySelector('.on');
-    if (on) on.scrollIntoView({ inline: 'nearest', block: 'nearest' });
+  if (names.length > 1) {
+    var html = '<div class="cal-tab' + (picked == null ? ' on' : '') + '" data-cal="-1">All</div>' + names.map(function (n, i) {
+      return '<div class="cal-tab' + (n === picked ? ' on' : '') + '" data-cal="' + i + '">' + esc(n) + '</div>';
+    }).join('');
+    if (redraw(tabs, html)) {
+      var on = tabs.querySelector('.on');
+      if (on) on.scrollIntoView({ inline: 'nearest', block: 'nearest' });
+    }
   }
+  redraw($('calweeks'), '<div class="cal-tab' + (weeks <= 1 ? ' off' : '') + '" data-weeks="-1">−</div>' +
+    '<b>' + weeks + (weeks === 1 ? ' week' : ' weeks') + '</b>' +
+    '<div class="cal-tab' + (weeks >= CAL_WEEKS ? ' off' : '') + '" data-weeks="1">+</div>');
 }
 function pickCalendar(i) {
   var name = i >= 0 ? (agenda.calendars || [])[i] : null;
@@ -1689,22 +1718,22 @@ function pickCalendar(i) {
 function updateAgenda() {
   var box = $('agenda');
   if (!box) return;
-  updateCalTabs();
-  var cols = box.classList.contains('cols'), picked = pickedCalendar(), names = agenda.calendars || [];
+  updateCalBar();
+  var cols = box.classList.contains('cols'), picked = pickedCalendar(), names = agenda.calendars || [], weeks = calendarWeeks(picked);
   var now = Date.now(), today = dayNumber(now), events = (agenda.events || []).filter(function (e) {
-    return e.end > now && (picked == null || names[e.cal] === picked);
+    return e.end > now && (picked == null || names[e.cal] === picked) && dayNumber(Math.max(e.start, now)) - today < weeks * 7;
   });
   var html = '', day = null, next = null;
   for (var i = 0; i < events.length && !next; i++) if (!events[i].all_day) next = events[i];
   if (cols && events.length) {
-    // Today | Tomorrow | the rest of the two weeks, each a card that scrolls on its own.
+    // Today | Tomorrow | the rest of the weeks shown, each a card that scrolls on its own.
     var parts = ['', '', ''], laterDay = null;
     events.forEach(function (e) {
       var d = dayNumber(Math.max(e.start, now)), c = Math.min(2, d - today);
       if (c === 2 && d !== laterDay) { laterDay = d; parts[2] += '<div class="ag-day">' + dayLabel(Math.max(e.start, now)) + '</div>'; }
       parts[c] += eventHTML(e, e === next, true);
     });
-    var titles = ['Today', 'Tomorrow', 'Next two weeks'];
+    var titles = ['Today', 'Tomorrow', weeks === 1 ? 'Later this week' : 'Next ' + WEEK_WORDS[weeks] + ' weeks'];
     html = parts.map(function (p, c) {
       return '<div class="card ag-col"><h3>' + titles[c] + '</h3><div class="ag-list">' +
         (p || '<div class="ag-empty">' + (c === 0 ? 'Nothing else today' : 'Nothing planned') + '</div>') + '</div></div>';
@@ -1718,7 +1747,7 @@ function updateAgenda() {
   if (!events.length) {
     if (agenda.state === 'none') html = stateCard('Calendar', 'No calendar yet', 'Put your Google Calendar’s secret iCal address in calendars.txt on the computer (see README).');
     else if (agenda.error) html = stateCard('Calendar', 'Couldn’t get the calendar', agenda.error);
-    else if (agenda.state === 'ok') html = stateCard('Calendar', 'Nothing coming up', 'No events' + (picked ? ' in ' + picked : '') + ' in the next 14 days.');
+    else if (agenda.state === 'ok') html = stateCard('Calendar', 'Nothing coming up', 'No events' + (picked ? ' in ' + picked : '') + ' in the next ' + weeks * 7 + ' days.');
     else html = agentCard('Calendar', 'your calendar');
   }
   if (box.innerHTML !== html) {
@@ -2329,7 +2358,7 @@ document.addEventListener('pointerdown', function (e) {
   startX = e.clientX; startY = e.clientY;
   startInBar = !!e.target.closest('#bar, .cal-tabs');
   startOnSlider = !!e.target.closest('[data-hue-bar], [data-hue-lbar]');   // dragging a light's brightness, not swiping
-  downEl = e.target.closest('.tile[data-i], .preset[data-i], #dial, .tab, #status, [data-set], [data-sys], [data-sec], [data-media], [data-join], [data-guard], [data-kill], [data-ev], [data-sheet-close], [data-sheet-card], [data-audio], [data-audio-dev], [data-gh], #tabmore, [data-hue-room], [data-hue-toggle], [data-hue-ltoggle], [data-hue-scene], [data-hue-alloff], [data-hue-pair], [data-hue-bar], [data-hue-lbar], [data-tab-move], [data-tabs-reset], [data-tab-hide], [data-goto-media], [data-rm-join], [data-rm-dismiss], [data-cal]');
+  downEl = e.target.closest('.tile[data-i], .preset[data-i], #dial, .tab, #status, [data-set], [data-sys], [data-sec], [data-media], [data-join], [data-guard], [data-kill], [data-ev], [data-sheet-close], [data-sheet-card], [data-audio], [data-audio-dev], [data-gh], #tabmore, [data-hue-room], [data-hue-toggle], [data-hue-ltoggle], [data-hue-scene], [data-hue-alloff], [data-hue-pair], [data-hue-bar], [data-hue-lbar], [data-tab-move], [data-tabs-reset], [data-tab-hide], [data-goto-media], [data-rm-join], [data-rm-dismiss], [data-cal], [data-weeks]');
   if (downEl) downEl.classList.add('down');
 });
 document.addEventListener('pointercancel', function () { if (downEl) downEl.classList.remove('down'); downEl = null; });
@@ -2359,6 +2388,7 @@ document.addEventListener('pointerup', function (e) {
   else if (el.hasAttribute('data-tab-hide')) toggleTab(el.getAttribute('data-tab-hide'));
   else if (el.hasAttribute('data-goto-media')) gotoMedia();
   else if (el.hasAttribute('data-cal')) pickCalendar(parseInt(el.getAttribute('data-cal'), 10));
+  else if (el.hasAttribute('data-weeks')) stepWeeks(parseInt(el.getAttribute('data-weeks'), 10));
   else if (el.hasAttribute('data-rm-join')) {
     var ev = reminderEvent;
     fire(el);

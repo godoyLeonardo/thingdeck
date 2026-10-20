@@ -711,8 +711,9 @@ class HostHue:
         self.ui.publish('hue_dial', {'room': room['id']})
 
 
-AGENDA_DAYS = 14        # today and the next days
-AGENDA_MAX = 160        # events sent to the UI
+AGENDA_WEEKS = 4        # the most the Calendar page shows (its weeks button: 1 to 4)
+AGENDA_DAYS = AGENDA_WEEKS * 7      # today and the next days
+AGENDA_MAX = 300        # events sent to the UI
 EPOCH = datetime.datetime(1970, 1, 1)
 
 
@@ -1010,6 +1011,7 @@ class Pad:
         # None means "use config.json".
         self.settings = {'os_mode': 'auto', 'layout': None, 'dial_invert': None,
                          'brightness_auto': True, 'brightness': 180, 'brightness_stops': 0, 'calendar': None,
+                         'calendar_weeks': {},
                          'theme': 'dark', 'accent': 'theme',
                          'clock_24h': True, 'icon_style': None,
                          'icon_color': None, 'page_order': [], 'page_hidden': [], 'page_shown': []}
@@ -1072,6 +1074,9 @@ class Pad:
             'brightness': lambda v: isinstance(v, int) and BRIGHTNESS_MIN <= v <= 255,
             'brightness_stops': lambda v: type(v) in (int, float) and abs(v) <= BRIGHTNESS_STOPS and v * 2 == int(v * 2),
             'calendar': lambda v: v is None or (isinstance(v, str) and len(v) <= 200),     # the Calendar page's tab; None: all
+            # Weeks the Calendar page shows, per tab: a calendar's name, or '' for All.
+            'calendar_weeks': lambda v: isinstance(v, dict) and len(v) <= 64 and all(
+                isinstance(k, str) and len(k) <= 200 and type(n) is int and 1 <= n <= AGENDA_WEEKS for k, n in v.items()),
         }
         if key not in valid or not valid[key](value):
             raise ValueError('bad setting %s=%r' % (key, value))
