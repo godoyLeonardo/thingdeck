@@ -211,7 +211,7 @@ them to the Car Thing **over the USB cable** (`adb forward`; no network):
   every 3 seconds while it's on screen, every 30 seconds otherwise (see
   [Connecting Plex](#connecting-plex)).
 - **NAS (TrueNAS):** each pool as a tank that fills up (yellow from 80%, red from 90%)
-  with its health and free space, the temperature of every disk (NVMe drives have
+  with its health, free space and size, the temperature of every disk (NVMe drives have
   their own, higher limits), the server's alerts, how many apps run and how many
   have updates, and the jobs that run now (a scrub, a snapshot, replication or cloud
   sync task, an app update), with the first one's progress. Below the pools: the
