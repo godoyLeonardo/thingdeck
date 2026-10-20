@@ -144,6 +144,12 @@
     --media: #3fb950; --key: #58a6ff; --type: #d29922; --nav: #bc8cff; --mouse: #39c5cf; --bad: #ff7b72; --warn: #db6d28;
     --on-acc: #0d1117;
   }
+  :root[data-theme="ayu"] {
+    --bg: #0b0e14; --panel: #0f131a; --tile: #131721; --tile-hi: #1c212b; --line: #272d38; --edge: #131721;
+    --text: #bfbdb6; --muted: #7d838c; --faint: #3d424d; --toast: #1c212b; --veil: rgba(11,14,20,.92); --standby: #07090d;
+    --media: #aad94c; --key: #59c2ff; --type: #ffb454; --nav: #d2a6ff; --mouse: #95e6cb; --bad: #f07178; --warn: #ff8f40;
+    --on-acc: #0b0e14;
+  }
   * { box-sizing: border-box; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); overflow: hidden;
     font-family: Geist, 'Circular Sp UI v3 T', 'Noto Sans', sans-serif; touch-action: none; cursor: none; }
@@ -1084,7 +1090,8 @@ var THEMES = {
   rosepine:   { name: 'Rosé Pine',   bg: '#191724', tile: '#1f1d2e', text: '#e0def4', acc: '#ebbcba' },
   everforest: { name: 'Everforest',  bg: '#2d353b', tile: '#343f44', text: '#d3c6aa', acc: '#a7c080' },
   kanagawa:   { name: 'Kanagawa',    bg: '#1f1f28', tile: '#2a2a37', text: '#dcd7ba', acc: '#7e9cd8' },
-  github:     { name: 'GitHub Dark', bg: '#0d1117', tile: '#161b22', text: '#e6edf3', acc: '#58a6ff' }
+  github:     { name: 'GitHub Dark', bg: '#0d1117', tile: '#161b22', text: '#e6edf3', acc: '#58a6ff' },
+  ayu:        { name: 'Ayu',         bg: '#0b0e14', tile: '#131721', text: '#bfbdb6', acc: '#e6b450' }
 };
 var ACCENTS = {   // [on dark themes, on light themes]
   green: ['#1ed760', '#12a150'], blue: ['#5b9cff', '#2f6fe0'], purple: ['#a78bfa', '#7c5cdb'],
