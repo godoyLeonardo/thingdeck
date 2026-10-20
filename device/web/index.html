@@ -589,6 +589,7 @@
   #tabs::-webkit-scrollbar { display: none; }
   #tabs.dense .tab { padding: 0 4px; font-size: calc(17px * var(--ts)); }
   .tab[data-settings] { font-size: calc(24px * var(--ts)); }
+  #tabs.fit .tab[data-settings] { flex-basis: 52px; padding: 0; }    /* the bar fits: ⚙ takes only its own width */
   .tab { flex: 0 0 var(--tabw, 25%); box-sizing: border-box; padding: 0 8px; height: 48px; line-height: 48px; border-radius: 24px; text-align: center;
     font-size: calc(19px * var(--ts)); font-weight: 500; color: var(--muted); scroll-snap-align: start;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -937,10 +938,12 @@ function render() {
   }).join('') + '<div class="tab' + (showSettings ? ' on' : '') + '" data-settings="1" title="Settings">⚙</div>';
   var on = $('tabs').querySelector('.on');
   if (on) on.scrollIntoView({ inline: 'nearest', block: 'nearest' });
-  // Up to 7 tabs share the bar evenly (no scrolling; 7 with smaller text); more show 4 at a time and scroll.
-  var count = $('tabs').children.length;
-  $('tabs').style.setProperty('--tabw', count <= 7 ? (100 / count) + '%' : '25%');
-  $('tabs').classList.toggle('dense', count === 7);
+  // Up to 7 pages share the bar evenly next to a narrow ⚙ (no scrolling; 6 and 7 with smaller text);
+  // more show 4 at a time and scroll.
+  var count = pages.length, fit = count <= 7;
+  $('tabs').style.setProperty('--tabw', fit ? 'calc((100% - 52px) / ' + count + ')' : '25%');
+  $('tabs').classList.toggle('fit', fit);
+  $('tabs').classList.toggle('dense', fit && count >= 6);
 
   applyTheme();
   document.body.classList.toggle('settings', showSettings);
