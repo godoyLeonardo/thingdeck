@@ -1108,6 +1108,16 @@ class Pad:
             subprocess.call(['supervisorctl', 'stop', 'backlight'], stdout=subprocess.DEVNULL)
             self._stock_stopped = True
 
+    def release_backlight(self):
+        """On the way out, give auto brightness back to the stock service, so the screen still
+        follows the light while this service is down. A manual or standby level stays as it is."""
+        if self._stock_stopped and self.settings['brightness_auto'] and not self._dimmed:
+            self._stock_stopped = False          # follow_sensor stops writing
+            try:
+                subprocess.call(['supervisorctl', 'start', 'backlight'], stdout=subprocess.DEVNULL, timeout=5)
+            except subprocess.TimeoutExpired:
+                log('could not start the stock light-sensor service')
+
     def follow_sensor(self):
         """Auto brightness: the stock service's level for the light sensor, times 2 for each
         stop of the offset. Every 0.5 s it moves a fifth of the way there, so it fades the
@@ -1119,7 +1129,7 @@ class Pad:
         written = None
         while True:
             time.sleep(0.5)
-            if self._dimmed or not self.settings['brightness_auto']:
+            if self._dimmed or not self._stock_stopped or not self.settings['brightness_auto']:
                 written = None
                 continue
             try:
@@ -1949,6 +1959,7 @@ def main():
             pad.refresh_hidden()
             pad.agenda.refresh()
     finally:
+        pad.release_backlight()
         pad.hid.close()
 
 

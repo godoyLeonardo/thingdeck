@@ -258,7 +258,9 @@ number (0–359), drawn light on dark themes and dark on light ones.
 
 `/sys/class/backlight/aml-bl/brightness` is **inverted**: 0–255, and higher means
 dimmer, so a level is written as `260 - level`. The stock `sp-als-backlight` service
-always stays stopped, because it has no offset. In auto mode, `Pad.follow_sensor` reads
+has no offset, so it stays stopped while the pad runs. When the pad service stops in
+auto mode (not in standby), it starts the stock service again, so the screen still
+follows the light; the next start stops it again. In auto mode, `Pad.follow_sensor` reads
 the TMD2772 light sensor (`in_intensity0_raw`) every 0.5 s. It uses the stock curve,
 fitted to that service's log: level 25 in the dark, `63.3 + 19.3 ln(raw - 12.2)` above a
 reading of 12, and 210 at most. It multiplies the level by 2 for each stop of the offset
