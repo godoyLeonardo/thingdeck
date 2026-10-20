@@ -170,6 +170,9 @@ them to the Car Thing **over the USB cable** (`adb forward`; no network):
   declined left out. The next event is highlighted with a countdown. Events with a
   Google Meet, Zoom or Teams link get a Join button that opens the link on the computer.
   Tap an event for its details: date, time and length, place, calendar and notes.
+  Five minutes before a meeting with a link, a reminder card comes up on any page
+  with a countdown, **Join meeting** and **Dismiss**; it stays until two minutes
+  after the start.
 - **Status:** the Status page shows CPU, memory, GPU and network speed, each with
   a graph of the last two minutes. The GPU needs an NVIDIA card (`nvidia-smi`), or
   an AMD one on Linux; CPU temperature shows on Linux.
