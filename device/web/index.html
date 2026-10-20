@@ -339,13 +339,13 @@
     animation: spin .9s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
   /* small motion where something is live: equalizer bars while a song plays, a pulsing dot for a
-     meeting in progress, the armed kill switch glowing */
+     meeting in progress, the armed kill switch glowing. What keeps moving moves from animate(),
+     not in a CSS animation: see animate(). */
   .eq { display: inline-flex; align-items: flex-end; flex: none; width: 16px; height: 14px; margin-right: 8px; }
   .eq i { flex: 1; height: 100%; margin: 0 1px; border-radius: 1px; background: var(--acc); transform-origin: bottom;
-    animation: eq 1s ease-in-out infinite; }
-  .eq i:nth-child(2) { animation-delay: -.45s; }
-  .eq i:nth-child(3) { animation-delay: -.75s; }
-  @keyframes eq { 0%, 100% { transform: scaleY(.3); } 50% { transform: scaleY(1); } }
+    transform: scaleY(.9); will-change: transform; }      /* its own layer: a frame moves it without a repaint */
+  .eq i:nth-child(2) { transform: scaleY(.5); }
+  .eq i:nth-child(3) { transform: scaleY(.7); }
   .np-app .eq { width: 12px; height: 10px; margin-right: 6px; vertical-align: -1px; display: inline-flex; }
   .live { display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 50%; background: var(--acc); vertical-align: 1px;
     animation: live 1.6s ease-in-out infinite; }
@@ -1461,7 +1461,7 @@ function updateNowPlaying() {
   }
   if (!np || !$('np-fill')) return;
   var playing = np.playing ? EQ + 'Playing' : 'Paused';
-  if ($('np-state').innerHTML !== playing) $('np-state').innerHTML = playing;     // runs every 500 ms: don't restart the animation
+  redraw($('np-state'), playing);     // only on a change: animate() styles the bars, so innerHTML never matches
   var pos = npPosition(), dur = np.duration_ms;
   $('np-progress').style.visibility = dur ? 'visible' : 'hidden';
   if (dur) {
@@ -1655,12 +1655,27 @@ function currentDevice(kind) {
 // The song playing, in the clock header of every page but the media card itself.
 // Three bars that bounce while a song plays (the song pill, "Playing" on Media).
 var EQ = '<span class="eq"><i></i><i></i><i></i></span>';
+// What shows that something is live moves here, and not in a CSS animation. The kiosk's Chromium
+// paints on the CPU, and every frame it makes costs a fixed share of it: a CSS animation that never
+// stops makes 60 a second, and the equalizer bars alone kept 60-66% of a core busy. At 24 frames
+// a second on their own layers, they cost about 55% while they show, and nothing when nothing
+// moves (see device/README.md).
+var MOTION_FPS = 24, frame = 0;
+function animate() {
+  frame++;
+  var t = Date.now() / 1000;
+  [].forEach.call(document.querySelectorAll('.eq i'), function (bar, i) {      // each bar on its own wave
+    var k = i % 3;
+    bar.style.transform = 'scaleY(' + (.3 + .7 * Math.abs(Math.sin(t * Math.PI * (1.1 + .25 * k) + k * 1.3))).toFixed(2) + ')';
+  });
+}
+setInterval(animate, 1000 / MOTION_FPS);
 function updateTopNp() {
   var box = $('topnp'), show = !!(np && np.title && currentPage.header === 'clock' && !currentPage.nowplaying);
   box.style.display = show ? '' : 'none';
   if (!show) return;
   var html = (np.playing ? EQ : icon('pause')) + '<span><b>' + esc(np.title) + '</b>' + (np.artist ? ' · ' + esc(np.artist) : '') + '</span>';
-  if (box.innerHTML !== html) box.innerHTML = html;
+  redraw(box, html);      // only on a change: animate() styles the bars
 }
 function gotoMedia() {
   var i = orderedEntries().findIndex(function (p) { return p.nowplaying; });
