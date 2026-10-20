@@ -31,9 +31,9 @@ as soon as you plug it in.
   Settings are saved on the Car Thing and survive power cycles.
 - **Themes:** Dark, Black, Light, and the editor color schemes Nord, Dracula,
   Catppuccin, Gruvbox, Tokyo Night, Solarized, One Dark, Monokai, Rosé Pine, Everforest,
-  Kanagawa and GitHub Dark, each with its own accent, one of six accent colors, or any
-  hue from a slider. Icons come in three styles (solid, outline, emoji) and three colors
-  (neutral, accent, or a color per tile category).
+  Kanagawa, GitHub Dark and Ayu, each with its own accent, one of six accent colors, or
+  any hue from a slider. Icons come in three styles (solid, outline, emoji) and three
+  colors (neutral, accent, or a color per tile category).
 - **Computer agent (optional):** a small background agent on the computer adds what's
   playing with its cover, Philips Hue lights, your calendar with Join buttons,
   CPU/memory/GPU/network graphs, a kill switch for the app in focus, GitHub Actions
