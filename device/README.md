@@ -195,7 +195,7 @@ song playing kept 60-66% of a core busy on every live page, and the Media page a
   own layer about 68%; a CSS animation costs the same with or without its own layer.
   The spinners (waiting cards, GitHub runs and checks) turn at the same rate, one turn
   a second.
-- The dot of a meeting in progress blinks once a second.
+- The dot of a meeting in progress and the reminder card's border blink once a second.
 - The progress bars move once a second, with no transition (a song's bar moves about
   2 px a second, so a transition adds nothing).
 
