@@ -248,7 +248,10 @@ login, survives unplugging and sleep, and needs `adb` (see [Requirements](#requi
   (`sudo dnf install playerctl`). Log: `journalctl --user -u thingdeck-agent`.
 - **macOS:** a LaunchAgent. `brew install nowplaying-cli` is recommended; recent
   macOS versions restrict it, in which case the agent asks Spotify or Music
-  directly (macOS asks once to allow that).
+  directly (macOS asks once to allow that). Lights, Plex and NAS also need
+  **Local Network** access: turn on Python under System Settings → Privacy &
+  Security → Local Network. Without it, the agent's requests to the bridge and
+  the servers fail with "No route to host".
 
 Uninstall with `install.ps1 -Uninstall` or `install.sh --uninstall`. To check what
 the agent sees without installing: `nowplaying.ps1 -Once` or `nowplaying.py --once`.

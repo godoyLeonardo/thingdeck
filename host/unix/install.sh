@@ -84,6 +84,7 @@ EOF
     launchctl bootstrap "gui/$(id -u)" "$PLIST"
     echo "installed and started. Log: $DIR/nowplaying.log"
     echo "macOS may ask to allow controlling Spotify/Music (Automation) the first time."
+    echo "For Hue, Plex and TrueNAS, turn on Python in System Settings > Privacy & Security > Local Network."
     ;;
 *)
     echo "this installer is for Linux and macOS; on Windows use host/windows/install.ps1"; exit 1
