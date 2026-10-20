@@ -8,8 +8,8 @@ and what it is playing, over USB through
 `adb forward`. It also opens meeting links, kills the focused app and switches audio
 devices when the Car Thing asks. What is playing comes from:
   Linux  playerctl (any MPRIS player: Spotify, browsers, VLC, ...)
-  macOS  nowplaying-cli; if that returns nothing (macOS 15.4+ restricts the API it
-         uses), AppleScript for Spotify and Music
+  macOS  media-control, else nowplaying-cli; if neither returns anything (macOS 15.4+
+         restricts the API they use), AppleScript for Spotify and Music
 
   python3 nowplaying.py          # run
   python3 nowplaying.py --once   # print one snapshot
@@ -21,6 +21,7 @@ THINGDECK_PORT (host side of the forward, default 28765), THINGDECK_CALENDARS
 """
 import ast
 import base64
+import calendar
 import datetime
 import glob
 import hashlib
@@ -118,7 +119,48 @@ def mac_app_name(bundle_id):
     return app_names.get(bundle_id)
 
 
+def mac_media_control():
+    """media-control (Homebrew) still works where macOS restricts nowplaying-cli, and says when
+    its position was taken: browsers report it only now and then, so it is moved on from there."""
+    try:
+        d = json.loads(run(['media-control', 'get', '--no-artwork']) or 'null')
+    except ValueError:
+        return None
+    if not isinstance(d, dict) or not d.get('title'):
+        return None
+    playing, duration = bool(d.get('playing')), d.get('duration')
+    elapsed = d.get('elapsedTime') if isinstance(d.get('elapsedTime'), (int, float)) else None
+    if elapsed is not None and playing and isinstance(d.get('timestamp'), str):
+        try:
+            taken = calendar.timegm(time.strptime(d['timestamp'][:19], '%Y-%m-%dT%H:%M:%S'))
+            elapsed += max(0.0, time.time() - taken) * (d.get('playbackRate') or 1)
+        except ValueError:
+            pass
+    if elapsed is not None and isinstance(duration, (int, float)) and duration > 0:
+        elapsed = min(elapsed, duration)
+    artist, album = d.get('artist') or None, d.get('album') or None
+    return {
+        'title': d['title'], 'artist': artist, 'album': album, 'app': mac_app_name(d.get('bundleIdentifier')),
+        'playing': playing,
+        'position_ms': as_int(elapsed * 1000) if elapsed is not None else None,
+        'duration_ms': as_int(duration * 1000) if isinstance(duration, (int, float)) and duration > 0 else None,
+        'cover': lambda: media_control_cover() or itunes_cover(artist, album),
+    }
+
+
+def media_control_cover():
+    try:
+        d = json.loads(run(['media-control', 'get'], timeout=10) or 'null')
+        return base64.b64decode(d['artworkData']) if isinstance(d, dict) and d.get('artworkData') else None
+    except (ValueError, TypeError):
+        return None
+
+
 def mac_snapshot():
+    if shutil.which('media-control'):
+        np = mac_media_control()
+        if np:
+            return np
     out = run(['nowplaying-cli', 'get', 'title', 'artist', 'album', 'duration', 'elapsedTime', 'playbackRate',
                'clientBundleIdentifier'])
     if out:

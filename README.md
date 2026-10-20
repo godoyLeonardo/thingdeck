@@ -243,14 +243,15 @@ login, survives unplugging and sleep, and needs `adb` (see [Requirements](#requi
 |---|---|---|
 | Windows | The system media session (Spotify, browsers, Media Player, …) | `powershell -ExecutionPolicy Bypass -File host\windows\install.ps1` |
 | Linux | MPRIS through `playerctl` (Spotify, browsers, VLC, …) | `host/unix/install.sh` |
-| macOS | `nowplaying-cli`, or Spotify and Music through AppleScript | `host/unix/install.sh` |
+| macOS | `media-control` or `nowplaying-cli` (Spotify, browsers, Music, …), or Spotify and Music through AppleScript | `host/unix/install.sh` |
 
 - **Windows:** a Task Scheduler task at logon starts a tiny windowless launcher
   in `%USERPROFILE%\.thingdeck`. Log: `%USERPROFILE%\.thingdeck\nowplaying.log`.
 - **Linux:** a systemd user service (`thingdeck-agent`). Needs `playerctl`
   (`sudo dnf install playerctl`). Log: `journalctl --user -u thingdeck-agent`.
-- **macOS:** a LaunchAgent. `brew install nowplaying-cli` is recommended; recent
-  macOS versions restrict it, in which case the agent asks Spotify or Music
+- **macOS:** a LaunchAgent. `brew install media-control` is recommended: it works on
+  recent macOS and keeps the progress bar right for browsers. Without it the agent
+  uses `nowplaying-cli`, and where macOS restricts that, asks Spotify or Music
   directly (macOS asks once to allow that). When the player gives macOS no cover
   (Firefox, for example), the agent looks the album up in Apple's iTunes Search API,
   which is sent the artist and album name. Lights, Plex and NAS also need

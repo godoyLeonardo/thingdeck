@@ -58,7 +58,8 @@ Darwin)
     fi
     need python3 "Install it with: xcode-select --install (or brew install python)"
     need adb "brew install android-platform-tools"
-    command -v nowplaying-cli >/dev/null || echo "note: nowplaying-cli not found (brew install nowplaying-cli); falling back to Spotify/Music via AppleScript"
+    command -v media-control >/dev/null || command -v nowplaying-cli >/dev/null ||
+        echo "note: media-control not found (brew install media-control); falling back to Spotify/Music via AppleScript"
     mkdir -p "$DIR" "$(dirname "$PLIST")"
     cp "$HERE/nowplaying.py" "$DIR/nowplaying.py"
     cat > "$PLIST" <<EOF
