@@ -10,7 +10,8 @@ as soon as you plug it in.
   steps, plus live pages filled by the computer agent: Media, Lights (Philips Hue),
   Calendar, Status, Code (GitHub) and Plex. Up to seven tabs share the bottom bar;
   with more, it shows four at a time and scrolls. Settings → Tabs sets their order
-  and hides any you don't use. On live pages, the top bar also shows the song
+  and hides any you don't use; live pages you haven't set up (no config file yet)
+  start hidden and can be turned on there. On live pages, the top bar also shows the song
   playing (tap it for Media).
 - **4 top buttons:** presets that change with the page. Tile pages show their
   labels under the buttons; live pages show a big clock and the date there instead,
@@ -162,8 +163,9 @@ time or their lock state to a keyboard. An optional agent on the computer sends
 them to the Car Thing **over the USB cable** (`adb forward`; no network):
 
 - **Now playing:** the Media page shows the cover, title, artist, album, the app it
-  plays in, playing/paused and a live progress bar, with the media controls in a row
-  below. When nothing is playing it says so; the controls work either way.
+  plays in, playing/paused and a live progress bar, on a card tinted with the cover's
+  colors, with round media controls under the progress bar. When nothing is playing
+  it says so; the controls work either way.
 - **Calendar:** the Calendar page shows today, tomorrow and the rest of the week
   from your calendars (see [Adding your calendar](#adding-your-calendar)): repeating
   events, moved or cancelled occurrences and time zones included, meetings you

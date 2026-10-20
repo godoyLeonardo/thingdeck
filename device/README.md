@@ -341,6 +341,13 @@ their config order after the named ones, so new pages appear at the end. Page
 indexes, the tabs, swipes and `{"page": "next"}` (the back button, wrapping around)
 all work on the shown pages. Changing either setting keeps the current page.
 
+**Pages that aren't set up** hide on their own: `Pad.refresh_hidden()` (every 2 s) hides
+a page whose widgets all report `none` (no `calendars.txt`, `github.txt`, `plex.txt` or
+`truenas.txt`, Hue not paired). `unknown`, before the agent first reports, doesn't count.
+Turning such a page on in Settings → Tabs adds it to `page_shown`, which wins over
+this; turning any page off adds it to `page_hidden`, which wins over both. The state
+carries `hidden` (the effective set) and `unconfigured` for the UI.
+
 ### Volume and audio devices
 
 The agent checks the default output's volume and mute, and the default output and
