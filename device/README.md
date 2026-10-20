@@ -269,6 +269,12 @@ reading of 12, and 210 at most. It multiplies the level by 2 for each stop of th
 (`brightness_stops`, -3 to +3 in half stops; Settings → General). Then it fades a
 fifth of the way to that level on each reading, as the stock service did.
 
+At night the level drops by `night_stops` more (0, off, to -3), in auto and in manual
+mode: from `night_from` to `night_to`, minutes of the day by the computer's clock
+(22:00 to 07:00 by default; the hours can cross midnight). The same loop checks it every
+0.5 s, and the state's `night` says when it is on. Before the agent has set the clock,
+it is never night.
+
 ### GitHub
 
 The widget `"github"` (the Code page) shows what the agent reads with the `gh` CLI,
