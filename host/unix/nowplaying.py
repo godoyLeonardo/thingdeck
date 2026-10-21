@@ -585,6 +585,7 @@ class HueLink:
         self.config = None             # {'bridge', 'key'}
         self.github_refresh = False    # set from the command poll, cleared by the main loop
         self.opened = set()            # panels that just came on screen, for the main loop
+        self.calendar_soon = False     # the Car Thing says an event starts within 15 minutes
         self.pairing = None            # {'until', 'next', 'bridge'} while waiting for the button
         self.lists, self.listed = None, 0.0
         self.fetched, self.sent, self.sent_at = 0.0, None, 0.0
@@ -718,6 +719,7 @@ class HueLink:
             polled = json.loads(r.read().decode('utf-8'))
         commands = polled.get('hue') or []
         self.github_refresh = self.github_refresh or bool(polled.get('github_refresh'))   # the Code page's refresh button
+        self.calendar_soon = bool(polled.get('calendar_soon'))
         if polled.get('github_details'):        # a card opened on the Code page
             threading.Thread(target=send_github_details, args=(polled['github_details'],), daemon=True).start()
         now_visible = set(polled.get('visible') or [])
@@ -1473,6 +1475,9 @@ def main():
                 stats.gpu_at = 0.0
             if 'github' in hue.opened:
                 hue.github_refresh = True
+            # The calendars come from Google and others: not more than twice a minute.
+            if 'agenda' in hue.opened and (calendars_fetched is None or time.monotonic() - calendars_fetched >= 30):
+                calendars_fetched = None
             hue.opened.clear()
             if hue.github_refresh:
                 github_fetched, hue.github_refresh = None, False
@@ -1482,7 +1487,10 @@ def main():
                 status = github.read()
                 github_busy = any(r['status'] != 'completed' for r in status.get('runs', []))
                 send('github', status)
-            if calendars_fetched is None or time.monotonic() - calendars_fetched >= 300:
+            # The calendars every 5 minutes; every minute while the Calendar page is on screen or
+            # an event starts within 15 minutes, so a late change still reaches its reminder.
+            if calendars_fetched is None or time.monotonic() - calendars_fetched >= (
+                    60 if hue.calendar_soon or 'agenda' in visible else 300):
                 calendars_fetched = time.monotonic()
                 calendars = fetch_calendars()
                 if calendars and calendars[1]:

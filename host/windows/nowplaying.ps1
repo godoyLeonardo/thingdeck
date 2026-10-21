@@ -434,6 +434,8 @@ function Show-Panel([string]$widget) {
         'plex' { $script:plexNext = [DateTime]::MinValue }
         'truenas' { $script:nasNext = [DateTime]::MinValue }
         'monitor' { $script:gpuAt = [DateTime]::MinValue }
+        # The calendars come from Google and others: not more than twice a minute.
+        'agenda' { if (((Get-Date) - $script:calendarFetched).TotalSeconds -ge 30) { $script:calendarFetched = [DateTime]::MinValue } }
     }
 }
 $lastNet = $null
@@ -793,6 +795,7 @@ function Update-Hue {
     $commands = $polled.hue
     if ($polled.github_refresh) { $script:gitHubFetched = [DateTime]::MinValue }     # the refresh button on the Code page
     if ($polled.github_details) { Send-GitHubDetails $polled.github_details }          # a card opened on the Code page
+    $script:calendarSoon = [bool]$polled.calendar_soon                                  # an event starts within 15 minutes
     $was = $script:visible
     $script:visible = @($polled.visible | Where-Object { $_ })
     foreach ($w in $script:visible) { if ($was -notcontains $w) { Show-Panel $w } }
@@ -1243,6 +1246,7 @@ $lastHostSent = [DateTime]::MinValue
 $lastStatsSent = [DateTime]::MinValue
 $calendarHash = $null        # what the device has
 $calendarFetched = [DateTime]::MinValue
+$calendarSoon = $false       # the Car Thing says an event starts within 15 minutes
 $calendars = $null
 $fetchedHash = $null
 
@@ -1283,7 +1287,9 @@ while ($true) {
             $gitHubBusy = [bool]($gitHub.runs | Where-Object { $_.status -ne 'completed' })
             [void](Send-Json 'github' $gitHub)
         }
-        if (((Get-Date) - $calendarFetched).TotalMinutes -ge 5) {
+        # The calendars every 5 minutes; every minute while the Calendar page is on screen or an
+        # event starts within 15 minutes, so a late change still reaches its reminder.
+        if (((Get-Date) - $calendarFetched).TotalMinutes -ge $(if ($calendarSoon -or (Test-Visible 'agenda')) { 1 } else { 5 })) {
             $calendarFetched = Get-Date
             $calendars = Get-Calendars
             if ($calendars -and $calendars.error) { Write-Log "calendar: $($calendars.error)" }

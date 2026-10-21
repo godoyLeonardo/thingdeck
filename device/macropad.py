@@ -754,6 +754,13 @@ class Agenda:
     def needs_calendar(self):
         return self.state == 'unknown'
 
+    def soon(self, within=15 * 60):
+        """A timed event starts within 15 minutes: the agent then reads the calendars every
+        minute, so a change to it (or one just added) reaches the reminder in time."""
+        now = time.time() * 1000
+        return any(not e['all_day'] and 0 <= e['start'] - now <= within * 1000
+                   for e in self.published.get('events') or [])
+
     def refresh(self, force=False):
         """Recompute the upcoming events: on new data, every 5 minutes, and when the UTC offset changes."""
         now = time.time()
@@ -1789,7 +1796,8 @@ class Handler(BaseHTTPRequestHandler):
         elif path == '/api/commands':
             refresh, pad.github.refresh = pad.github.refresh, False
             self._send(200, {'hue': pad.hue.take(), 'github_refresh': refresh,   # the agent collects these several times a second
-                             'github_details': pad.github.take_ask(), 'visible': pad.visible_widgets()})
+                             'github_details': pad.github.take_ask(), 'visible': pad.visible_widgets(),
+                             'calendar_soon': pad.agenda.soon()})
         elif path == '/api/events':
             self._events()
         else:

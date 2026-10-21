@@ -299,8 +299,9 @@ The agent reads calendars from their private iCal address, so it needs no sign-i
 
    Add one line per calendar. Any iCal address works (Outlook's published calendars
    too); lines starting with `#` are ignored.
-3. The agent downloads the calendars every 5 minutes, so they show up within 5
-   minutes; no restart needed.
+3. The agent downloads the calendars every 5 minutes (every minute while the Calendar
+   page is open or an event is near), so they show up within 5 minutes; no restart
+   needed. Google itself can take a few minutes to publish a change to the address.
 
 The secret address lets anyone who has it read that calendar, so keep the file to
 yourself; if it leaks, reset it on the same Google Calendar settings page. Work
