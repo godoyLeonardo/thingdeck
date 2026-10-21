@@ -83,7 +83,7 @@ def main():
     if agent:
         for _ in range(45):
             s = state()
-            if all((s.get(k) or {}).get('state') not in (None, 'unknown') for k in used):
+            if all((s.get(k) or {}).get('state') not in (None, 'unknown') for k in used + ['weather']):
                 break
             time.sleep(2)
     for key in used:
@@ -97,6 +97,15 @@ def main():
             report('OK', '%s: not set up on this computer' % key)
         else:
             report('WARN', '%s: %s%s' % (key, status, ': ' + data['error'] if data.get('error') else ''))
+
+    # The weather under the large clocks (not a page of its own).
+    weather = s.get('weather') or {}
+    if weather.get('state') == 'ok':
+        report('OK', 'weather: %s°%s%s' % (weather.get('temp'), weather.get('unit') or '', ' in ' + weather['place'] if weather.get('place') else ''))
+    elif weather.get('state') == 'none':
+        report('OK', 'weather: not set up on this computer')
+    elif agent:
+        report('WARN', 'weather: %s%s' % (weather.get('state') or 'unknown', ': ' + weather['error'] if weather.get('error') else ''))
 
     # The page: connected to the service, and every tab drawn without an error.
     try:
