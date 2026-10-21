@@ -26,3 +26,6 @@ screen*.png
 *.swp
 .DS_Store
 Thumbs.db
+
+# deploy.sh check's screenshots
+check-shots/
