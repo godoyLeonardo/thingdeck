@@ -4,7 +4,7 @@
 Stop the computer agent first, or it overwrites the demo data within seconds:
   macOS    launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.thingdeck.agent.plist
   Linux    systemctl --user stop thingdeck-agent
-  Windows  Stop-ScheduledTask thingdeck-agent
+  Windows  Stop-ScheduledTask 'thingdeck agent'   (Start-ScheduledTask 'thingdeck agent' after)
 then run this from the repo (adb on PATH, Pillow installed) and start the agent again:
 
   python3 docs/screenshots/take.py               # every screenshot
