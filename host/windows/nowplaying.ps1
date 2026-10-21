@@ -596,9 +596,12 @@ $gitHubBusy = $false        # a run is queued or running: check more often
 
 # The details a card asks for when it opens on the Car Thing (through the command poll): for a
 # run, its number, attempt, actor, commit and jobs (each with its step counts, the step that
-# runs and the step that failed). gh takes a second or two; the loop waits for it.
+# runs and the step that failed); for a pull request, its branches, size, merge state,
+# reviews and checks. gh takes a second or two; the loop waits for it.
 $RunDetailFields = '{number: .run_number, attempt: .run_attempt, actor: .actor.login, sha: .head_sha, commit: ((.head_commit.message // "") | split("\n")[0]), started: .run_started_at, status, conclusion, updated: .updated_at}'
 $JobFields = '[.jobs[] | {name, status, conclusion, started: .started_at, completed: .completed_at, steps: [.steps[]? | {name, status, conclusion}]}]'
+$PrDetailJson = 'state,isDraft,author,baseRefName,headRefName,additions,deletions,changedFiles,commits,comments,mergeable,mergeStateStatus,reviewDecision,labels,createdAt,latestReviews,reviewRequests,statusCheckRollup'
+$PrDetailFields = '{state, draft: .isDraft, author: .author.login, base: .baseRefName, head: .headRefName, additions, deletions, files: .changedFiles, commits: (.commits | length), comments: (.comments | length), mergeable, merge_state: .mergeStateStatus, review: .reviewDecision, labels: [.labels[].name], created: .createdAt, reviews: [.latestReviews[] | {by: .author.login, state}], requested: [.reviewRequests[] | (.login // .name // .slug // "")], checks: [.statusCheckRollup[] | {name: (.name // .context // ""), workflow: (.workflowName // ""), status: (.status // ""), conclusion: (.conclusion // .state // ""), started: (.startedAt // ""), completed: (.completedAt // "")}]}'
 function Send-GitHubDetails($ask) {
     $out = [ordered]@{ row = $ask.row; seq = $ask.seq; kind = $ask.kind }
     try {
@@ -616,6 +619,9 @@ function Send-GitHubDetails($ask) {
                     current = (@($steps | Where-Object { $_.status -eq 'in_progress' }) | Select-Object -First 1).name
                     failed = (@($steps | Where-Object { $_.conclusion -eq 'failure' }) | Select-Object -First 1).name }
             })
+        } elseif ($ask.kind -eq 'pr') {
+            $pr = Invoke-Gh @('pr', 'view', [string][int]$ask.number, '--repo', $ask.repo, '--json', $PrDetailJson, '--jq', $PrDetailFields) | ConvertFrom-Json
+            foreach ($p in $pr.PSObject.Properties) { $out[$p.Name] = $p.Value }
         }
     } catch { $out.error = $_.Exception.Message }
     [void](Send-Json 'github/details' $out 6)
