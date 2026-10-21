@@ -1203,6 +1203,62 @@ function Update-TrueNas {
     $script:nasSentAt = Get-Date
 }
 
+# --- Weather, for the large clocks. weather.txt next to the log: a place on the first line
+# ("Paris", "Paris, France", or "48.85, 2.35"), and "fahrenheit" on a second line for °F.
+# Open-Meteo (open-meteo.com) needs no key; a name is looked up once with its geocoder.
+$WeatherFile = Join-Path (Split-Path $LogFile) 'weather.txt'
+$weatherPlace = @{ query = $null }      # the looked-up place: query, lat, lon, name
+$weatherNext = [DateTime]::MinValue
+$weatherSent = $null; $weatherSentAt = [DateTime]::MinValue; $weatherError = $null
+
+function Read-Weather {
+    $lines = @()
+    if (Test-Path $WeatherFile) { $lines = @(Get-Content $WeatherFile -Encoding UTF8 | ForEach-Object { $_.Trim() } | Where-Object { $_ -and -not $_.StartsWith('#') }) }
+    if (-not $lines.Count) { return @{ state = 'none' } }
+    $query = $lines[0]
+    $fahrenheit = $lines.Count -gt 1 -and $lines[1] -match '^f'
+    if ($script:weatherPlace.query -ne $query) {
+        if ($query -match '^\s*(-?\d+(\.\d+)?)\s*,\s*(-?\d+(\.\d+)?)\s*$') {
+            $script:weatherPlace = @{ query = $query; lat = [double]$Matches[1]; lon = [double]$Matches[3]; name = $null }
+        } else {
+            # "Paris, France": the geocoder takes the name; a country after the comma picks among the matches.
+            $name, $country = ($query -split ',', 2) | ForEach-Object { $_.Trim() }
+            $found = Invoke-RestMethod -TimeoutSec 5 -Uri ("https://geocoding-api.open-meteo.com/v1/search?count=10&language=en&name=" + [uri]::EscapeDataString($name))
+            $hit = @($found.results | Where-Object { -not $country -or $_.country -like "$country*" -or $_.country_code -eq $country })[0]
+            if (-not $hit) { throw "Open-Meteo doesn't know `"$query`": check the first line of weather.txt" }
+            $script:weatherPlace = @{ query = $query; lat = $hit.latitude; lon = $hit.longitude; name = $hit.name }
+        }
+    }
+    $p = $script:weatherPlace
+    $url = 'https://api.open-meteo.com/v1/forecast?latitude={0}&longitude={1}&current=temperature_2m,weather_code,is_day' -f
+        $p.lat.ToString([Globalization.CultureInfo]::InvariantCulture), $p.lon.ToString([Globalization.CultureInfo]::InvariantCulture)
+    if ($fahrenheit) { $url += '&temperature_unit=fahrenheit' }
+    $w = Invoke-RestMethod -TimeoutSec 5 -Uri $url
+    @{ state = 'ok'; place = $p.name; temp = $w.current.temperature_2m; code = $w.current.weather_code; day = [bool]$w.current.is_day
+        unit = $(if ($fahrenheit) { 'F' } else { 'C' }) }
+}
+
+# Every 15 minutes (5 after an error); sends changes, and at least every 30 minutes.
+function Update-Weather {
+    if ((Get-Date) -lt $script:weatherNext) { return }
+    $script:weatherNext = (Get-Date).AddMinutes(15)
+    try { $state = Read-Weather }
+    catch {
+        $script:weatherNext = (Get-Date).AddMinutes(5)
+        $e = $_.Exception; while ($e.InnerException) { $e = $e.InnerException }
+        $state = @{ state = 'error'; error = $e.Message }
+    }
+    if ($state.error -ne $script:weatherError) {
+        $script:weatherError = $state.error
+        if ($state.error) { Write-Log "weather: $($state.error)" }
+    }
+    $key = $state | ConvertTo-Json -Compress
+    if ($key -eq $script:weatherSent -and ((Get-Date) - $script:weatherSentAt).TotalMinutes -lt 30) { return }
+    [void](Send-Json 'weather' $state)
+    $script:weatherSent = $key
+    $script:weatherSentAt = Get-Date
+}
+
 # Links the Car Thing asks to open: https links of known meeting services, and GitHub.
 $OpenableUrl ='^https://(meet\.google\.com|([a-z0-9-]+\.)?zoom\.us|teams\.microsoft\.com|teams\.live\.com|github\.com)/'
 
@@ -1215,6 +1271,7 @@ if ($Once) {
     Read-Audio | ConvertTo-Json
     $audioLists | ConvertTo-Json -Depth 4
     try { Read-Plex | ConvertTo-Json -Depth 6 } catch { "plex: $($_.Exception.Message)" }
+    try { Read-Weather | ConvertTo-Json } catch { "weather: $($_.Exception.Message)" }
     try { Read-TrueNas | ConvertTo-Json -Depth 5 } catch { $e = $_.Exception; while ($e.InnerException) { $e = $e.InnerException }; "truenas: $($e.Message)" }
     exit
 }
@@ -1264,6 +1321,7 @@ while ($true) {
             $hueSent = $null; $hueFetched = [DateTime]::MinValue
             $plexSent = $null; $plexNext = [DateTime]::MinValue
             $nasSent = $null; $nasNext = [DateTime]::MinValue
+            $weatherSent = $null; $weatherNext = [DateTime]::MinValue
         }
         # Stats (and the focused app) every 2 s; the reply may ask to kill that app, open a
         # meeting link or resend the calendars.
@@ -1354,7 +1412,7 @@ while ($true) {
     # The volume four times a second between rounds, so the Car Thing's volume bar follows the dial.
     for ($tick = 0; $tick -lt 4; $tick++) {
         if ($tunnelUp) {
-            try { Update-Audio; Update-Hue; Update-Plex; Update-TrueNas } catch { Write-Log "update failed: $($_.Exception.Message)"; $tunnelUp = $false }
+            try { Update-Audio; Update-Hue; Update-Plex; Update-TrueNas; Update-Weather } catch { Write-Log "update failed: $($_.Exception.Message)"; $tunnelUp = $false }
         }
         Start-Sleep -Milliseconds 250
     }

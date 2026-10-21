@@ -3,7 +3,7 @@
 
 Sends the Car Thing the computer's time (for its clock) and lock state, system stats
 (CPU, memory, GPU, network), the focused app, the volume and audio devices, the
-calendars listed in calendars.txt, the Plex server in plex.txt, the TrueNAS server in truenas.txt,
+calendars listed in calendars.txt, the Plex server in plex.txt, the TrueNAS server in truenas.txt, the weather for weather.txt,
 and what it is playing, over USB through
 `adb forward`. It also opens meeting links, kills the focused app and switches audio
 devices when the Car Thing asks. What is playing comes from:
@@ -1298,6 +1298,78 @@ class TrueNasLink:
         self.sent, self.sent_at = key, time.monotonic()
 
 
+# ------------------------------------------------------------------ Weather
+
+# For the large clocks. weather.txt next to calendars.txt: a place on the first line ("Paris",
+# "Paris, France", or "48.85, 2.35"), and "fahrenheit" on a second line for °F. Open-Meteo
+# (open-meteo.com) needs no key; a name is looked up once with its geocoder.
+WEATHER_FILE = os.path.join(os.path.dirname(CALENDAR_FILE), 'weather.txt')
+
+
+class WeatherLink:
+    """Reads the weather every 15 minutes (5 after an error) and sends it when it changes,
+    and at least every 30 minutes."""
+
+    def __init__(self):
+        self.place = {'query': None}
+        self.next = 0.0
+        self.sent, self.sent_at, self.error = None, 0.0, None
+
+    @staticmethod
+    def get(url):
+        with urllib.request.urlopen(url, timeout=5) as r:
+            return json.loads(r.read().decode('utf-8'))
+
+    def read(self):
+        try:
+            with open(WEATHER_FILE, encoding='utf-8') as f:
+                lines = [l.strip() for l in f if l.strip() and not l.strip().startswith('#')]
+        except OSError:
+            lines = []
+        if not lines:
+            return {'state': 'none'}
+        query, fahrenheit = lines[0], len(lines) > 1 and lines[1].lower().startswith('f')
+        if self.place['query'] != query:
+            m = re.match(r'^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$', query)
+            if m:
+                self.place = {'query': query, 'lat': float(m.group(1)), 'lon': float(m.group(2)), 'name': None}
+            else:
+                # "Paris, France": the geocoder takes the name; a country after the comma picks among the matches.
+                name, _, country = (part.strip() for part in query.partition(','))
+                found = self.get('https://geocoding-api.open-meteo.com/v1/search?count=10&language=en&name=' +
+                                 urllib.parse.quote(name)).get('results') or []
+                hits = [r for r in found if not country or (r.get('country') or '').lower().startswith(country.lower())
+                        or (r.get('country_code') or '').lower() == country.lower()]
+                if not hits:
+                    raise ValueError("Open-Meteo doesn't know \"%s\": check the first line of weather.txt" % query)
+                self.place = {'query': query, 'lat': hits[0]['latitude'], 'lon': hits[0]['longitude'], 'name': hits[0].get('name')}
+        p = self.place
+        w = self.get('https://api.open-meteo.com/v1/forecast?latitude=%s&longitude=%s&current=temperature_2m,weather_code,is_day%s'
+                     % (p['lat'], p['lon'], '&temperature_unit=fahrenheit' if fahrenheit else ''))
+        current = w.get('current') or {}
+        return {'state': 'ok', 'place': p['name'], 'temp': current.get('temperature_2m'), 'code': current.get('weather_code'),
+                'day': bool(current.get('is_day')), 'unit': 'F' if fahrenheit else 'C'}
+
+    def update(self):
+        if time.monotonic() < self.next:
+            return
+        self.next = time.monotonic() + 15 * 60
+        try:
+            state = self.read()
+        except (OSError, ValueError, KeyError, TypeError) as e:
+            self.next = time.monotonic() + 5 * 60
+            state = {'state': 'error', 'error': str(getattr(e, 'reason', None) or e)}
+        if state.get('error') != self.error:
+            self.error = state.get('error')
+            if self.error:
+                log('weather:', self.error)
+        key = json.dumps(state, sort_keys=True)
+        if key == self.sent and time.monotonic() - self.sent_at < 30 * 60:
+            return
+        send('weather', state)
+        self.sent, self.sent_at = key, time.monotonic()
+
+
 def fetch_calendars():
     """(ics text, error text), or None when there is no calendars.txt."""
     try:
@@ -1416,6 +1488,10 @@ def main():
             print(json.dumps(TrueNasLink().read(), indent=2, ensure_ascii=False))
         except (OSError, ValueError, KeyError, TypeError, AttributeError) as e:
             print('truenas:', e)
+        try:
+            print(json.dumps(WeatherLink().read(), indent=2, ensure_ascii=False))
+        except (OSError, ValueError, KeyError, TypeError) as e:
+            print('weather:', e)
         return
     log('started (adb: %s, port %d)' % (ADB, PORT))
     tunnel = False
@@ -1427,6 +1503,7 @@ def main():
     hue = HueLink()
     plex = PlexLink()
     truenas = TrueNasLink()
+    weather = WeatherLink()
     calendars, calendars_fetched, fetched_hash, calendar_hash = None, None, None, None
     github, github_fetched, github_busy = GitHub(), None, False
     while True:
@@ -1445,6 +1522,7 @@ def main():
                 hue.sent, hue.fetched = None, 0.0
                 plex.sent, plex.next = None, 0.0
                 truenas.sent, truenas.next = None, 0.0
+                weather.sent, weather.next = None, 0.0
             # Stats (and the focused app) every 2 s, and right away when another app comes to the
             # front; the reply may ask to kill that app, open a meeting link or resend the calendars.
             focused = focus()
@@ -1537,6 +1615,7 @@ def main():
             hue.update()
             plex.update()
             truenas.update()
+            weather.update()
         except (OSError, ValueError) as e:
             log('update failed:', e)
             tunnel = False
