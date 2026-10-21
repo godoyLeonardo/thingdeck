@@ -266,7 +266,8 @@ login, survives unplugging and sleep, and needs `adb` (see [Requirements](#requi
 | macOS | `media-control` or `nowplaying-cli` (Spotify, browsers, Music, …), or Spotify and Music through AppleScript | `host/unix/install.sh` |
 
 - **Windows:** a Task Scheduler task at logon starts a tiny windowless launcher
-  in `%USERPROFILE%\.thingdeck`. Log: `%USERPROFILE%\.thingdeck\nowplaying.log`.
+  in `%USERPROFILE%\.thingdeck`. Log: `%USERPROFILE%\.thingdeck\nowplaying.log` (past
+  256 KB the older part moves to `nowplaying.log.1`).
 - **Linux:** a systemd user service (`thingdeck-agent`). Needs `playerctl`
   (`sudo dnf install playerctl`). Log: `journalctl --user -u thingdeck-agent`.
 - **macOS:** a LaunchAgent. `brew install media-control` is recommended: it works on
@@ -277,7 +278,9 @@ login, survives unplugging and sleep, and needs `adb` (see [Requirements](#requi
   which is sent the artist and album name. Lights, Plex and NAS also need
   **Local Network** access: turn on Python under System Settings → Privacy &
   Security → Local Network. Without it, the agent's requests to the bridge and
-  the servers fail with "No route to host".
+  the servers fail with "No route to host". Log:
+  `~/Library/Application Support/thingdeck/nowplaying.log` (past 256 KB the older
+  part moves to `nowplaying.log.1`).
 
 Uninstall with `install.ps1 -Uninstall` or `install.sh --uninstall`. To check what
 the agent sees without installing: `nowplaying.ps1 -Once` or `nowplaying.py --once`.
