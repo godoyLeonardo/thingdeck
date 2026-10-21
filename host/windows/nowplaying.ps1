@@ -594,6 +594,33 @@ function Get-GitHub {
 $gitHubFetched = [DateTime]::MinValue
 $gitHubBusy = $false        # a run is queued or running: check more often
 
+# The details a card asks for when it opens on the Car Thing (through the command poll): for a
+# run, its number, attempt, actor, commit and jobs (each with its step counts, the step that
+# runs and the step that failed). gh takes a second or two; the loop waits for it.
+$RunDetailFields = '{number: .run_number, attempt: .run_attempt, actor: .actor.login, sha: .head_sha, commit: ((.head_commit.message // "") | split("\n")[0]), started: .run_started_at, status, conclusion, updated: .updated_at}'
+$JobFields = '[.jobs[] | {name, status, conclusion, started: .started_at, completed: .completed_at, steps: [.steps[]? | {name, status, conclusion}]}]'
+function Send-GitHubDetails($ask) {
+    $out = [ordered]@{ row = $ask.row; seq = $ask.seq; kind = $ask.kind }
+    try {
+        if (-not $script:ghExe) { $script:ghExe = (Get-Command gh.exe -ErrorAction SilentlyContinue).Source }
+        if (-not $script:ghExe) { throw 'Install the GitHub CLI (gh) and sign in (see README)' }
+        if ($ask.kind -eq 'run') {
+            $path = "repos/$($ask.repo)/actions/runs/$([long]$ask.run_id)"
+            $run = Invoke-Gh @('api', $path, '--jq', $RunDetailFields) | ConvertFrom-Json
+            foreach ($p in $run.PSObject.Properties) { $out[$p.Name] = $p.Value }
+            $jobs = Invoke-Gh @('api', "$path/jobs?per_page=100", '--jq', $JobFields) | ConvertFrom-Json
+            $out.jobs = @(foreach ($j in $jobs) {
+                $steps = @($j.steps)
+                [ordered]@{ name = $j.name; status = $j.status; conclusion = $j.conclusion; started = $j.started; completed = $j.completed
+                    steps = $steps.Count; done = @($steps | Where-Object { $_.status -eq 'completed' }).Count
+                    current = (@($steps | Where-Object { $_.status -eq 'in_progress' }) | Select-Object -First 1).name
+                    failed = (@($steps | Where-Object { $_.conclusion -eq 'failure' }) | Select-Object -First 1).name }
+            })
+        }
+    } catch { $out.error = $_.Exception.Message }
+    [void](Send-Json 'github/details' $out 6)
+}
+
 # --- Philips Hue. The Car Thing has no network, so the agent talks to the Hue Bridge (its
 # local API v2) and passes rooms, zones, lights and scenes on. The bridge's address and key
 # are in hue.json next to the log, written when you pair from the Car Thing's Lights page.
@@ -757,6 +784,7 @@ function Update-Hue {
     $polled = Invoke-RestMethod -Uri "http://127.0.0.1:$Port/api/commands" -TimeoutSec 5
     $commands = $polled.hue
     if ($polled.github_refresh) { $script:gitHubFetched = [DateTime]::MinValue }     # the refresh button on the Code page
+    if ($polled.github_details) { Send-GitHubDetails $polled.github_details }          # a card opened on the Code page
     $was = $script:visible
     $script:visible = @($polled.visible | Where-Object { $_ })
     foreach ($w in $script:visible) { if ($was -notcontains $w) { Show-Panel $w } }

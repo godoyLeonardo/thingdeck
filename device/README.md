@@ -311,6 +311,15 @@ its **Open on computer** button posts `POST /api/github/open {id}`, which sends 
 through the same `LinkOpener` as meeting links (the agent opens `https://github.com/`
 links and meeting links only).
 
+When a card opens, it asks for more: the page posts `POST /api/github/ask {id}`, and the
+next command poll (`GET /api/commands`) gives the agent `github_details`, `{row, seq, kind,
+repo, run_id}`. The agent reads the run (`repos/{repo}/actions/runs/{id}`) and its jobs
+(`…/jobs`) with `gh`, in a thread on Linux and macOS (the Windows loop waits for it), and
+posts `POST /api/github/details`. The service passes that on as the event `github_details`.
+A job comes with its step counts, the step that runs and the step that failed, not with
+every step. While the run goes on, the page asks again every 5 s; with no answer in 15 s,
+the card says so.
+
 ### What updates when
 
 The command poll's reply carries `visible`, the widgets of the page on screen
@@ -515,7 +524,7 @@ page, or `adb shell`).
 |---|---|---|---|
 | GET | `/api/ping` | | Health check (used by `shim.html`) |
 | GET | `/api/state` | | Config, state, presets, now playing, stats, agenda, audio, github, hue, plex, truenas |
-| GET | `/api/events` | | SSE stream: `state`, `config`, `fired`, `turn`, `hw`, `toast`, `nowplaying`, `stats`, `agenda`, `audio`, `github`, `hue`, `hue_dial`, `plex`, `truenas`, `view` |
+| GET | `/api/events` | | SSE stream: `state`, `config`, `fired`, `turn`, `hw`, `toast`, `nowplaying`, `stats`, `agenda`, `audio`, `github`, `github_details`, `hue`, `hue_dial`, `plex`, `truenas`, `view` |
 | GET | `/api/info` | | Uptime, temperature, memory, load, brightness |
 | POST | `/api/tap` | `{"page", "index"}` | Run a tile |
 | POST | `/api/preset` | `{"index"}` | Run a preset |
@@ -534,6 +543,8 @@ page, or `adb shell`).
 | POST | `/api/audio/set` | `{"id"}` | Make an output or input the default on the computer |
 | POST | `/api/github` | `{"repo", "runs", "prs", "error"?}` or `{"none": true}` | From the host agent |
 | POST | `/api/github/open` | `{"id"}` | Open a run or pull request on the computer |
+| POST | `/api/github/ask` | `{"id"}` | A card asks for its details (the agent fetches them) |
+| POST | `/api/github/details` | `{"row", "seq", "kind", …}` | From the host agent: the details a card asked for |
 | POST | `/api/hue` | `{"state", "rooms"?, "error"?}` | From the host agent |
 | POST | `/api/hue/command` | `{"op", "id"?, "on"?, "brightness"?, "mirek"?}` | Queue a Hue command for the agent |
 | POST | `/api/hue/select` | `{"id"}` | Make a room the target of the Lights dial mode |

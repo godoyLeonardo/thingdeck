@@ -561,6 +561,22 @@
   .sh-link { margin-top: 10px; font: 500 calc(12.5px * var(--ts)) GeistMono, monospace; color: var(--muted); word-break: break-all; }
   .sh-actions .btn { flex: none; min-width: 120px; padding: 0 18px; margin-left: 8px; }
   .sh-actions .btn.primary { background: var(--acc); color: var(--on-acc); }
+  /* a GitHub card: wider and taller, with a list of jobs that scrolls */
+  .sheet-card.gh-card { width: 720px; max-height: 452px; }
+  .sheet-card.gh-card > * { flex: none; }        /* only the list gives up height */
+  .sheet-card.gh-card > .sh-list { flex: 1 1 auto; }
+  .sh-line { margin-top: 4px; font-size: calc(14px * var(--ts)); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sh-line.bad { color: var(--bad); white-space: normal; }
+  .sh-sum { display: flex; align-items: center; margin-top: 10px; font: 600 calc(11.5px * var(--ts)) GeistMono, monospace;
+    letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+  .sh-sum .spin { margin-right: 8px; }
+  .sh-list { flex: 1; min-height: 0; margin-top: 4px; padding-right: 0; }
+  .sh-item { display: flex; align-items: center; padding: 4px 0; }
+  .sh-item .gh-st { width: 28px; height: 28px; margin-right: 10px; }
+  .sh-item .gh-st svg { width: 16px; height: 16px; }
+  .sh-name { font-size: calc(15px * var(--ts)); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sh-sub { font-size: calc(12.5px * var(--ts)); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sh-time { flex: none; margin-left: 12px; font: 500 calc(12.5px * var(--ts)) GeistMono, monospace; color: var(--muted); }
   /* audio: the volume bar (over everything) and, in a page's clock header, the output pill */
   #volhud { position: fixed; left: 50%; top: 12px; width: 400px; margin-left: -200px; height: 60px; z-index: 6;
     display: flex; align-items: center; padding: 0 20px; border-radius: 30px; background: var(--toast);
@@ -1729,9 +1745,11 @@ function openEvent(id) {
     .then(function (d) { if (sheetMode === 'event') render(d); }).catch(function () {});
 }
 function closeSheet() {
+  closeGitHubCard();
   sheetOpen = false;
   sheetMode = null;
   $('sheet').className = '';
+  $('sheetcard').className = 'sheet-card';
 }
 
 // ---- audio (from the computer agent): a volume bar when the volume or mute changes, and
@@ -2024,40 +2042,114 @@ function ghRow(id, state, title, sub, when, wrap) {
     '<div class="gh-when">' + when + '</div></div>';
 }
 // A run or pull request in a card: what it is, its state and times, and its link, with a
-// button that opens it on the computer (POST /api/github/open, by its id).
+// button that opens it on the computer (POST /api/github/open, by its id). When the card opens,
+// it asks the agent for more (POST /api/github/ask): a run's jobs and steps. While a run goes
+// on, it asks again every 5 s, and its times move every second.
 var RUN_STATES = { success: 'Succeeded', failure: 'Failed', timed_out: 'Timed out', startup_failure: 'Failed to start',
   action_required: 'Needs action', cancelled: 'Cancelled', skipped: 'Skipped', neutral: 'Neutral', stale: 'Stale' };
 var CHECKS = { SUCCESS: 'Checks pass', FAILURE: 'Checks fail', ERROR: 'Checks fail', PENDING: 'Checks run', EXPECTED: 'Checks wait' };
 var REVIEWS = { APPROVED: 'Approved', CHANGES_REQUESTED: 'Changes requested', REVIEW_REQUIRED: 'Review required' };
 function longTime(iso) { var ms = Date.parse(iso); return longDay(ms) + ' · ' + fmtClock(ms); }
 function since(iso) { var a = ago(iso); return a === 'now' ? 'just now' : a + ' ago'; }
+function fmtElapsed(ms) {
+  var s = Math.max(0, Math.round(ms / 1000)), m = Math.floor(s / 60), h = Math.floor(m / 60);
+  return h ? h + ' h ' + m % 60 + ' min' : m ? m + ' min ' + s % 60 + ' s' : s + ' s';
+}
+var ghCard = null;      // the open card: {id, details, asked, tick, again}
 function openGitHub(id) {
-  var g = github, run = (g.runs || []).filter(function (r) { return r.id === id; })[0];
-  var pr = (g.prs || []).filter(function (p) { return p.id === id; })[0], html;
+  closeGitHubCard();
+  ghCard = { id: id, details: null, asked: Date.now() };
+  $('sheetcard')._html = null;           // other cards set innerHTML themselves
+  if (!renderGitHubCard()) { ghCard = null; return; }
+  $('sheetcard').className = 'sheet-card gh-card';
+  $('sheet').className = 'show';
+  sheetOpen = true;
+  sheetMode = 'github';
+  ghCard.tick = setInterval(renderGitHubCard, 1000);      // the times move
+  askGitHub();
+}
+function askGitHub() {
+  if (!ghCard) return;
+  clearTimeout(ghCard.again);
+  post('/api/github/ask', { id: ghCard.id });
+}
+function closeGitHubCard() {
+  if (!ghCard) return;
+  clearInterval(ghCard.tick);
+  clearTimeout(ghCard.again);
+  ghCard = null;
+}
+function gitHubDetails(d) {              // the agent's answer
+  if (!ghCard || d.row !== ghCard.id) return;
+  ghCard.details = d;
+  renderGitHubCard();
+  if (ghLive(d)) ghCard.again = setTimeout(askGitHub, 5000);
+}
+function ghLive(d) { return !d.error && d.kind === 'run' && d.status !== 'completed'; }
+function ghWaiting(what) {
+  return '<div class="sh-sum">' + (Date.now() - ghCard.asked < 15000 ? '<i class="spin"></i>Loading the ' + what + '…'
+    : 'The computer agent did not answer') + '</div>';
+}
+function runCard(run, d, repo) {
+  var status = d ? d.status : run.status, conclusion = d ? d.conclusion : run.conclusion;
+  var start = Date.parse((d && d.started) || run.created);
+  var end = status === 'completed' ? Date.parse((d && d.updated) || run.updated) : Date.now();
+  var state = status === 'in_progress' ? 'Running · ' + fmtElapsed(end - start)
+    : status !== 'completed' ? 'Queued · ' + since(run.created)
+    : (RUN_STATES[conclusion] || 'Done') + ' in ' + fmtElapsed(end - start) + ' · ' + since((d && d.updated) || run.updated);
+  var label = 'Workflow run' + (d && d.number ? ' #' + d.number : '') + (d && d.attempt > 1 ? ' · attempt ' + d.attempt : '') + ' · ' + repo;
+  var who = [run.branch, run.event, d && d.actor ? 'by ' + d.actor : '', d && d.sha ? d.sha.slice(0, 7) : ''];
+  return '<div class="m-label">' + esc(label) + '</div>' +
+    '<div class="sh-title">' + esc(run.workflow) + '</div>' +
+    '<div class="sh-when">' + esc(state) + '</div>' +
+    '<div class="sh-where">' + esc(who.filter(function (x) { return x; }).join(' · ')) + '</div>' +
+    '<div class="sh-line">' + esc((d && d.commit) || run.title || '') + '</div>' +
+    (d ? jobList(d.jobs || []) : ghWaiting('jobs'));
+}
+// The jobs of a run: how many in each state, then each with the step it runs, the step that
+// failed or its step count, and how long it took (or takes so far).
+function jobList(jobs) {
+  if (!jobs.length) return '<div class="sh-sum">No jobs</div>';
+  var count = function (test) { return jobs.filter(test).length; };
+  var parts = [[count(function (j) { return j.conclusion === 'success'; }), 'passed'],
+    [count(function (j) { return /failure|timed_out|startup_failure/.test(j.conclusion); }), 'failed'],
+    [count(function (j) { return j.status === 'in_progress'; }), 'running'],
+    [count(function (j) { return j.status !== 'completed' && j.status !== 'in_progress'; }), 'waiting'],
+    [count(function (j) { return /cancelled|skipped|neutral/.test(j.conclusion); }), 'skipped']];
+  var summary = jobs.length + (jobs.length === 1 ? ' job: ' : ' jobs: ') +
+    parts.filter(function (p) { return p[0]; }).map(function (p) { return p[0] + ' ' + p[1]; }).join(', ');
+  return '<div class="sh-sum">' + esc(summary) + '</div><div class="ag-list sh-list">' + jobs.map(function (j) {
+    var running = j.status === 'in_progress', ran = running || j.status === 'completed';
+    var sub = running ? 'Step ' + Math.min(j.done + 1, j.steps) + ' of ' + j.steps + (j.current ? ': ' + j.current : '')
+      : j.failed ? 'Failed at: ' + j.failed : !ran ? 'Waiting' : j.steps + (j.steps === 1 ? ' step' : ' steps');
+    var time = ran && j.started ? fmtElapsed((j.completed ? Date.parse(j.completed) : Date.now()) - Date.parse(j.started)) : '';
+    var st = runState(j);
+    return '<div class="sh-item"><div class="gh-st st-' + st[0] + '">' + st[1] + '</div><div class="ev-main">' +
+      '<div class="sh-name">' + esc(j.name) + '</div><div class="sh-sub">' + esc(sub) + '</div></div>' +
+      '<div class="sh-time">' + time + '</div></div>';
+  }).join('') + '</div>';
+}
+function renderGitHubCard() {
+  if (!ghCard) return false;
+  var g = github, id = ghCard.id, d = ghCard.details, html;
+  var run = (g.runs || []).filter(function (r) { return r.id === id; })[0];
+  var pr = (g.prs || []).filter(function (p) { return p.id === id; })[0];
+  var ok = d && !d.error ? d : null;
   if (run) {
-    var running = run.status === 'in_progress', done = run.status === 'completed';
-    var state = running ? 'Running for ' + fmtLength(Math.max(60000, Date.now() - Date.parse(run.created)))
-      : !done ? 'Queued ' + since(run.created) : (RUN_STATES[run.conclusion] || 'Done') + ' · ' + since(run.updated);
-    html = '<div class="m-label">Workflow run · ' + esc((g.repo || '').split('/').pop()) + '</div>' +
-      '<div class="sh-title">' + esc(run.workflow) + '</div>' +
-      '<div class="sh-when">' + esc(state) + '</div>' +
-      '<div class="sh-where">' + esc([run.branch, run.event].filter(function (x) { return x; }).join(' · ')) + '</div>' +
-      '<div class="sh-notes">' + esc(run.title || '') + '<br>Started ' + esc(longTime(run.created)) +
-        (done ? ', took ' + esc(fmtLength(Math.max(60000, Date.parse(run.updated) - Date.parse(run.created)))) : '') + '</div>';
+    html = runCard(run, ok, (g.repo || '').split('/').pop());
   } else if (pr) {
     html = '<div class="m-label">Pull request · ' + esc(pr.repo + '#' + pr.number) + '</div>' +
       '<div class="sh-title">' + esc(pr.title) + '</div>' +
       '<div class="sh-when">' + esc([CHECKS[pr.checks] || 'No checks', pr.draft ? 'Draft' : ''].filter(function (x) { return x; }).join(' · ')) + '</div>' +
       '<div class="sh-where">' + esc(REVIEWS[pr.review] || 'No review yet') + '</div>' +
       '<div class="sh-notes">Updated ' + esc(longTime(pr.updated)) + '</div>';
-  } else return;
+  } else return false;
+  if (d && d.error) html += '<div class="sh-line bad">' + esc(d.error) + '</div>';
   var link = (run || pr).url || '';
-  $('sheetcard').innerHTML = html + (link ? '<div class="sh-link">' + esc(link.replace(/^https?:\/\//, '')) + '</div>' : '') +
+  redraw($('sheetcard'), html + (link ? '<div class="sh-link">' + esc(link.replace(/^https?:\/\//, '')) + '</div>' : '') +
     '<div class="sh-actions"><div class="btn primary" data-gh-open="' + esc(id) + '">Open on computer</div>' +
-    '<div class="btn" data-sheet-close="1">Close</div></div>';
-  $('sheet').className = 'show';
-  sheetOpen = true;
-  sheetMode = 'github';
+    '<div class="btn" data-sheet-close="1">Close</div></div>');
+  return true;
 }
 function updateGitHub() {
   var box = $('github');
@@ -2689,6 +2781,8 @@ function connect() {
       updateLights();
     } else if (m.type === 'hue_dial') {
       showLightHud(d.room);
+    } else if (m.type === 'github_details') {
+      gitHubDetails(d);
     } else if (m.type === 'github') {
       ghRefreshing = false;
       ghPull(0, false);
