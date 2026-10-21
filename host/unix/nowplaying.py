@@ -761,7 +761,7 @@ PR_QUERY = ('query { viewer { pullRequests(states: OPEN, first: 20, orderBy: {fi
             '{ nodes { number title url isDraft updatedAt reviewDecision repository { nameWithOwner } '
             'commits(last: 1) { nodes { commit { statusCheckRollup { state } } } } } } } }')
 # One request for the last 100 runs (gh run list makes a second one for the workflow names).
-RUN_FIELDS = ('[.workflow_runs[] | {workflow_id, name, display_title, status, conclusion, head_branch, event, '
+RUN_FIELDS = ('[.workflow_runs[] | {id, workflow_id, name, display_title, status, conclusion, head_branch, event, '
               'created_at, updated_at, html_url}]')
 
 
@@ -819,7 +819,7 @@ class GitHub:
                 result['runs'].append({'workflow': names[run['workflow_id']], 'status': run['status'],
                                        'conclusion': run['conclusion'] or '', 'branch': run['head_branch'],
                                        'title': run['display_title'], 'event': run['event'], 'created': run['created_at'],
-                                       'updated': run['updated_at'], 'url': run['html_url']})
+                                       'updated': run['updated_at'], 'url': run['html_url'], 'run_id': run['id']})
             prs = json.loads(gh('api', 'graphql', '--input', '-', stdin=json.dumps({'query': PR_QUERY})))
             for pr in prs['data']['viewer']['pullRequests']['nodes']:
                 commits = pr['commits']['nodes']

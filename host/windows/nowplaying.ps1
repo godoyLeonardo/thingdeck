@@ -513,7 +513,7 @@ $ghRepo = @{ name = ''; full = '' }        # the github.txt line and what it res
 $ghWorkflows = @{}                         # workflow id (as text: Int32 and Int64 keys differ) -> name
 $ghWorkflowsAt = [DateTime]::MinValue
 # One request for the last 100 runs (gh run list makes a second one for the workflow names).
-$RunFields = '[.workflow_runs[] | {workflow_id, name, display_title, status, conclusion, head_branch, event, created_at, updated_at, html_url}]'
+$RunFields = '[.workflow_runs[] | {id, workflow_id, name, display_title, status, conclusion, head_branch, event, created_at, updated_at, html_url}]'
 $PrQuery = '{"query":"query { viewer { pullRequests(states: OPEN, first: 20, orderBy: {field: UPDATED_AT, direction: DESC}) { nodes { number title url isDraft updatedAt reviewDecision repository { nameWithOwner } commits(last: 1) { nodes { commit { statusCheckRollup { state } } } } } } } }"}'
 
 # Run gh and read its output as UTF-8 (PowerShell 5.1 would decode it with the console code page).
@@ -576,7 +576,8 @@ function Get-GitHub {
             if ($seen.ContainsKey($id)) { continue }
             $seen[$id] = $true
             [ordered]@{ workflow = $script:ghWorkflows[$id]; status = $run.status; conclusion = "$($run.conclusion)"; branch = $run.head_branch
-                title = $run.display_title; event = $run.event; created = $run.created_at; updated = $run.updated_at; url = $run.html_url }
+                title = $run.display_title; event = $run.event; created = $run.created_at; updated = $run.updated_at; url = $run.html_url
+                run_id = $run.id }
         }
         $result.runs = @($latest | Select-Object -First 20)
         $prs = (Invoke-Gh @('api', 'graphql', '--input', '-') $PrQuery | ConvertFrom-Json).data.viewer.pullRequests.nodes
