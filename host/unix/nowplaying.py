@@ -1093,6 +1093,7 @@ TRUENAS_CALLS = [
     ('alert.list', []),
     ('app.query', [[], {'select': ['name', 'state', 'upgrade_available']}]),
     ('core.get_jobs', [[['state', '=', 'RUNNING']]]),      # no 'select': TrueNAS fails on it for jobs
+    ('update.status', []),                                 # a newer TrueNAS to install (25.10 and later)
 ]
 # The scheduled tasks, so the Car Thing can show the next one: (query, kind, fields that name it).
 TRUENAS_TASKS = [
@@ -1270,7 +1271,8 @@ class TrueNasLink:
         return {
             'state': 'ok',
             'system': {'host': info.get('hostname'), 'version': info.get('version'), 'uptime': int(info.get('uptime_seconds') or 0),
-                       'memory': info.get('physmem'), 'cores': info.get('cores'), 'load': list(info.get('loadavg') or [])},
+                       'memory': info.get('physmem'), 'cores': info.get('cores'), 'load': list(info.get('loadavg') or []),
+                       'update': ((((r.get('update.status') or {}).get('status') or {}).get('new_version') or {}).get('version'))},
             'pools': pools,
             'disks': disks,
             'alerts': [{'level': a.get('level'), 'text': re.sub(r'<[^>]+>', '', a.get('formatted') or '').strip()}
