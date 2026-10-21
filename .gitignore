@@ -12,6 +12,7 @@ github.txt
 hue.json
 plex.txt
 truenas.txt
+weather.txt
 *.tmp
 *.log
 
