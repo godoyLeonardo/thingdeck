@@ -1113,6 +1113,7 @@ $TrueNasTasks = @(
     @{ call = 'cronjob.query'; kind = 'cron'; names = @('description', 'command') }
 )
 
+$nasFailed = @{}      # TrueNAS calls that failed: logged once, until they work again (an older TrueNAS lacks some)
 function Read-TrueNas {
     Read-TrueNasConfig
     if (-not $script:nas.host) { return @{ state = 'none' } }
@@ -1132,8 +1133,9 @@ function Read-TrueNas {
         if ($reply.error) {
             $reason = $(if ($reply.error.data.reason) { $reply.error.data.reason } else { $reply.error.message })
             if ($calls[$i] -eq 'system.info') { throw "TrueNAS: $reason" }
-            Write-Log "truenas $($calls[$i]): $reason"; $result[$calls[$i]] = $null
-        } else { $result[$calls[$i]] = $reply.result }
+            if (-not $script:nasFailed.ContainsKey($calls[$i])) { $script:nasFailed[$calls[$i]] = $true; Write-Log "truenas $($calls[$i]): $reason" }
+            $result[$calls[$i]] = $null
+        } else { $script:nasFailed.Remove($calls[$i]); $result[$calls[$i]] = $reply.result }
     }
     $info = $result['system.info']
     $disks = @()

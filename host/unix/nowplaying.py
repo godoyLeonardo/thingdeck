@@ -1203,6 +1203,7 @@ class TrueNasLink:
 
     def __init__(self):
         self.host = self.key = None
+        self.failed = set()       # calls that failed, logged once
         self.next = 0.0
         self.sent, self.sent_at, self.error = None, 0.0, None
 
@@ -1216,7 +1217,8 @@ class TrueNasLink:
         self.host, self.key = host, (lines[1] if len(lines) > 1 else None)
 
     def call_all(self):
-        """Log in with the key and run TRUENAS_CALLS: {method: result or None}."""
+        """Log in with the key and run TRUENAS_CALLS: {method: result or None}. A call that fails
+        is logged once, until it works again (an older TrueNAS lacks some of them)."""
         ws = WebSocket(self.host, '/api/current')
         try:
             results = {}
@@ -1235,7 +1237,11 @@ class TrueNasLink:
                     reason = (error.get('data') or {}).get('reason') or error.get('message')
                     if method == 'system.info':
                         raise ValueError('TrueNAS: %s' % reason)
-                    log('truenas %s: %s' % (method, reason))
+                    if method not in self.failed:
+                        self.failed.add(method)
+                        log('truenas %s: %s' % (method, reason))
+                else:
+                    self.failed.discard(method)
                 results[method] = reply.get('result')
             return results
         finally:
