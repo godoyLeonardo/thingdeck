@@ -168,7 +168,7 @@ them to the Car Thing **over the USB cable** (`adb forward`; no network):
 - **Now playing:** the Media page shows the cover, title, artist, album, the app it
   plays in, playing/paused and a live progress bar, on a card tinted with the cover's
   colors, with round media controls under the progress bar. When nothing is playing
-  it says so; the controls work either way.
+  the card shows a large clock and the date over the controls, which work either way.
 - **Calendar:** the Calendar page shows today, tomorrow and the rest of the next two
   weeks (− and + at the top left show 1 to 4 weeks) from your calendars (see [Adding
   your calendar](#adding-your-calendar)): repeating events, moved or cancelled

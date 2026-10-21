@@ -165,7 +165,8 @@ A page with `"header": "clock"` (Media, Lights, Calendar, Status, Code and Plex,
 shows a big clock and the date in place of the preset labels and dial chip, as long
 as the agent has set the time; the presets and dial still work. A page with
 `"nowplaying": true` (Media) is the media card: cover, details and progress on top
-(or "Nothing playing"), and its tiles as a compact row of controls below.
+(with nothing playing: a large clock and the date, while the top bar hides its own),
+and its tiles as a compact row of round controls below.
 
 ### Touch UI
 
