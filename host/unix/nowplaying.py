@@ -1414,7 +1414,14 @@ def main():
                     time.sleep(3)
                     continue
                 tunnel = True
+                # A new connection (start, replug, the Car Thing restarted): it may have lost
+                # everything, so send it all again now instead of at each part's next turn.
                 last_signature, cover_sent_for, last_host, calendar_hash = None, '', None, None
+                github_fetched = None
+                audio.sent = audio.lists_sent = None
+                hue.sent, hue.fetched = None, 0.0
+                plex.sent, plex.next = None, 0.0
+                truenas.sent, truenas.next = None, 0.0
             # Stats (and the focused app) every 2 s, and right away when another app comes to the
             # front; the reply may ask to kill that app, open a meeting link or resend the calendars.
             focused = focus()
