@@ -216,7 +216,9 @@ clears them. The reply carries a meeting link to open (`open`) and whether the
 service needs the calendars again (`need_calendar`, e.g. after a restart), so the
 agent needs no second request.
 
-**Calendars:** the agent downloads the addresses in `calendars.txt` every 5 minutes and
+**Calendars:** the agent downloads the addresses in `calendars.txt` every 5 minutes (every
+minute while the Calendar page is on screen or `calendar_soon` is true, see [What updates
+when](#what-updates-when)) and
 posts the iCal text as it is to `POST /api/calendar` when it changes (`?none=1`: no
 `calendars.txt`; `?error=`: a download failed). `ics.py` reads it here, so the logic
 exists once for every OS: VTIMEZONE observances (DST included), RRULE
@@ -553,7 +555,7 @@ page, or `adb shell`).
 | POST | `/api/plex` | `{"state", "server"?, "sessions"?, "load"?, "net"?, "libraries"?, "activities"?, "posters"?, "error"?}` | From the host agent every 3 s. Replies `{"need_art": [keys]}` |
 | GET | `/api/plex/art?k=…` | | A stream's poster |
 | POST | `/api/truenas` | `{"state", "system"?, "pools"?, "disks"?, "alerts"?, "apps"?, "jobs"?, "error"?}` | From the host agent every 10 s on screen, 60 s otherwise |
-| GET | `/api/commands` | | For the host agent: queued commands (`{"hue": [...], "github_refresh": bool}`, emptied on read) and the panels on screen (`"visible"`) |
+| GET | `/api/commands` | | For the host agent: queued commands (`{"hue": [...], "github_refresh": bool, "github_details": ask or null}`, emptied on read), the panels on screen (`"visible"`) and `"calendar_soon"` |
 | POST | `/api/github/refresh` | | Ask the agent to read GitHub now (pull down on the Code page) |
 | POST | `/api/run` | any action | Run an action |
 | POST | `/api/system` | `{"do": "reconnect" \| "restart" \| "reboot"}` | Reconnect USB (software replug) / restart service / reboot |
