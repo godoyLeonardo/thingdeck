@@ -39,7 +39,7 @@ as soon as you plug it in.
   playing with its cover, Philips Hue lights, your calendar with Join buttons,
   CPU/memory/GPU/network graphs, a kill switch for the app in focus, GitHub Actions
   runs and pull requests, the streams and load of your Plex server, your TrueNAS
-  pools, disks, alerts, apps and running jobs, a volume bar,
+  pools, disks, alerts, apps and running jobs, the weather under the large clocks, a volume bar,
   an audio device picker, a clock and a lock screen (see [Computer agent](#computer-agent)).
 - **Standby screen** while the computer sleeps; the pad reconnects by itself
   when it wakes up.
@@ -247,6 +247,11 @@ them to the Car Thing **over the USB cable** (`adb forward`; no network):
   The time shows large with the date at the top of the live pages (Media, Lights,
   Calendar, Status, Code, Plex, NAS), and on the standby and lock
   screens; 24h/12h is under Settings → General → Clock.
+- **Weather:** under the large clocks (Media with nothing playing, the lock and
+  standby screens): the temperature and the sky with its icon (sun or moon by the
+  time of day); while something plays, the Media page's top bar shows the icon and
+  temperature next to the date. From [Open-Meteo](https://open-meteo.com) every 15
+  minutes (see [Adding the weather](#adding-the-weather)).
 - **Lock screen:** while the computer is locked, the Car Thing shows the clock,
   "🔒 Computer locked", the cover and what's playing, and media buttons. Tiles,
   presets and dial modes that press keys are blocked while locked, so nothing gets
@@ -391,6 +396,19 @@ self-signed certificate for that address only. The agent only reads (system info
 disk temperatures, alerts, apps, running jobs). The key carries the rights of the user
 who made it, so for read-only access, make it as a user in the read-only administrators
 group. Keep `truenas.txt` to yourself.
+
+### Adding the weather
+
+Put your place on the first line of `weather.txt`, next to `calendars.txt`: a city
+(`Paris`), a city and its country when the name is common (`Paris, France`), or
+`latitude, longitude` (`48.85, 2.35`). For °F, add a second line `fahrenheit`.
+Lines starting with `#` are ignored.
+
+The agent asks [Open-Meteo](https://open-meteo.com) every 15 minutes; it needs no
+account or key. A name is looked up once with Open-Meteo's geocoder. The place you
+put there is sent to Open-Meteo, so use coordinates of your town rather than your
+street if that matters to you. The weather shows within 15 minutes, or at once after
+the agent restarts.
 
 ## When the computer sleeps
 

@@ -436,6 +436,20 @@ INFO ones. A call waits at most 5 s, because the Windows agent's main loop waits
 `"truenas"` shows pools as tanks (80% yellow, 90% red), disk temperatures (45/55 °C,
 NVMe 60/70 °C), alerts, apps and running jobs.
 
+### Weather
+
+The agent reads `weather.txt` (a place, then optionally `fahrenheit`) and asks
+Open-Meteo every 15 minutes (5 after an error) for the current `temperature_2m`,
+`weather_code` and `is_day`. A place name is looked up once with Open-Meteo's geocoder
+(a country after a comma picks among the matches). It posts `POST /api/weather` with
+`{state, place, temp, code, day, unit}` when that changes, and at least every 30
+minutes. `HostWeather` keeps it for 2 hours without an update, so it still shows on the
+standby screen for a while after the computer sleeps. The UI puts it in every
+`.bigweather` (under the large clocks of the idle Media card, the lock and the standby
+screens: an icon and words for the WMO weather code, and the temperature) and in
+`#topweather`, the top bar's icon and temperature, shown on the Media page while
+something plays (`body.media-page:not(.media-idle)`).
+
 ### Tab order
 
 `state.json` keeps `page_order`, a list of page keys (a page's `name`), and
@@ -536,8 +550,8 @@ page, or `adb shell`).
 | Method | Path | Body | Purpose |
 |---|---|---|---|
 | GET | `/api/ping` | | Health check (used by `shim.html`) |
-| GET | `/api/state` | | Config, state, presets, now playing, stats, agenda, audio, github, hue, plex, truenas |
-| GET | `/api/events` | | SSE stream: `state`, `config`, `fired`, `turn`, `hw`, `toast`, `nowplaying`, `stats`, `agenda`, `audio`, `github`, `github_details`, `hue`, `hue_dial`, `plex`, `truenas`, `view` |
+| GET | `/api/state` | | Config, state, presets, now playing, stats, agenda, audio, github, hue, plex, truenas, weather |
+| GET | `/api/events` | | SSE stream: `state`, `config`, `fired`, `turn`, `hw`, `toast`, `nowplaying`, `stats`, `agenda`, `audio`, `github`, `github_details`, `hue`, `hue_dial`, `plex`, `truenas`, `weather`, `view` |
 | GET | `/api/info` | | Uptime, temperature, memory, load, brightness |
 | POST | `/api/tap` | `{"page", "index"}` | Run a tile |
 | POST | `/api/preset` | `{"index"}` | Run a preset |
@@ -564,6 +578,7 @@ page, or `adb shell`).
 | POST | `/api/plex` | `{"state", "server"?, "sessions"?, "load"?, "net"?, "libraries"?, "activities"?, "posters"?, "error"?}` | From the host agent every 3 s. Replies `{"need_art": [keys]}` |
 | GET | `/api/plex/art?k=…` | | A stream's poster |
 | POST | `/api/truenas` | `{"state", "system"?, "pools"?, "disks"?, "alerts"?, "apps"?, "jobs"?, "error"?}` | From the host agent every 10 s on screen, 60 s otherwise |
+| POST | `/api/weather` | `{"state", "place"?, "temp"?, "code"?, "day"?, "unit"?, "error"?}` | From the host agent every 15 min |
 | GET | `/api/commands` | | For the host agent: queued commands (`{"hue": [...], "github_refresh": bool, "github_details": ask or null}`, emptied on read), the panels on screen (`"visible"`) and `"calendar_soon"` |
 | POST | `/api/github/refresh` | | Ask the agent to read GitHub now (pull down on the Code page) |
 | POST | `/api/run` | any action | Run an action |
