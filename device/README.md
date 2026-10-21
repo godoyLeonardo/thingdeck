@@ -180,6 +180,8 @@ to the start), and a drag that starts on the bar never switches pages. Details a
 the audio picker open as a card over the page; tapping outside it closes it.
 A live page's tab can show a dot after its name (`TAB_DOTS`, by widget): Plex while
 someone streams, and NAS in the accent color while TrueNAS answers or red when it fails.
+With updates waiting (apps, and a newer TrueNAS), the NAS tab shows their number in a
+badge, in the warning color.
 
 In a page's clock header, every page but the media card shows the song playing on
 the right (title, then artist, cut off from the end when space runs out); tapping
