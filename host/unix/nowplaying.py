@@ -774,6 +774,15 @@ RUN_DETAIL_FIELDS = ('{number: .run_number, attempt: .run_attempt, actor: .actor
                      'status, conclusion, updated: .updated_at}')
 JOB_FIELDS = ('[.jobs[] | {name, status, conclusion, started: .started_at, completed: .completed_at, '
               'steps: [.steps[]? | {name, status, conclusion}]}]')
+PR_DETAIL_JSON = 'state,isDraft,author,baseRefName,headRefName,additions,deletions,changedFiles,commits,comments,mergeable,mergeStateStatus,reviewDecision,labels,createdAt,latestReviews,reviewRequests,statusCheckRollup'
+PR_DETAIL_FIELDS = ('{state, draft: .isDraft, author: .author.login, base: .baseRefName, head: .headRefName, '
+                    'additions, deletions, files: .changedFiles, commits: (.commits | length), '
+                    'comments: (.comments | length), mergeable, merge_state: .mergeStateStatus, review: .reviewDecision, '
+                    'labels: [.labels[].name], created: .createdAt, reviews: [.latestReviews[] | {by: .author.login, state}], '
+                    'requested: [.reviewRequests[] | (.login // .name // .slug // "")], '
+                    'checks: [.statusCheckRollup[] | {name: (.name // .context // ""), workflow: (.workflowName // ""), '
+                    'status: (.status // ""), conclusion: (.conclusion // .state // ""), started: (.startedAt // ""), '
+                    'completed: (.completedAt // "")}]}')
 
 
 def gh(*args, stdin=None):
@@ -846,7 +855,8 @@ class GitHub:
 def github_details(ask):
     """The details for a card on the Car Thing: {row, seq, kind} and, for a run, its number,
     attempt, actor, commit and jobs (each with its step counts, the step that runs and the
-    step that failed), or {error}."""
+    step that failed); for a pull request, its branches, size, merge state, reviews and
+    checks; or {error}."""
     out = {'row': ask.get('row'), 'seq': ask.get('seq'), 'kind': ask.get('kind')}
     try:
         if ask.get('kind') == 'run':
@@ -858,6 +868,9 @@ def github_details(ask):
                 out['jobs'].append(dict(job, steps=len(steps), done=sum(1 for s in steps if s['status'] == 'completed'),
                                         current=next((s['name'] for s in steps if s['status'] == 'in_progress'), None),
                                         failed=next((s['name'] for s in steps if s['conclusion'] == 'failure'), None)))
+        elif ask.get('kind') == 'pr':
+            out.update(json.loads(gh('pr', 'view', str(int(ask['number'])), '--repo', ask['repo'],
+                                     '--json', PR_DETAIL_JSON, '--jq', PR_DETAIL_FIELDS)))
     except (OSError, ValueError, KeyError, TypeError, subprocess.TimeoutExpired) as e:
         out['error'] = str(e)
     return out

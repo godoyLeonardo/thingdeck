@@ -831,7 +831,7 @@ class GitHubStatus:
     def __init__(self, ui, opener):
         self.ui, self.opener = ui, opener
         self.links = {}
-        self.rows = {}            # row id -> what its card asks the agent for: {kind, repo, run_id}
+        self.rows = {}            # row id -> what its card asks the agent for: {kind, repo, run_id or number}
         self.ask, self.asks = None, 0     # the details a card asked for last, for the agent's next command poll
         self.published = {'state': 'unknown'}
         self.refresh = False      # a refresh asked for on the Car Thing, for the agent's next command poll
@@ -851,6 +851,8 @@ class GitHubStatus:
                 if isinstance(pr, dict):
                     prs.append(dict({k: pr.get(k) for k in GITHUB_FIELDS_PR}, id='pr%d' % i))
                     links['pr%d' % i] = str(pr.get('url') or '')
+                    if pr.get('repo') and pr.get('number'):
+                        rows['pr%d' % i] = {'kind': 'pr', 'repo': str(pr['repo']), 'number': pr['number']}
             self.links, self.rows = links, rows
             data = {'state': 'ok', 'repo': str(body.get('repo') or ''), 'runs': runs, 'prs': prs,
                     'error': str(body['error']) if body.get('error') else None, 'at': int(time.time() * 1000)}

@@ -312,13 +312,15 @@ through the same `LinkOpener` as meeting links (the agent opens `https://github.
 links and meeting links only).
 
 When a card opens, it asks for more: the page posts `POST /api/github/ask {id}`, and the
-next command poll (`GET /api/commands`) gives the agent `github_details`, `{row, seq, kind,
-repo, run_id}`. The agent reads the run (`repos/{repo}/actions/runs/{id}`) and its jobs
-(`…/jobs`) with `gh`, in a thread on Linux and macOS (the Windows loop waits for it), and
-posts `POST /api/github/details`. The service passes that on as the event `github_details`.
-A job comes with its step counts, the step that runs and the step that failed, not with
-every step. While the run goes on, the page asks again every 5 s; with no answer in 15 s,
-the card says so.
+next command poll (`GET /api/commands`) gives the agent `github_details`, `{row, seq,
+kind, repo, run_id or number}`. The agent reads the run
+(`repos/{repo}/actions/runs/{id}`) and its jobs (`…/jobs`), or the pull request (`gh pr
+view`: branches, size, merge state, reviews and the check rollup) with `gh`, in a thread
+on Linux and macOS (the Windows loop waits for it), and posts `POST
+/api/github/details`. The service passes that on as the event `github_details`. A job
+comes with its step counts, the step that runs and the step that failed, not with every
+step. While the run or a check goes on, the page asks again every 5 s; with no answer in
+15 s, the card says so.
 
 ### What updates when
 

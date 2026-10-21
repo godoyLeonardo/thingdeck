@@ -2043,8 +2043,9 @@ function ghRow(id, state, title, sub, when, wrap) {
 }
 // A run or pull request in a card: what it is, its state and times, and its link, with a
 // button that opens it on the computer (POST /api/github/open, by its id). When the card opens,
-// it asks the agent for more (POST /api/github/ask): a run's jobs and steps. While a run goes
-// on, it asks again every 5 s, and its times move every second.
+// it asks the agent for more (POST /api/github/ask): a run's jobs and steps, or a pull
+// request's checks, reviews, size and merge state. While a run or a check goes on, it asks
+// again every 5 s, and its times move every second.
 var RUN_STATES = { success: 'Succeeded', failure: 'Failed', timed_out: 'Timed out', startup_failure: 'Failed to start',
   action_required: 'Needs action', cancelled: 'Cancelled', skipped: 'Skipped', neutral: 'Neutral', stale: 'Stale' };
 var CHECKS = { SUCCESS: 'Checks pass', FAILURE: 'Checks fail', ERROR: 'Checks fail', PENDING: 'Checks run', EXPECTED: 'Checks wait' };
@@ -2085,7 +2086,11 @@ function gitHubDetails(d) {              // the agent's answer
   renderGitHubCard();
   if (ghLive(d)) ghCard.again = setTimeout(askGitHub, 5000);
 }
-function ghLive(d) { return !d.error && d.kind === 'run' && d.status !== 'completed'; }
+function ghLive(d) {
+  if (d.error) return false;
+  if (d.kind === 'run') return d.status !== 'completed';
+  return (d.checks || []).some(function (c) { var k = checkState(c)[0]; return k === 'run' || k === 'wait'; });
+}
 function ghWaiting(what) {
   return '<div class="sh-sum">' + (Date.now() - ghCard.asked < 15000 ? '<i class="spin"></i>Loading the ' + what + '…'
     : 'The computer agent did not answer') + '</div>';
@@ -2129,6 +2134,56 @@ function jobList(jobs) {
       '<div class="sh-time">' + time + '</div></div>';
   }).join('') + '</div>';
 }
+// A pull request's check: a GitHub Actions job (status, then conclusion) or a commit status (state only).
+function checkState(c) {
+  var k = c.conclusion;
+  if (c.status === 'IN_PROGRESS' || !c.status && k === 'PENDING') return ['run', '<i class="spin"></i>'];
+  if (c.status && c.status !== 'COMPLETED' || k === 'EXPECTED') return ['wait', icon('clock')];
+  if (k === 'SUCCESS') return ['ok', icon('check')];
+  if (/FAILURE|ERROR|TIMED_OUT|STARTUP_FAILURE/.test(k)) return ['bad', icon('x')];
+  if (k === 'ACTION_REQUIRED') return ['warn', icon('alert')];
+  return ['off', icon('slash')];                                    // cancelled, skipped, neutral, stale
+}
+var CHECK_WORDS = { ok: 'passed', bad: 'failed', run: 'running', wait: 'waiting', warn: 'need action', off: 'skipped' };
+var MERGE_STATES = { CLEAN: 'Can merge', HAS_HOOKS: 'Can merge', UNSTABLE: 'Can merge, not all checks pass',
+  BLOCKED: 'Blocked: it needs reviews or checks', BEHIND: 'Behind its base branch', DIRTY: 'Has conflicts',
+  DRAFT: 'A draft: it cannot merge yet', UNKNOWN: 'Checking if it can merge' };
+function plural(n, word) { return n + ' ' + word + (n === 1 ? '' : 's'); }
+function prCard(pr, d) {
+  var label = 'Pull request · ' + pr.repo + '#' + pr.number;
+  if (!d) {
+    return '<div class="m-label">' + esc(label) + '</div><div class="sh-title">' + esc(pr.title) + '</div>' +
+      '<div class="sh-when">' + esc([CHECKS[pr.checks] || 'No checks', pr.draft ? 'Draft' : ''].filter(function (x) { return x; }).join(' · ')) + '</div>' +
+      '<div class="sh-where">' + esc(REVIEWS[pr.review] || 'No review yet') + '</div>' + ghWaiting('checks');
+  }
+  var ORDER = ['bad', 'run', 'warn', 'wait', 'ok', 'off'];          // what needs a look first
+  var checks = (d.checks || []).map(function (c, i) { return [ORDER.indexOf(checkState(c)[0]), i, c]; })
+    .sort(function (a, b) { return a[0] - b[0] || a[1] - b[1]; }).map(function (x) { return x[2]; }), counts = {};
+  checks.forEach(function (c) { var k = checkState(c)[0]; counts[k] = (counts[k] || 0) + 1; });
+  var summary = checks.length ? plural(checks.length, 'check') + ': ' + ['ok', 'bad', 'run', 'wait', 'warn', 'off']
+    .filter(function (k) { return counts[k]; }).map(function (k) { return counts[k] + ' ' + CHECK_WORDS[k]; }).join(', ') : 'No checks';
+  var by = function (state) { return (d.reviews || []).filter(function (r) { return r.state === state; }).map(function (r) { return r.by; }); };
+  var reviews = [[by('APPROVED'), 'Approved by '], [by('CHANGES_REQUESTED'), 'Changes asked by '], [by('COMMENTED'), 'Comments by '],
+    [(d.requested || []).filter(function (x) { return x; }), 'Waiting for ']]
+    .filter(function (r) { return r[0].length; }).map(function (r) { return r[1] + r[0].join(', '); }).join(' · ');
+  return '<div class="m-label">' + esc(label) + '</div>' +
+    '<div class="sh-title">' + esc(pr.title) + '</div>' +
+    '<div class="sh-when">' + esc([d.draft ? 'Draft' : '', MERGE_STATES[d.merge_state] || (d.mergeable === 'CONFLICTING' ? 'Has conflicts' : '')]
+      .filter(function (x) { return x; }).join(' · ') || 'Open') + '</div>' +
+    '<div class="sh-where">' + esc(d.head + ' → ' + d.base + ' · by ' + d.author) + '</div>' +
+    '<div class="sh-line">' + esc(['+' + d.additions + ' −' + d.deletions + ' in ' + plural(d.files, 'file'), plural(d.commits, 'commit'),
+      plural(d.comments, 'comment'), (d.labels || []).length ? 'labels: ' + d.labels.join(', ') : ''].filter(function (x) { return x; }).join(' · ')) + '</div>' +
+    '<div class="sh-line">' + esc(reviews || REVIEWS[d.review] || 'No reviews yet') + '</div>' +
+    '<div class="sh-line">' + esc('Opened ' + longTime(d.created) + ' · updated ' + since(pr.updated)) + '</div>' +
+    '<div class="sh-sum">' + esc(summary) + '</div>' + (checks.length ? '<div class="ag-list sh-list">' + checks.map(function (c) {
+      var st = checkState(c), start = Date.parse(c.started);
+      var end = st[0] !== 'run' && /^[12]/.test(c.completed) ? Date.parse(c.completed) : Date.now();   // a running one ends in year 0001
+      var time = st[0] !== 'wait' && /^[12]/.test(c.started) ? fmtElapsed(end - start) : '';
+      return '<div class="sh-item"><div class="gh-st st-' + st[0] + '">' + st[1] + '</div><div class="ev-main">' +
+        '<div class="sh-name">' + esc(c.name) + '</div><div class="sh-sub">' + esc(c.workflow || 'Status') + '</div></div>' +
+        '<div class="sh-time">' + time + '</div></div>';
+    }).join('') + '</div>' : '');
+}
 function renderGitHubCard() {
   if (!ghCard) return false;
   var g = github, id = ghCard.id, d = ghCard.details, html;
@@ -2138,11 +2193,7 @@ function renderGitHubCard() {
   if (run) {
     html = runCard(run, ok, (g.repo || '').split('/').pop());
   } else if (pr) {
-    html = '<div class="m-label">Pull request · ' + esc(pr.repo + '#' + pr.number) + '</div>' +
-      '<div class="sh-title">' + esc(pr.title) + '</div>' +
-      '<div class="sh-when">' + esc([CHECKS[pr.checks] || 'No checks', pr.draft ? 'Draft' : ''].filter(function (x) { return x; }).join(' · ')) + '</div>' +
-      '<div class="sh-where">' + esc(REVIEWS[pr.review] || 'No review yet') + '</div>' +
-      '<div class="sh-notes">Updated ' + esc(longTime(pr.updated)) + '</div>';
+    html = prCard(pr, ok);
   } else return false;
   if (d && d.error) html += '<div class="sh-line bad">' + esc(d.error) + '</div>';
   var link = (run || pr).url || '';
