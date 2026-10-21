@@ -653,9 +653,22 @@
   .np-empty .np-controls { margin-top: 28px; }
   /* nothing playing: a large clock in the card, controls under it; the top bar's clock steps aside */
   .np-idle { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-  .np-idle .bigclock { font-size: 150px; font-weight: 600; letter-spacing: -.04em; }
-  .np-idle .bigdate { font-size: calc(24px * var(--ts)); margin-top: 4px; }
-  .np-idle .np-controls { width: 100%; max-width: 440px; margin-top: 22px; }
+  .np-idle .bigclock { font-size: 128px; font-weight: 600; letter-spacing: -.04em; }
+  .np-idle .bigdate { font-size: calc(22px * var(--ts)); margin-top: 2px; }
+  .np-idle .bigweather { margin-top: 6px; }
+  .np-idle .np-controls { width: 100%; max-width: 440px; margin-top: 16px; }
+  /* the weather under a large clock's date: icon, temperature, sky, today's high / low */
+  .bigweather { display: flex; align-items: center; margin-top: 12px; font-size: calc(21px * var(--ts)); color: var(--muted); white-space: nowrap; }
+  .bigweather.hidden { display: none; }
+  /* the top bar's weather chip: only on the Media page while something plays (idle, the big clock has it) */
+  #topweather { display: none; align-items: center; flex: none; margin-left: 16px; font-size: calc(22px * var(--ts)); font-weight: 600;
+    font-variant-numeric: tabular-nums; }
+  body.media-page:not(.media-idle) #topweather:not(.hidden) { display: inline-flex; }
+  #topweather svg { width: 26px; height: 26px; margin-right: 6px; color: var(--acc); }
+  #topweather .emoji { font-size: 22px; margin-right: 6px; }
+  .bigweather svg { width: 30px; height: 30px; margin-right: 10px; color: var(--acc); }
+  .bigweather .emoji { font-size: 26px; margin-right: 10px; }
+  .bigweather b { color: var(--text); font-weight: 700; margin-right: 10px; font-variant-numeric: tabular-nums; }
   body.media-idle .tc-time, body.media-idle .tc-suffix, body.media-idle .tc-date { visibility: hidden; }
   .tile.mini .label { font-size: calc(14px * var(--ts)); font-weight: 600; margin-top: 4px; max-width: 100%; text-align: center;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -829,7 +842,7 @@
 </head>
 <body>
   <div id="top">
-    <div id="topclock"><span class="tc-time"></span><span class="tc-suffix"></span><span class="tc-date"></span><div id="topnp" data-goto-media="1"></div><div id="audiopill" data-audio="1"></div></div>
+    <div id="topclock"><span class="tc-time"></span><span class="tc-suffix"></span><span class="tc-date"></span><span id="topweather" class="hidden"></span><div id="topnp" data-goto-media="1"></div><div id="audiopill" data-audio="1"></div></div>
     <div id="presets"></div>
     <div id="dial">
       <svg viewBox="0 0 26 26" fill="none"><circle cx="13" cy="13" r="10.5" style="stroke:var(--muted)" stroke-width="2"/><line x1="13" y1="4.5" x2="13" y2="9.5" style="stroke:var(--acc)" stroke-width="2.4" stroke-linecap="round"/></svg>
@@ -906,6 +919,7 @@
   <div id="lockscreen">
     <div class="bigclock"><span class="bc-time"></span><span class="bc-suffix"></span></div>
     <div class="bigdate"></div>
+    <div class="bigweather hidden"></div>
     <div id="lktitle">🔒 Computer locked</div>
     <div id="lknp" class="hidden"><img id="lkart" class="hidden" alt=""><div class="lknp-text"><div id="lknpt"></div><div id="lknpa"></div></div></div>
     <div id="lkcontrols">
@@ -916,6 +930,7 @@
     <div id="sbicon">💤</div>
     <div class="bigclock"><span class="bc-time"></span><span class="bc-suffix"></span></div>
     <div class="bigdate"></div>
+    <div class="bigweather hidden"></div>
     <div id="sbtitle"></div>
     <div id="sbhint">The pad comes back when the computer wakes up</div>
     <div id="sbstuck">Stuck here while your PC is on? <span class="btn" data-sys="reconnect">Reconnect</span></div>
@@ -943,6 +958,8 @@ function load() {
     hue = j.hue || hue;
     plex = j.plex || plex;
     truenas = j.truenas || truenas;
+    weather = j.weather || weather;
+    updateWeather();
     render();
   });
 }
@@ -1119,6 +1136,7 @@ function render() {
   document.body.classList.toggle('settings', showSettings);
   document.body.classList.toggle('topclock', !showSettings && page.header === 'clock' && !!st.clock);
   document.body.classList.toggle('media-idle', !showSettings && !!page.nowplaying && !np && !!st.clock);
+  document.body.classList.toggle('media-page', !showSettings && !!page.nowplaying);
   if (showSettings) renderSettings();
   renderStatus();
   updateAudioPill();
@@ -1469,7 +1487,17 @@ var ICON_LINES = {
   alert:      ['<path d="M12 4l9 16H3z"/><path d="M12 10v4M12 17.5h.01"/>', '⚠️'],
   pr:         ['<circle cx="6" cy="6" r="2.2"/><circle cx="6" cy="18" r="2.2"/><circle cx="18" cy="18" r="2.2"/><path d="M6 8.2v7.6M18 15.8V10a3 3 0 0 0-3-3h-4m2 2l-2-2 2-2"/>', '🔀'],
   bulb:       ['<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.7.7 1 1.4 1 2.5h6c0-1.1.3-1.8 1-2.5A6 6 0 0 0 12 3z"/>', '💡'],
-  power:      ['<path d="M12 3v9M6.3 6.3a8 8 0 1 0 11.4 0"/>', '⏻']
+  power:      ['<path d="M12 3v9M6.3 6.3a8 8 0 1 0 11.4 0"/>', '⏻'],
+  // weather (the large clocks)
+  wsun:       ['<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/>', '☀️'],
+  wmoon:      ['<path d="M19.5 14.5A7.5 7.5 0 1 1 9.5 4.5a6 6 0 0 0 10 10z"/>', '🌙'],
+  wpartsun:   ['<circle cx="8" cy="8" r="3"/><path d="M8 2.5v1.3M2.5 8h1.3M4.1 4.1l.9.9M11.9 4.1l-.9.9"/><path d="M9 20h8a3.5 3.5 0 0 0 .3-7 5 5 0 0 0-9.4 1.3A3 3 0 0 0 9 20z"/>', '⛅'],
+  wpartmoon:  ['<path d="M11.5 9A4 4 0 1 1 6.5 4a3.2 3.2 0 0 0 5 5z"/><path d="M9 20h8a3.5 3.5 0 0 0 .3-7 5 5 0 0 0-9.4 1.3A3 3 0 0 0 9 20z"/>', '☁️'],
+  wcloud:     ['<path d="M7 18h10a4 4 0 0 0 .4-8 6 6 0 0 0-11.3 1.6A3.3 3.3 0 0 0 7 18z"/>', '☁️'],
+  wfog:       ['<path d="M7 12h10a4 4 0 0 0 .4-8 6 6 0 0 0-11.3 1.6A3.3 3.3 0 0 0 7 12z"/><path d="M4 16h16M6 20h12"/>', '🌫️'],
+  wrain:      ['<path d="M7 14h10a4 4 0 0 0 .4-8 6 6 0 0 0-11.3 1.6A3.3 3.3 0 0 0 7 14z"/><path d="M8.5 17l-1 3M12.5 17l-1 3M16.5 17l-1 3"/>', '🌧️'],
+  wsnow:      ['<path d="M7 14h10a4 4 0 0 0 .4-8 6 6 0 0 0-11.3 1.6A3.3 3.3 0 0 0 7 14z"/><path d="M8 17.5h.01M12 17.5h.01M16 17.5h.01M10 20.5h.01M14 20.5h.01"/>', '🌨️'],
+  wstorm:     ['<path d="M7 14h10a4 4 0 0 0 .4-8 6 6 0 0 0-11.3 1.6A3.3 3.3 0 0 0 7 14z"/><path d="M12.5 14l-2.5 4h3.5l-2.5 4"/>', '⛈️']
 };
 function icon(name) {
   var style = iconStyle(), shape = ICON_SETS[style][name], line = ICON_LINES[name];
@@ -1531,7 +1559,7 @@ function renderNowPlaying(page, g) {
   } else if (st.clock) {
     // Nothing playing: a large clock and the date (the top bar hides its own meanwhile).
     top = '<div class="np-idle"><div class="bigclock"><span class="bc-time"></span><span class="bc-suffix"></span></div>' +
-      '<div class="bigdate"></div></div>';
+      '<div class="bigdate"></div><div class="bigweather hidden"></div></div>';
   } else {
     // No clock means no computer agent, so no track info at all.
     top = '<div class="np-art">' + icon('note') + '</div><div class="np-info np-empty">' +
@@ -1551,6 +1579,7 @@ function renderNowPlaying(page, g) {
   g.innerHTML = '<div class="np-top' + (cached ? ' tinted' : '') + '"' + (cached ? ' style="' + cached + '"' : '') + '><div class="np-glow"></div>' +
     top.replace(/<\/div>$/, '<div class="np-controls">' + controls + '</div></div>');
   tick();       // fill the large clock now, not at the next second
+  updateWeather();
   updateNowPlaying();
 }
 
@@ -2686,6 +2715,32 @@ function tick() {
 }
 setInterval(tick, 1000);
 
+// ---- weather under the large clocks (idle Media, lock, standby), from the agent's weather.txt
+var weather = { state: 'unknown' };
+// Open-Meteo's weather codes (WMO): [day icon, night icon, words]
+var WMO = [
+  [[0], 'wsun', 'wmoon', 'Clear'], [[1], 'wsun', 'wmoon', 'Mostly clear'], [[2], 'wpartsun', 'wpartmoon', 'Partly cloudy'],
+  [[3], 'wcloud', 'wcloud', 'Cloudy'], [[45, 48], 'wfog', 'wfog', 'Fog'], [[51, 53, 55], 'wrain', 'wrain', 'Drizzle'],
+  [[56, 57, 66, 67], 'wrain', 'wrain', 'Freezing rain'], [[61, 63, 65], 'wrain', 'wrain', 'Rain'],
+  [[71, 73, 75, 77], 'wsnow', 'wsnow', 'Snow'], [[80, 81, 82], 'wrain', 'wrain', 'Showers'],
+  [[85, 86], 'wsnow', 'wsnow', 'Snow showers'], [[95, 96, 99], 'wstorm', 'wstorm', 'Thunderstorm']
+];
+function updateWeather() {
+  var w = weather, ok = w.state === 'ok' && w.temp != null;
+  var sky = ok && WMO.filter(function (r) { return r[0].indexOf(w.code) >= 0; })[0];
+  var deg = function (v) { return Math.round(v) + '°'; };
+  var pic = ok && sky ? icon(w.day === false ? sky[2] : sky[1]) : '';
+  var html = !ok ? '' : pic + '<b>' + deg(w.temp) + '</b>' + (sky ? esc(sky[3]) : '');
+  each('.bigweather', function (el) {
+    el.classList.toggle('hidden', !ok);
+    if (el._html !== html) el.innerHTML = el._html = html;
+  });
+  // The top bar's chip (the Media page while something plays): icon and temperature.
+  var chip = ok ? pic + deg(w.temp) : '', top = $('topweather');
+  top.classList.toggle('hidden', !ok);
+  if (top._html !== chip) top.innerHTML = top._html = chip;
+}
+
 // ---- lock screen: the computer is locked (from the agent). Only media keys go through;
 // the service refuses keystrokes so nothing gets typed into the password box.
 var lockShown = false;
@@ -2855,6 +2910,9 @@ function connect() {
       plex = d;
       updatePlex();
       updateTabDots();
+    } else if (m.type === 'weather') {
+      weather = d;
+      updateWeather();
     } else if (m.type === 'truenas') {
       truenas = d;
       updateNas();
