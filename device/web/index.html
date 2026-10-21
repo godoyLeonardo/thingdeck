@@ -790,6 +790,9 @@
   .tab-dot { display: none; width: 8px; height: 8px; margin-left: 6px; border-radius: 50%; vertical-align: 2px; }
   .tab-dot.alive { display: inline-block; background: var(--acc); }
   .tab-dot.dead { display: inline-block; background: var(--bad); }
+  .tab-dot.update { display: inline-block; width: auto; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px;
+    background: var(--warn); color: var(--on-acc); font-size: calc(12.5px * var(--ts)); font-weight: 700; line-height: 20px;
+    text-align: center; vertical-align: 1px; }      /* a number: updates that wait */
   #status { flex: none; display: flex; align-items: center; font: 500 calc(12px * var(--ts)) GeistMono, monospace; color: var(--muted); margin-left: 8px; }
   #status i { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); margin-right: 7px; }
   #status.connected i { background: var(--acc); box-shadow: 0 0 8px var(--acc); }      /* the accent; red (.bad) when it fails */
@@ -1008,14 +1011,21 @@ function variant(a) {
 
 // The page entries in the order picked in Settings → Tabs (same rules as Pad.ordered_pages).
 function pageKey(p) { return p.name; }
-// The dot after a page's name in the bottom bar, by its widget: '' (none) or a class of .tab-dot.
+// The mark after a page's name in the bottom bar, by its widget: [a class of .tab-dot, its text].
+// A dot, a badge with a number, or nothing ('').
 var TAB_DOTS = {
-  plex: function () { return plex.state === 'ok' && (plex.sessions || []).length ? 'alive' : ''; },     // someone streams
-  truenas: function () { return { ok: 'alive', error: 'dead' }[truenas.state] || ''; }                  // answers or fails
+  plex: function () { return [plex.state === 'ok' && (plex.sessions || []).length ? 'alive' : '', '']; },  // someone streams
+  truenas: function () {        // fails (red), has updates waiting (their number), or answers
+    if (truenas.state !== 'ok') return [truenas.state === 'error' ? 'dead' : '', ''];
+    var updates = (truenas.apps || []).filter(function (a) { return a.update; }).length + ((truenas.system || {}).update ? 1 : 0);
+    return updates ? ['update', String(updates)] : ['alive', ''];
+  }
 };
 function updateTabDots() {
   [].forEach.call(document.querySelectorAll('[data-dot]'), function (dot) {
-    dot.className = 'tab-dot ' + TAB_DOTS[dot.getAttribute('data-dot')]();
+    var mark = TAB_DOTS[dot.getAttribute('data-dot')]();
+    dot.className = 'tab-dot ' + mark[0];
+    dot.textContent = mark[1];
   });
 }
 function orderedEntries(withHidden) {
