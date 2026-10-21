@@ -651,6 +651,12 @@
   .np-empty .np-title { margin-top: 0; }
   .np-empty .np-album { margin-top: 8px; white-space: normal; }
   .np-empty .np-controls { margin-top: 28px; }
+  /* nothing playing: a large clock in the card, controls under it; the top bar's clock steps aside */
+  .np-idle { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .np-idle .bigclock { font-size: 150px; font-weight: 600; letter-spacing: -.04em; }
+  .np-idle .bigdate { font-size: calc(24px * var(--ts)); margin-top: 4px; }
+  .np-idle .np-controls { width: 100%; max-width: 440px; margin-top: 22px; }
+  body.media-idle .tc-time, body.media-idle .tc-suffix, body.media-idle .tc-date { visibility: hidden; }
   .tile.mini .label { font-size: calc(14px * var(--ts)); font-weight: 600; margin-top: 4px; max-width: 100%; text-align: center;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   #grid.swipe-l { transform: translateX(-24px); opacity: 0; }
@@ -1112,6 +1118,7 @@ function render() {
   applyTheme();
   document.body.classList.toggle('settings', showSettings);
   document.body.classList.toggle('topclock', !showSettings && page.header === 'clock' && !!st.clock);
+  document.body.classList.toggle('media-idle', !showSettings && !!page.nowplaying && !np && !!st.clock);
   if (showSettings) renderSettings();
   renderStatus();
   updateAudioPill();
@@ -1521,8 +1528,12 @@ function renderNowPlaying(page, g) {
         '<div class="np-progress" id="np-progress"><div class="np-bar"><i id="np-fill"></i></div>' +
           '<div class="np-times"><span id="np-pos"></span><span id="np-dur"></span></div></div>' +
       '</div>';
+  } else if (st.clock) {
+    // Nothing playing: a large clock and the date (the top bar hides its own meanwhile).
+    top = '<div class="np-idle"><div class="bigclock"><span class="bc-time"></span><span class="bc-suffix"></span></div>' +
+      '<div class="bigdate"></div></div>';
   } else {
-    // A clock means the computer agent is running; without it there's no track info at all.
+    // No clock means no computer agent, so no track info at all.
     top = '<div class="np-art">' + icon('note') + '</div><div class="np-info np-empty">' +
       '<div class="np-title">Nothing playing</div>' +
       (st.clock ? '' : '<div class="np-album">Install the computer agent to see what’s playing (see README).</div>') + '</div>';
@@ -1539,6 +1550,7 @@ function renderNowPlaying(page, g) {
   var cached = np && np.art && coverStyle(np.art);
   g.innerHTML = '<div class="np-top' + (cached ? ' tinted' : '') + '"' + (cached ? ' style="' + cached + '"' : '') + '><div class="np-glow"></div>' +
     top.replace(/<\/div>$/, '<div class="np-controls">' + controls + '</div></div>');
+  tick();       // fill the large clock now, not at the next second
   updateNowPlaying();
 }
 
