@@ -11,6 +11,7 @@ calendars.txt
 github.txt
 hue.json
 plex.txt
+truenas.txt
 *.tmp
 *.log
 
