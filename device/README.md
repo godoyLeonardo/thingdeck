@@ -331,8 +331,15 @@ The command poll's reply carries `visible`, the widgets of the page on screen
 often and the rest slowly:
 Hue 2 s / 30 s, Plex 3 s / 30 s, TrueNAS 10 s / 60 s, GitHub 1 min (15 s while a workflow runs) / 5 min, and
 the GPU part of the stats 2 s / 30 s (the rest of the stats, the song, audio, the host
-heartbeat and the calendars keep their pace). A widget that comes on screen is read at
-once. `PLEX_TTL` is 75 s so slow Plex updates don't expire.
+heartbeat keep their pace). A widget that comes on screen is read at once (the calendars
+at most twice a minute). The calendars are read every minute while the Calendar page is on
+screen or the poll's `calendar_soon` is true (`Agenda.soon()`: a timed event starts within
+15 minutes, so a late change still reaches the reminder), else every 5 minutes. `PLEX_TTL`
+is 75 s so slow Plex updates don't expire.
+
+When the forward comes back (the agent's start, a replug, the Car Thing restarted), the
+agent forgets what it last sent and sends everything at once: the song and cover, the
+heartbeat, the calendars, audio, Hue, Plex, TrueNAS and GitHub.
 
 ### Philips Hue
 

@@ -253,8 +253,10 @@ them to the Car Thing **over the USB cable** (`adb forward`; no network):
 The agent works hardest for the page on screen: Lights, Status (its GPU reading), Code,
 Plex and NAS update every few seconds while you look at them and slowly otherwise (every
 30 seconds; GitHub every 5 minutes, NAS every minute), and opening one of them fetches
-its data right away.
-What the other screens need (the song, volume, lock state, calendar) keeps its usual pace.
+its data right away. The calendars are read every 5 minutes, and every minute while the
+Calendar page is on screen or an event starts within 15 minutes. What the other screens
+need (the song, volume, lock state) keeps its usual pace. When the Car Thing reconnects
+(after a restart, an unplug or sleep), the agent sends everything again at once.
 
 Install it once per computer (and once per OS on a dual-boot PC). It starts at
 login, survives unplugging and sleep, and needs `adb` (see [Requirements](#requirements)):
