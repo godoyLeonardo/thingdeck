@@ -1250,7 +1250,14 @@ while ($true) {
             # Only now call adb: on start and after a failed send (unplugged, rebooted).
             if (-not (Invoke-Adb 'start-server') -or -not (Invoke-Adb "forward tcp:$Port tcp:8765")) { Start-Sleep -Seconds 3; continue }
             $tunnelUp = $true
+            # A new connection (start, replug, the Car Thing restarted): it may have lost
+            # everything, so send it all again now instead of at each part's next turn.
             $lastSignature = $null; $coverSentFor = ''; $lastHost = $null; $calendarHash = $null
+            $gitHubFetched = [DateTime]::MinValue
+            $audioSent = $null; $audioListsSent = $null
+            $hueSent = $null; $hueFetched = [DateTime]::MinValue
+            $plexSent = $null; $plexNext = [DateTime]::MinValue
+            $nasSent = $null; $nasNext = [DateTime]::MinValue
         }
         # Stats (and the focused app) every 2 s; the reply may ask to kill that app, open a
         # meeting link or resend the calendars.
