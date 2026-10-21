@@ -408,8 +408,9 @@ The agent reads the TrueNAS server in `truenas.txt` (address, then an API key) t
 its JSON-RPC 2.0 API over a WebSocket, `wss://<address>/api/current` (TrueNAS 25.04+;
 the REST API is deprecated there). Each read opens one connection, calls
 `auth.login_with_api_key`, then `system.info`, `pool.query` (only the fields it shows,
-through `select`), `disk.temperatures`, `alert.list`, `app.query` and `core.get_jobs`
-(the `RUNNING` jobs; without `select`, because TrueNAS fails on it for jobs), and the
+through `select`), `disk.temperatures`, `alert.list`, `app.query`, `core.get_jobs`
+(the `RUNNING` jobs; without `select`, because TrueNAS fails on it for jobs) and
+`update.status` (TrueNAS 25.10 and later: `system.update` is the newer version, if any), and the
 scheduled tasks (`pool.scrub.query`, `pool.snapshottask.query`, `replication.query`,
 `cloudsync.query`, `rsynctask.query`, `cronjob.query`), and closes it. Replies are
 matched by `id`, so notifications in between are skipped. A failing call other than

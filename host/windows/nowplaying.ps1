@@ -1118,13 +1118,14 @@ function Read-TrueNas {
     Read-TrueNasConfig
     if (-not $script:nas.host) { return @{ state = 'none' } }
     if (-not $script:nas.key) { throw 'No API key: put one on the second line of truenas.txt' }
-    $calls = @('system.info', 'pool.query', 'disk.temperatures', 'alert.list', 'app.query', 'core.get_jobs') + @($TrueNasTasks | ForEach-Object { $_.call })
+    $calls = @('system.info', 'pool.query', 'disk.temperatures', 'alert.list', 'app.query', 'core.get_jobs', 'update.status') + @($TrueNasTasks | ForEach-Object { $_.call })
     $params = '[]',
         '[[], {"select": ["name", "status", "healthy", "size", "allocated", "free", "scan"]}]',
         '[[]]',
         '[]',
         '[[], {"select": ["name", "state", "upgrade_available"]}]',
-        '[[["state", "=", "RUNNING"]]]'                    # no "select": TrueNAS fails on it for jobs
+        '[[["state", "=", "RUNNING"]]]',                   # no "select": TrueNAS fails on it for jobs
+        '[]'                                               # update.status: a newer TrueNAS to install (25.10 and later)
     $params = @($params) + @($TrueNasTasks | ForEach-Object { '[]' })
     $replies = [ThingdeckNas]::Call($script:nas.host, $script:nas.key, $calls, $params) | ConvertFrom-Json
     $result = @{}
@@ -1148,7 +1149,8 @@ function Read-TrueNas {
     @{
         state = 'ok'
         system = [ordered]@{ host = $info.hostname; version = $info.version; uptime = [long]$info.uptime_seconds
-            memory = $info.physmem; cores = $info.cores; load = @($info.loadavg) }
+            memory = $info.physmem; cores = $info.cores; load = @($info.loadavg)
+            update = $(if ($result['update.status'].status.new_version) { $result['update.status'].status.new_version.version } else { $null }) }
         pools = @(foreach ($p in $result['pool.query']) {
             [ordered]@{ name = $p.name; status = $p.status; healthy = [bool]$p.healthy
                 size = $p.size; used = $p.allocated; free = $p.free
