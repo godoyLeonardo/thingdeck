@@ -500,6 +500,7 @@
   .nas-sys { flex: none; margin-top: 6px; padding: 8px 0 4px; border-top: 1px solid var(--line); font: 500 calc(12.5px * var(--ts)) GeistMono, monospace;
     color: var(--muted); line-height: 1.5; }
   .nas-sys div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .nas-sys .nas-upd { color: var(--warn); font-weight: 700; }
   .px-num.warn, .m-value.warn { color: var(--warn); }
   .px-num.bad, .m-value.bad { color: var(--bad); }
   .m-value.good { color: var(--good); }
@@ -2620,6 +2621,7 @@ function updateNas() {
       '<div class="ag-empty">No pools</div>') + '</div>');
   // The server under the disks: version, uptime, cores, memory and load.
   var sysInfo = '<div class="nas-sys">' + line([sys.version ? 'TrueNAS ' + esc(String(sys.version).replace(/^TrueNAS-/, '')) : '']) +
+    (sys.update ? '<div class="nas-upd">TrueNAS ' + esc(String(sys.update).replace(/^TrueNAS-/, '')) + ' is out</div>' : '') +
     line([sys.uptime ? 'up ' + fmtUptime(sys.uptime) : '', sys.load && sys.load.length ? 'load ' + Number(sys.load[0]).toFixed(1) : '']) +
     line([sys.cores ? sys.cores + ' cores' : '', sys.memory ? fmtBytes(sys.memory) + ' RAM' : '']) + '</div>';
   var hot = disks.filter(function (d) { return d.temp != null; });
