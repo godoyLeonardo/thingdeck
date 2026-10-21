@@ -204,12 +204,17 @@ them to the Car Thing **over the USB cable** (`adb forward`; no network):
   bar on screen like the volume one). "All off" turns every room off. See
   [Connecting Philips Hue](#connecting-philips-hue).
 - **Code (GitHub):** the latest run of each workflow in one repository (up to 20:
-  running, queued, passed, failed or cancelled, with branch, commit and time) and
-  your open pull requests on any repository, with their checks, review state and
-  draft flag. Both lists scroll. Tap a row for its details and its link, and **Open on
-  computer** to open it in the browser there.
-  It refreshes every minute, or every 15 seconds while a workflow runs; pull down on either
-  list to fetch it right away (see [Adding GitHub](#adding-github)).
+  running, queued, passed, failed or cancelled, with branch, commit and time) and your
+  open pull requests on any repository, with their checks, review state and draft flag.
+  Both lists scroll. Tap a row for a card with its details and its link. For a workflow
+  run, the card shows its number, who started it and the commit, how long it runs, and
+  each job with its state, the step it runs or the step that failed, and its time; for a
+  pull request, its branches, author and size, whether it can merge, who reviewed it and
+  who still has to, and each check with its state and time, failing and running ones
+  first. While a run or a check goes on, the card updates every 5 seconds. **Open on
+  computer** opens the run or pull request in the browser there. It refreshes every
+  minute, or every 15 seconds while a workflow runs; pull down on either list to fetch
+  it right away (see [Adding GitHub](#adding-github)).
 - **Plex:** the streams on your Plex Media Server, and a dot on the Plex tab while
   someone streams. Each stream shows its poster, the user and player, the progress and
   the quality. A tag shows how the server sends it: direct play, direct stream, or

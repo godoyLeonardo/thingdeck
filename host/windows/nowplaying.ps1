@@ -513,7 +513,7 @@ $ghRepo = @{ name = ''; full = '' }        # the github.txt line and what it res
 $ghWorkflows = @{}                         # workflow id (as text: Int32 and Int64 keys differ) -> name
 $ghWorkflowsAt = [DateTime]::MinValue
 # One request for the last 100 runs (gh run list makes a second one for the workflow names).
-$RunFields = '[.workflow_runs[] | {workflow_id, name, display_title, status, conclusion, head_branch, event, created_at, updated_at, html_url}]'
+$RunFields = '[.workflow_runs[] | {id, workflow_id, name, display_title, status, conclusion, head_branch, event, created_at, updated_at, html_url}]'
 $PrQuery = '{"query":"query { viewer { pullRequests(states: OPEN, first: 20, orderBy: {field: UPDATED_AT, direction: DESC}) { nodes { number title url isDraft updatedAt reviewDecision repository { nameWithOwner } commits(last: 1) { nodes { commit { statusCheckRollup { state } } } } } } } }"}'
 
 # Run gh and read its output as UTF-8 (PowerShell 5.1 would decode it with the console code page).
@@ -576,7 +576,8 @@ function Get-GitHub {
             if ($seen.ContainsKey($id)) { continue }
             $seen[$id] = $true
             [ordered]@{ workflow = $script:ghWorkflows[$id]; status = $run.status; conclusion = "$($run.conclusion)"; branch = $run.head_branch
-                title = $run.display_title; event = $run.event; created = $run.created_at; updated = $run.updated_at; url = $run.html_url }
+                title = $run.display_title; event = $run.event; created = $run.created_at; updated = $run.updated_at; url = $run.html_url
+                run_id = $run.id }
         }
         $result.runs = @($latest | Select-Object -First 20)
         $prs = (Invoke-Gh @('api', 'graphql', '--input', '-') $PrQuery | ConvertFrom-Json).data.viewer.pullRequests.nodes
@@ -592,6 +593,39 @@ function Get-GitHub {
 }
 $gitHubFetched = [DateTime]::MinValue
 $gitHubBusy = $false        # a run is queued or running: check more often
+
+# The details a card asks for when it opens on the Car Thing (through the command poll): for a
+# run, its number, attempt, actor, commit and jobs (each with its step counts, the step that
+# runs and the step that failed); for a pull request, its branches, size, merge state,
+# reviews and checks. gh takes a second or two; the loop waits for it.
+$RunDetailFields = '{number: .run_number, attempt: .run_attempt, actor: .actor.login, sha: .head_sha, commit: ((.head_commit.message // "") | split("\n")[0]), started: .run_started_at, status, conclusion, updated: .updated_at}'
+$JobFields = '[.jobs[] | {name, status, conclusion, started: .started_at, completed: .completed_at, steps: [.steps[]? | {name, status, conclusion}]}]'
+$PrDetailJson = 'state,isDraft,author,baseRefName,headRefName,additions,deletions,changedFiles,commits,comments,mergeable,mergeStateStatus,reviewDecision,labels,createdAt,latestReviews,reviewRequests,statusCheckRollup'
+$PrDetailFields = '{state, draft: .isDraft, author: .author.login, base: .baseRefName, head: .headRefName, additions, deletions, files: .changedFiles, commits: (.commits | length), comments: (.comments | length), mergeable, merge_state: .mergeStateStatus, review: .reviewDecision, labels: [.labels[].name], created: .createdAt, reviews: [.latestReviews[] | {by: .author.login, state}], requested: [.reviewRequests[] | (.login // .name // .slug // "")], checks: [.statusCheckRollup[] | {name: (.name // .context // ""), workflow: (.workflowName // ""), status: (.status // ""), conclusion: (.conclusion // .state // ""), started: (.startedAt // ""), completed: (.completedAt // "")}]}'
+function Send-GitHubDetails($ask) {
+    $out = [ordered]@{ row = $ask.row; seq = $ask.seq; kind = $ask.kind }
+    try {
+        if (-not $script:ghExe) { $script:ghExe = (Get-Command gh.exe -ErrorAction SilentlyContinue).Source }
+        if (-not $script:ghExe) { throw 'Install the GitHub CLI (gh) and sign in (see README)' }
+        if ($ask.kind -eq 'run') {
+            $path = "repos/$($ask.repo)/actions/runs/$([long]$ask.run_id)"
+            $run = Invoke-Gh @('api', $path, '--jq', $RunDetailFields) | ConvertFrom-Json
+            foreach ($p in $run.PSObject.Properties) { $out[$p.Name] = $p.Value }
+            $jobs = Invoke-Gh @('api', "$path/jobs?per_page=100", '--jq', $JobFields) | ConvertFrom-Json
+            $out.jobs = @(foreach ($j in $jobs) {
+                $steps = @($j.steps)
+                [ordered]@{ name = $j.name; status = $j.status; conclusion = $j.conclusion; started = $j.started; completed = $j.completed
+                    steps = $steps.Count; done = @($steps | Where-Object { $_.status -eq 'completed' }).Count
+                    current = (@($steps | Where-Object { $_.status -eq 'in_progress' }) | Select-Object -First 1).name
+                    failed = (@($steps | Where-Object { $_.conclusion -eq 'failure' }) | Select-Object -First 1).name }
+            })
+        } elseif ($ask.kind -eq 'pr') {
+            $pr = Invoke-Gh @('pr', 'view', [string][int]$ask.number, '--repo', $ask.repo, '--json', $PrDetailJson, '--jq', $PrDetailFields) | ConvertFrom-Json
+            foreach ($p in $pr.PSObject.Properties) { $out[$p.Name] = $p.Value }
+        }
+    } catch { $out.error = $_.Exception.Message }
+    [void](Send-Json 'github/details' $out 6)
+}
 
 # --- Philips Hue. The Car Thing has no network, so the agent talks to the Hue Bridge (its
 # local API v2) and passes rooms, zones, lights and scenes on. The bridge's address and key
@@ -756,6 +790,7 @@ function Update-Hue {
     $polled = Invoke-RestMethod -Uri "http://127.0.0.1:$Port/api/commands" -TimeoutSec 5
     $commands = $polled.hue
     if ($polled.github_refresh) { $script:gitHubFetched = [DateTime]::MinValue }     # the refresh button on the Code page
+    if ($polled.github_details) { Send-GitHubDetails $polled.github_details }          # a card opened on the Code page
     $was = $script:visible
     $script:visible = @($polled.visible | Where-Object { $_ })
     foreach ($w in $script:visible) { if ($was -notcontains $w) { Show-Panel $w } }

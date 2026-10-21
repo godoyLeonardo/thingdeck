@@ -831,6 +831,8 @@ class GitHubStatus:
     def __init__(self, ui, opener):
         self.ui, self.opener = ui, opener
         self.links = {}
+        self.rows = {}            # row id -> what its card asks the agent for: {kind, repo, run_id or number}
+        self.ask, self.asks = None, 0     # the details a card asked for last, for the agent's next command poll
         self.published = {'state': 'unknown'}
         self.refresh = False      # a refresh asked for on the Car Thing, for the agent's next command poll
 
@@ -838,20 +840,40 @@ class GitHubStatus:
         if body.get('none'):
             data = {'state': 'none'}
         else:
-            runs, prs, links = [], [], {}
+            runs, prs, links, rows = [], [], {}, {}
             for i, run in enumerate(body.get('runs') or []):
                 if isinstance(run, dict):
                     runs.append(dict({k: run.get(k) for k in GITHUB_FIELDS_RUN}, id='run%d' % i))
                     links['run%d' % i] = str(run.get('url') or '')
+                    if run.get('run_id'):
+                        rows['run%d' % i] = {'kind': 'run', 'repo': str(body.get('repo') or ''), 'run_id': run['run_id']}
             for i, pr in enumerate(body.get('prs') or []):
                 if isinstance(pr, dict):
                     prs.append(dict({k: pr.get(k) for k in GITHUB_FIELDS_PR}, id='pr%d' % i))
                     links['pr%d' % i] = str(pr.get('url') or '')
-            self.links = links
+                    if pr.get('repo') and pr.get('number'):
+                        rows['pr%d' % i] = {'kind': 'pr', 'repo': str(pr['repo']), 'number': pr['number']}
+            self.links, self.rows = links, rows
             data = {'state': 'ok', 'repo': str(body.get('repo') or ''), 'runs': runs, 'prs': prs,
                     'error': str(body['error']) if body.get('error') else None, 'at': int(time.time() * 1000)}
         self.published = data
         self.ui.publish('github', data)
+
+    def ask_details(self, row):
+        """A card opened (or asks again while something runs): the agent fetches its details."""
+        if row not in self.rows:
+            return False
+        self.asks += 1
+        self.ask = dict(self.rows[row], row=row, seq=self.asks)
+        return True
+
+    def take_ask(self):
+        ask, self.ask = self.ask, None
+        return ask
+
+    def details(self, body):
+        """The agent's answer, for the card that asked (the page keeps only the one it shows)."""
+        self.ui.publish('github_details', body)
 
     def open(self, row):
         link = self.links.get(row)
@@ -1767,7 +1789,7 @@ class Handler(BaseHTTPRequestHandler):
         elif path == '/api/commands':
             refresh, pad.github.refresh = pad.github.refresh, False
             self._send(200, {'hue': pad.hue.take(), 'github_refresh': refresh,   # the agent collects these several times a second
-                             'visible': pad.visible_widgets()})
+                             'github_details': pad.github.take_ask(), 'visible': pad.visible_widgets()})
         elif path == '/api/events':
             self._events()
         else:
@@ -1860,6 +1882,11 @@ class Handler(BaseHTTPRequestHandler):
             pad.github.update(body)
         elif path == '/api/github/refresh':
             pad.github.refresh = True
+        elif path == '/api/github/ask':
+            if not pad.github.ask_details(str(body.get('id'))):
+                return self._send(404, {'error': 'no such row'})
+        elif path == '/api/github/details':
+            pad.github.details(body)
         elif path == '/api/github/open':
             if not pad.stats.alive():
                 pad.toast('The computer agent is not running', 'warn')

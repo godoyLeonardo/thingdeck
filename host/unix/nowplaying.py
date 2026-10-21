@@ -34,6 +34,7 @@ import socket
 import ssl
 import subprocess
 import sys
+import threading
 import time
 import urllib.parse
 import urllib.request
@@ -716,6 +717,8 @@ class HueLink:
             polled = json.loads(r.read().decode('utf-8'))
         commands = polled.get('hue') or []
         self.github_refresh = self.github_refresh or bool(polled.get('github_refresh'))   # the Code page's refresh button
+        if polled.get('github_details'):        # a card opened on the Code page
+            threading.Thread(target=send_github_details, args=(polled['github_details'],), daemon=True).start()
         now_visible = set(polled.get('visible') or [])
         self.opened |= now_visible - visible             # just came on screen: the main loop reads them now
         visible.clear()
@@ -761,8 +764,25 @@ PR_QUERY = ('query { viewer { pullRequests(states: OPEN, first: 20, orderBy: {fi
             '{ nodes { number title url isDraft updatedAt reviewDecision repository { nameWithOwner } '
             'commits(last: 1) { nodes { commit { statusCheckRollup { state } } } } } } } }')
 # One request for the last 100 runs (gh run list makes a second one for the workflow names).
-RUN_FIELDS = ('[.workflow_runs[] | {workflow_id, name, display_title, status, conclusion, head_branch, event, '
+RUN_FIELDS = ('[.workflow_runs[] | {id, workflow_id, name, display_title, status, conclusion, head_branch, event, '
               'created_at, updated_at, html_url}]')
+
+
+# The details a card asks for when it opens on the Car Thing (through the command poll).
+RUN_DETAIL_FIELDS = ('{number: .run_number, attempt: .run_attempt, actor: .actor.login, sha: .head_sha, '
+                     'commit: ((.head_commit.message // "") | split("\\n")[0]), started: .run_started_at, '
+                     'status, conclusion, updated: .updated_at}')
+JOB_FIELDS = ('[.jobs[] | {name, status, conclusion, started: .started_at, completed: .completed_at, '
+              'steps: [.steps[]? | {name, status, conclusion}]}]')
+PR_DETAIL_JSON = 'state,isDraft,author,baseRefName,headRefName,additions,deletions,changedFiles,commits,comments,mergeable,mergeStateStatus,reviewDecision,labels,createdAt,latestReviews,reviewRequests,statusCheckRollup'
+PR_DETAIL_FIELDS = ('{state, draft: .isDraft, author: .author.login, base: .baseRefName, head: .headRefName, '
+                    'additions, deletions, files: .changedFiles, commits: (.commits | length), '
+                    'comments: (.comments | length), mergeable, merge_state: .mergeStateStatus, review: .reviewDecision, '
+                    'labels: [.labels[].name], created: .createdAt, reviews: [.latestReviews[] | {by: .author.login, state}], '
+                    'requested: [.reviewRequests[] | (.login // .name // .slug // "")], '
+                    'checks: [.statusCheckRollup[] | {name: (.name // .context // ""), workflow: (.workflowName // ""), '
+                    'status: (.status // ""), conclusion: (.conclusion // .state // ""), started: (.startedAt // ""), '
+                    'completed: (.completedAt // "")}]}')
 
 
 def gh(*args, stdin=None):
@@ -819,7 +839,7 @@ class GitHub:
                 result['runs'].append({'workflow': names[run['workflow_id']], 'status': run['status'],
                                        'conclusion': run['conclusion'] or '', 'branch': run['head_branch'],
                                        'title': run['display_title'], 'event': run['event'], 'created': run['created_at'],
-                                       'updated': run['updated_at'], 'url': run['html_url']})
+                                       'updated': run['updated_at'], 'url': run['html_url'], 'run_id': run['id']})
             prs = json.loads(gh('api', 'graphql', '--input', '-', stdin=json.dumps({'query': PR_QUERY})))
             for pr in prs['data']['viewer']['pullRequests']['nodes']:
                 commits = pr['commits']['nodes']
@@ -830,6 +850,38 @@ class GitHub:
         except (OSError, ValueError, KeyError, TypeError, subprocess.TimeoutExpired) as e:
             result['error'] = str(e)
         return result
+
+
+def github_details(ask):
+    """The details for a card on the Car Thing: {row, seq, kind} and, for a run, its number,
+    attempt, actor, commit and jobs (each with its step counts, the step that runs and the
+    step that failed); for a pull request, its branches, size, merge state, reviews and
+    checks; or {error}."""
+    out = {'row': ask.get('row'), 'seq': ask.get('seq'), 'kind': ask.get('kind')}
+    try:
+        if ask.get('kind') == 'run':
+            path = 'repos/%s/actions/runs/%d' % (ask['repo'], int(ask['run_id']))
+            out.update(json.loads(gh('api', path, '--jq', RUN_DETAIL_FIELDS)))
+            out['jobs'] = []
+            for job in json.loads(gh('api', path + '/jobs?per_page=100', '--jq', JOB_FIELDS)):
+                steps = job.pop('steps')
+                out['jobs'].append(dict(job, steps=len(steps), done=sum(1 for s in steps if s['status'] == 'completed'),
+                                        current=next((s['name'] for s in steps if s['status'] == 'in_progress'), None),
+                                        failed=next((s['name'] for s in steps if s['conclusion'] == 'failure'), None)))
+        elif ask.get('kind') == 'pr':
+            out.update(json.loads(gh('pr', 'view', str(int(ask['number'])), '--repo', ask['repo'],
+                                     '--json', PR_DETAIL_JSON, '--jq', PR_DETAIL_FIELDS)))
+    except (OSError, ValueError, KeyError, TypeError, subprocess.TimeoutExpired) as e:
+        out['error'] = str(e)
+    return out
+
+
+def send_github_details(ask):
+    """In its own thread: gh takes a second or two, and the main loop must not wait."""
+    try:
+        send('github/details', github_details(ask))
+    except OSError as e:
+        log('github details:', e)
 
 
 # ------------------------------------------------------------------ Plex
