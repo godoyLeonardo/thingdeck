@@ -15,6 +15,7 @@ the writable data partition. `../deploy.sh` copies it there.
 | `web/index.html` | Touch UI shown in the kiosk browser |
 | `web/shim.html` | Bind-mounted over the stock UI's `index.html`; redirects to the service once it is up |
 | `tools/cdp.py` | DevTools helper for the kiosk browser: `screenshot`, `eval`, `reload` |
+| `tools/check.py` | Smoke test that `deploy.sh check` runs here: service, agent, each feed, each page |
 
 ## The device
 
@@ -576,6 +577,7 @@ adb shell supervisorctl status                  # all services
 adb shell python3 /var/macropad/tools/cdp.py screenshot /tmp/s.png && adb pull /tmp/s.png
 adb shell python3 /var/macropad/tools/cdp.py eval "JSON.stringify(st)"
 adb shell curl -s http://127.0.0.1:8765/api/state
+./deploy.sh check                               # the whole smoke test, screenshots in check-shots/
 ```
 
 Restarting the service re-creates the USB device, which also drops ADB. Run it

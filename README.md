@@ -107,7 +107,9 @@ them.
 
 | Command | Does |
 |---|---|
-| `./deploy.sh` | Push the files and restart the service (after editing code) |
+| `./deploy.sh` | Push the files and restart the service (after editing code), then check |
+| `./deploy.sh all` | The same, and reinstall the agent on this computer (after a `git pull`), then check |
+| `./deploy.sh check` | Smoke test: the service, the agent's version, each live page's data, and every page drawn without an error; screenshots go to `check-shots/` |
 | `./deploy.sh config` | Push only `device/config.json`; the pad reloads it within 2 s |
 | `./deploy.sh status` | Show whether the boot hook is on each system slot |
 | `./deploy.sh uninstall` | Remove the boot hook and reboot to the stock UI (files stay in `/var/macropad`) |

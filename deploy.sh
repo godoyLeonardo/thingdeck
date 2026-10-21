@@ -1,14 +1,16 @@
 #!/usr/bin/env bash
 # Push device/ to the Car Thing over ADB and restart the macro pad.
 #
-#   ./deploy.sh              copy files + restart the service
-#   ./deploy.sh all          the same, then reinstall the agent on this computer (after a git pull)
+#   ./deploy.sh              copy files + restart the service, then check
+#   ./deploy.sh all          the same, then reinstall the agent on this computer (after a git pull), then check
+#   ./deploy.sh check        smoke test: service, agent version, each page's data and drawing
 #   ./deploy.sh config       copy config.json only (reloaded live, no restart)
 #   ./deploy.sh install      first install: copy files + enable start on boot + reboot
 #   ./deploy.sh uninstall    remove the boot hook and reboot to the stock UI
 #   ./deploy.sh status       show whether the boot hook is on each system slot
 #
 # Works in Git Bash on Windows, Linux and macOS (its bash 3.2 too). Set ADB=/path/to/adb if adb is not on PATH.
+# SKIP_CHECK=1 skips the check after a deploy.
 set -euo pipefail
 export MSYS_NO_PATHCONV=1          # stop Git Bash rewriting /var/... into C:/Program Files/Git/var/...
 
@@ -18,7 +20,7 @@ SRC="$(cd "$(dirname "$0")/device" && { pwd -W 2>/dev/null || pwd; })"
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 DEST=/var/macropad
 CHECK=/tmp/macropad-check
-FILES="macropad.py ics.py gadget.sh start.sh hook.sh macropad.conf config.json web/index.html web/shim.html tools/cdp.py"
+FILES="macropad.py ics.py gadget.sh start.sh hook.sh macropad.conf config.json web/index.html web/shim.html tools/cdp.py tools/check.py"
 
 # Check the Python files and config.json in a scratch folder first, so a broken file never
 # replaces a working one. The device's adb doesn't pass exit codes back: look for CHECK_OK.
@@ -68,6 +70,31 @@ install_agent() {
     esac
 }
 
+# The smoke test (device/tools/check.py) on the Car Thing; its screenshots land in check-shots/.
+# adb doesn't pass exit codes back, so the last line says CHECK_OK or CHECK_FAILED.
+run_check() {
+    local out shots
+    "$ADB" push -q "$SRC/tools/check.py" "$DEST/tools/check.py"
+    out=$("$ADB" shell "python3 $DEST/tools/check.py" 2>&1 | tr -d '\r') || true
+    echo "$out"
+    shots="$ROOT/check-shots"
+    rm -rf "$shots" && mkdir -p "$shots"
+    "$ADB" pull -q /tmp/thingdeck-check/. "$(cygpath -w "$shots" 2>/dev/null || echo "$shots")" >/dev/null 2>&1 || true
+    case "$out" in
+        *CHECK_OK*) ;;
+        *) echo "check failed (screenshots in check-shots/)"; return 1 ;;
+    esac
+}
+
+# After a restart: wait for USB to come back, then check (unless SKIP_CHECK=1).
+check_after_restart() {
+    [ "${SKIP_CHECK:-}" = 1 ] && return 0
+    sleep 8
+    "$ADB" wait-for-device
+    echo "checking:"
+    run_check
+}
+
 # Restarting re-creates the USB device, which drops ADB for a few seconds,
 # so the command runs detached on the device.
 detached() {
@@ -88,12 +115,17 @@ case "${1:-}" in
         push_files
         detached "supervisorctl restart macropad"
         echo "restarting (USB reconnects in ~10 s)"
+        check_after_restart
         ;;
     all)
         push_files
         detached "supervisorctl restart macropad"
         echo "restarting (USB reconnects in ~10 s); now the agent:"
         install_agent
+        check_after_restart
+        ;;
+    check)
+        run_check
         ;;
     config)
         check_files
@@ -117,6 +149,6 @@ case "${1:-}" in
         echo "boot hook removed (files stay in $DEST); rebooting to the stock UI"
         ;;
     *)
-        sed -n '2,10p' "$0"; exit 2
+        sed -n '2,13p' "$0"; exit 2
         ;;
 esac
