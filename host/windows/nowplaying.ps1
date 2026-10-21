@@ -122,7 +122,9 @@ function Write-Log([string]$message) {
     try {
         $dir = Split-Path $LogFile
         if (-not (Test-Path $dir)) { New-Item -ItemType Directory $dir | Out-Null }
-        if ((Test-Path $LogFile) -and (Get-Item $LogFile).Length -gt 256KB) { Remove-Item $LogFile }
+        if ((Test-Path $LogFile) -and (Get-Item $LogFile).Length -gt 256KB) {     # keep one older file
+            Move-Item $LogFile "$LogFile.1" -Force
+        }
         Add-Content $LogFile ("{0:yyyy-MM-dd HH:mm:ss} {1}" -f (Get-Date), $message)
     } catch { }
 }

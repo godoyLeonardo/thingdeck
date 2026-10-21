@@ -32,6 +32,7 @@ import shutil
 import signal
 import socket
 import ssl
+import stat
 import subprocess
 import sys
 import threading
@@ -1367,8 +1368,28 @@ def send(path, body):
         return json.loads(r.read().decode('utf-8') or '{}')
 
 
+LOG_MAX = 256 * 1024
+
+
 def log(*args):
+    rotate_log()
     print(time.strftime('%Y-%m-%d %H:%M:%S'), *args, file=sys.stderr, flush=True)
+
+
+def rotate_log():
+    """On macOS, launchd appends stderr to nowplaying.log next to this script, for ever: past
+    LOG_MAX keep one older copy (.1) and start over. (Linux logs to the journal, which rotates.)"""
+    try:
+        st = os.fstat(2)
+        if not stat.S_ISREG(st.st_mode) or st.st_size <= LOG_MAX:
+            return          # a terminal, the journal, a pipe, or still small
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'nowplaying.log')
+        if not os.path.exists(path) or not os.path.samestat(st, os.stat(path)):
+            return          # some other file stderr was sent to: leave it alone
+        shutil.copyfile(path, path + '.1')
+        os.ftruncate(2, 0)  # launchd opened it to append, so writing goes on from the start
+    except OSError:
+        pass
 
 
 def main():
