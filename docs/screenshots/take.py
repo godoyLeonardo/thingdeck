@@ -246,6 +246,8 @@ def plex(with_posters):
 
 
 TB, GB = 1024 ** 4, 1024 ** 3
+WEATHER = {'state': 'ok', 'place': 'Paris', 'temp': 17.4, 'code': 2, 'day': True, 'unit': 'C'}
+
 TRUENAS = {
     'state': 'ok',
     'system': {'host': 'nas', 'version': '25.10.7', 'uptime': 14 * 86400 + 6 * 3600, 'memory': 64 * GB, 'cores': 8,
@@ -307,6 +309,7 @@ class Feeder:
         if self.i % 5 == 1:
             post('hue', HUE)
             post('truenas', TRUENAS)
+            post('weather', WEATHER)
             post('github', github())
             post('plex', plex(with_posters=True))
 
