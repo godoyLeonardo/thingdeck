@@ -231,12 +231,12 @@ them to the Car Thing **over the USB cable** (`adb forward`; no network):
   waiting (apps, and a newer TrueNAS); each pool as a tank that fills up (yellow from
   80%, red from 90%) with its health, free space and size, the temperature of every disk
   (NVMe drives have their own, higher limits), the server's alerts, how many apps run
-  and how many have updates, and the jobs that run now (a scrub, a snapshot, replication
-  or cloud sync task, an app update), with the first one's progress. When no job runs,
-  it shows the next scheduled task and when it runs (a scrub waits for its threshold).
-  Below the disks: the TrueNAS version, uptime, load, cores and memory. It refreshes
-  every 10 seconds while on screen, every minute otherwise (see [Connecting
-  TrueNAS](#connecting-truenas)).
+  and which have updates (in the warning color), and the jobs that run now (a scrub, a
+  snapshot, replication or cloud sync task, an app update), with the first one's
+  progress. When no job runs, it shows the next scheduled task and when it runs (a scrub
+  waits for its threshold). Below the disks: the TrueNAS version, uptime, load, cores
+  and memory. It refreshes every 10 seconds while on screen, every minute otherwise (see
+  [Connecting TrueNAS](#connecting-truenas)).
 - **Volume and audio devices:** when the volume or mute changes (the dial, the Mute
   tile, your keyboard), a volume bar shows at the top for a moment. The Media page
   header shows the current output; tap it to pick the output and input devices.

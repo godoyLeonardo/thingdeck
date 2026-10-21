@@ -503,9 +503,12 @@
   .px-num.warn, .m-value.warn { color: var(--warn); }
   .px-num.bad, .m-value.bad { color: var(--bad); }
   .m-value.good { color: var(--good); }
+  .m-detail.warn { color: var(--warn); font-weight: 700; white-space: normal; line-height: 1.2;     /* up to two lines */
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
   .nas-alert { font-size: calc(13px * var(--ts)); color: var(--muted); line-height: 1.3; margin-bottom: 10px;
     display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
   .nas .mcard .m-detail { margin-bottom: 10px; }
+  .nas .mcard .m-detail.warn { margin-bottom: 4px; }
   .nas .monitor.px-side { grid-template-rows: repeat(3, minmax(0, 1fr)); }     /* Alerts, Apps and Jobs next to the disks */
   .nas .m-value { font-size: calc(24px * var(--ts)); }
   .nas .nas-alert { -webkit-line-clamp: 2; line-height: 1.25; margin-bottom: 4px; }
@@ -2629,11 +2632,12 @@ function updateNas() {
   var alertCard = '<div class="mcard"><div class="m-label">Alerts</div><div class="m-value' + (worst ? ' bad' : alerts.length ? ' warn' : ' good') + '">' +
     alerts.length + '</div>' + (alerts.length ? '<div class="nas-alert">' + esc(alerts[0].text || '') + '</div>' : '<div class="m-detail">All clear</div>') + '</div>';
   var running = apps.filter(function (a) { return a.state === 'RUNNING'; }).length;
-  var updates = apps.filter(function (a) { return a.update; }).length;
+  var updates = apps.filter(function (a) { return a.update; }).map(function (a) { return a.name; });
   var stopped = apps.filter(function (a) { return a.state !== 'RUNNING' && a.state !== 'STOPPED'; });
   var appCard = '<div class="mcard"><div class="m-label">Apps</div><div class="m-value">' + running + '<small>/ ' + apps.length + ' up</small></div>' +
-    '<div class="m-detail">' + (stopped.length ? esc(stopped[0].name) + ' ' + esc(String(stopped[0].state).toLowerCase())
-      : updates ? updates + (updates === 1 ? ' update' : ' updates') : 'Up to date') + '</div></div>';
+    (stopped.length ? '<div class="m-detail">' + esc(stopped[0].name) + ' ' + esc(String(stopped[0].state).toLowerCase()) + '</div>'
+      : updates.length ? '<div class="m-detail warn">' + esc((updates.length === 1 ? 'Update for ' : updates.length + ' updates: ') + updates.join(', ')) + '</div>'
+      : '<div class="m-detail">Up to date</div>') + '</div>';
   var job = jobs[0], pct = job && job.percent != null ? Math.max(0, Math.min(100, job.percent)) : null;
   var jobCard = '<div class="mcard nas-jobs"><div class="m-label">Jobs</div><div class="m-value">' + jobs.length + '<small> running</small></div>' +
     (job ? '<div class="m-detail nas-job">' + esc(nasJobName(job)) + (pct != null ? ' · ' + Math.round(pct) + '%' : '') + '</div>' +
