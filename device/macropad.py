@@ -1041,6 +1041,33 @@ class HostTrueNAS:
             self.ui.publish('truenas', self.published)
 
 
+WEATHER_TTL = 2 * 3600  # seconds a reading stays on screen without a new one (sent every 15 min)
+WEATHER_FIELDS = ('place', 'temp', 'code', 'day', 'unit')
+
+
+class HostWeather:
+    """The weather where weather.txt on the computer says, which the agent reads from
+    Open-Meteo every 15 minutes: shown under the large clocks (idle Media, lock, standby)."""
+
+    def __init__(self, ui):
+        self.ui = ui
+        self.published = {'state': 'unknown'}
+        self.updated = None
+
+    def update(self, body):
+        data = {k: body[k] for k in WEATHER_FIELDS if k in body}
+        data['state'] = str(body.get('state') or 'error')
+        data['error'] = str(body['error']) if body.get('error') else None
+        self.published, self.updated = data, time.monotonic()
+        self.ui.publish('weather', data)
+
+    def expire(self):
+        if self.updated is not None and time.monotonic() - self.updated > WEATHER_TTL:
+            self.updated = None
+            self.published = {'state': 'unknown'}
+            self.ui.publish('weather', self.published)
+
+
 class Broadcaster:
     def __init__(self):
         self.lock = threading.Lock()
@@ -1101,6 +1128,7 @@ class Pad:
         self.hue = HostHue(self.ui)
         self.plex = HostPlex(self.ui)
         self.truenas = HostTrueNAS(self.ui, self.host)
+        self.weather = HostWeather(self.ui)
         self.hid = Hid(lambda status: self.on_usb_status(status))
         self.config = {}
         self.config_mtime = 0
@@ -1774,7 +1802,8 @@ class Handler(BaseHTTPRequestHandler):
             self._send(200, {'config': pad.config, 'state': pad.state(), 'presets': pad.presets(),
                              'nowplaying': pad.np.meta, 'stats': pad.stats.snapshot(), 'agenda': pad.agenda.published,
                              'audio': pad.audio.state, 'github': pad.github.published,
-                             'hue': pad.hue.snapshot(), 'plex': pad.plex.published, 'truenas': pad.truenas.published})
+                             'hue': pad.hue.snapshot(), 'plex': pad.plex.published, 'truenas': pad.truenas.published,
+                             'weather': pad.weather.published})
         elif path == '/api/nowplaying':
             self._send(200, {'nowplaying': pad.np.meta})
         elif path == '/api/nowplaying/art':
@@ -1886,6 +1915,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, {'ok': True, 'need_art': pad.plex.update(body)})
         elif path == '/api/truenas':
             pad.truenas.update(body)
+        elif path == '/api/weather':
+            pad.weather.update(body)
         elif path == '/api/github':
             pad.github.update(body)
         elif path == '/api/github/refresh':
@@ -2118,6 +2149,7 @@ def main():
             pad.audio.expire()
             pad.plex.expire()
             pad.truenas.expire()
+            pad.weather.expire()
             pad.refresh_hidden()
             pad.agenda.refresh()
     finally:
