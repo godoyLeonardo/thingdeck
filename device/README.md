@@ -413,7 +413,7 @@ through `select`), `disk.temperatures`, `alert.list`, `app.query` and `core.get_
 scheduled tasks (`pool.scrub.query`, `pool.snapshottask.query`, `replication.query`,
 `cloudsync.query`, `rsynctask.query`, `cronjob.query`), and closes it. Replies are
 matched by `id`, so notifications in between are skipped. A failing call other than
-`system.info` only leaves its part empty.
+`system.info` only leaves its part empty, and the agent logs it once, until it works again.
 
 It is always TLS: TrueNAS revokes an API key that arrives over plain HTTP. The
 certificate is usually self-signed, so the agents accept it for that address only (the
