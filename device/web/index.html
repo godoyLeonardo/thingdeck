@@ -575,6 +575,7 @@
   .px-cover { flex: none; width: 84px; height: 126px; margin-right: 16px; border-radius: 8px; background: var(--tile-hi) center / cover; }
   .px-cover.sq { height: 84px; }
   .px-sum { margin-top: 6px; font-size: calc(13.5px * var(--ts)); line-height: 1.4; color: var(--muted); }
+  .sheet-card.px-new { width: 560px; }        /* a new stream: smaller than a details card */
   .sh-line { margin-top: 4px; font-size: calc(14px * var(--ts)); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .sh-line.bad { color: var(--bad); white-space: normal; }
   .sh-sum { display: flex; align-items: center; margin-top: 10px; font: 600 calc(11.5px * var(--ts)) GeistMono, monospace;
@@ -1808,6 +1809,7 @@ function openEvent(id) {
 function closeSheet() {
   closeGitHubCard();
   closePlexCard();
+  clearTimeout(pxNewTimer);
   sheetOpen = false;
   sheetMode = null;
   $('sheet').className = '';
@@ -2547,6 +2549,37 @@ function renderPlexCard() {
     '<div class="sh-actions"><div class="btn" data-sheet-close="1">Close</div></div>');
   return true;
 }
+// A stream that starts while another page is on screen: a small card with what started, Go to
+// Plex and Dismiss; it closes by itself after 20 s. Streams already on when Plex first answers
+// (or answers again after a gap) don't count. It waits for no other card, reminder or Settings.
+var plexSeen = null, pxNewTimer = null;      // the stream ids last seen, or null before Plex answers
+function plexPage() {
+  return orderedEntries().findIndex(function (p) { return (p.widgets || []).indexOf('plex') >= 0; });
+}
+function checkNewStreams() {
+  if (plex.state !== 'ok') { plexSeen = null; return; }
+  var sessions = plex.sessions || [], seen = plexSeen;
+  plexSeen = sessions.map(function (s) { return s.id; });
+  var fresh = seen ? sessions.filter(function (s) { return seen.indexOf(s.id) < 0; }) : [];
+  if (!fresh.length || sheetOpen || reminderShown || standbyShown || lockShown || showSettings) return;
+  if ((currentPage.widgets || []).indexOf('plex') >= 0) return;      // on the Plex page already
+  var s = fresh[0];
+  $('sheetcard')._html = null;
+  $('sheetcard').className = 'sheet-card px-new';
+  $('sheetcard').innerHTML = '<div class="px-head">' + plexCover(s) + '<div>' +
+      '<div class="m-label">New Plex stream</div>' +
+      '<div class="sh-title">' + esc(s.title || '') + '</div>' +
+      '<div class="sh-where">' + esc(s.sub || '') + '</div>' +
+      '<div class="sh-when">' + esc(joined([s.user, s.player])) + '</div>' +
+      '<div class="sh-line">' + esc(joined([plexDelivery(s), s.quality, s.local === false ? 'Remote' : ''])) + '</div>' +
+      (fresh.length > 1 ? '<div class="sh-line">' + esc('and ' + (fresh.length - 1) + ' more') + '</div>' : '') + '</div></div>' +
+    '<div class="sh-actions">' + (plexPage() >= 0 ? '<div class="btn primary" data-plex-go="1">Go to Plex</div>' : '') +
+    '<div class="btn" data-sheet-close="1">Dismiss</div></div>';
+  $('sheet').className = 'show';
+  sheetOpen = true;
+  sheetMode = 'plex-new';
+  pxNewTimer = setTimeout(function () { if (sheetMode === 'plex-new') closeSheet(); }, 20000);
+}
 function plexRow(s) {
   var tag = s.decision === 'transcode' ? ['tc', 'Transcode' + (s.hw ? ' · HW' : '')]
     : s.decision === 'direct stream' ? ['ds', 'Direct stream'] : ['dp', 'Direct play'];
@@ -2875,7 +2908,7 @@ document.addEventListener('pointerdown', function (e) {
   startX = e.clientX; startY = e.clientY;
   startInBar = !!e.target.closest('#bar, .cal-tabs');
   startOnSlider = !!e.target.closest('[data-hue-bar], [data-hue-lbar]');   // dragging a light's brightness, not swiping
-  downEl = e.target.closest('.tile[data-i], .preset[data-i], #dial, .tab, #status, [data-set], [data-sys], [data-sec], [data-media], [data-join], [data-guard], [data-kill], [data-ev], [data-sheet-close], [data-sheet-card], [data-audio], [data-audio-dev], [data-gh], #tabmore, [data-hue-room], [data-hue-toggle], [data-hue-ltoggle], [data-hue-scene], [data-hue-alloff], [data-hue-pair], [data-hue-bar], [data-hue-lbar], [data-tab-move], [data-tabs-reset], [data-tab-hide], [data-goto-media], [data-rm-join], [data-rm-dismiss], [data-cal], [data-weeks], [data-gh-open], [data-plex]');
+  downEl = e.target.closest('.tile[data-i], .preset[data-i], #dial, .tab, #status, [data-set], [data-sys], [data-sec], [data-media], [data-join], [data-guard], [data-kill], [data-ev], [data-sheet-close], [data-sheet-card], [data-audio], [data-audio-dev], [data-gh], #tabmore, [data-hue-room], [data-hue-toggle], [data-hue-ltoggle], [data-hue-scene], [data-hue-alloff], [data-hue-pair], [data-hue-bar], [data-hue-lbar], [data-tab-move], [data-tabs-reset], [data-tab-hide], [data-goto-media], [data-rm-join], [data-rm-dismiss], [data-cal], [data-weeks], [data-gh-open], [data-plex], [data-plex-go]');
   if (downEl) downEl.classList.add('down');
 });
 document.addEventListener('pointercancel', function () { if (downEl) downEl.classList.remove('down'); downEl = null; });
@@ -2900,6 +2933,7 @@ document.addEventListener('pointerup', function (e) {
   else if (el.hasAttribute('data-audio')) openAudio();
   else if (el.hasAttribute('data-gh')) openGitHub(el.getAttribute('data-gh'));
   else if (el.hasAttribute('data-plex')) openPlexStream(el.getAttribute('data-plex'));
+  else if (el.hasAttribute('data-plex-go')) { closeSheet(); if (plexPage() >= 0) post('/api/page', { page: plexPage() }); }
   else if (el.hasAttribute('data-gh-open')) { fire(el); post('/api/github/open', { id: el.getAttribute('data-gh-open') }); closeSheet(); }
   else if (el.id === 'tabmore') scrollTabs();
   else if (el.hasAttribute('data-tab-move')) { var mv = el.getAttribute('data-tab-move').split('|'); moveTab(mv[0], parseInt(mv[1], 10)); }
@@ -3002,6 +3036,7 @@ function connect() {
       plex = d;
       plexAt = Date.now();
       updatePlex();
+      checkNewStreams();
       updateTabDots();
     } else if (m.type === 'weather') {
       weather = d;

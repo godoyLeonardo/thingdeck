@@ -398,6 +398,11 @@ Plex's decision for each; and for a transcode, what changes (from and to which c
 its speed and progress, throttling, and hardware decoding and encoding. They come from
 the same `/status/sessions` reply, so they cost no request.
 
+The page remembers the stream ids it has seen. A new one, while another page is on screen
+and no other card, reminder or Settings is open, shows a small card with Go to Plex
+(`checkNewStreams`); it closes by itself after 20 s. Before Plex first answers, and after
+it stops answering, the page remembers nothing, so streams already on don't count.
+
 The bandwidth history has one row per device and sample, at uneven times. The agent
 adds up the rows per 6 s, LAN and WAN apart, and sends bytes per second.
 
