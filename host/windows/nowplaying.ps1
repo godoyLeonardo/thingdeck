@@ -878,6 +878,34 @@ function Invoke-Plex([string]$path, [switch]$Raw, [switch]$Optional) {
 }
 
 # One stream from /status/sessions, as the Car Thing shows it, plus its poster's path.
+# What a stream's card shows: the item, the player and its network, the media, the streams picked
+# (with Plex's decision for each) and, for a transcode, what changes and how fast.
+$PlexStreams = @{ 1 = 'video'; 2 = 'audio'; 3 = 'subtitles' }
+function Get-PlexDetails($s, $player, $media, $transcode) {
+    $part = if ($media -and $media.Part) { @($media.Part)[0] } else { $null }
+    $streams = @(foreach ($st in @($part.Stream)) {
+        if (-not $st) { continue }
+        $type = [int]$st.streamType
+        if (-not $PlexStreams.ContainsKey($type)) { continue }
+        $picked = if ($st.ContainsKey('selected')) { [bool]$st.selected } else { $type -eq 1 }
+        if ($picked) { [ordered]@{ kind = $PlexStreams[$type]; title = $(if ($st.displayTitle) { $st.displayTitle } else { $st.codec }); decision = $st.decision } }
+    }) | Select-Object -First 6
+    $summary = "$($s.summary)"
+    if ($summary.Length -gt 500) { $summary = $summary.Substring(0, 500) }
+    [ordered]@{
+        library = $s.librarySectionTitle; year = $s.year; rating = $s.contentRating; summary = $(if ($summary) { $summary } else { $null })
+        product = $player.product; platform = $player.platform; device = $(if ($player.device) { $player.device } else { $player.model })
+        address = $player.address; relayed = [bool]$player.relayed; secure = $player.secure
+        container = $media.container; video = $media.videoCodec; resolution = $media.videoResolution; fps = $media.videoFrameRate
+        audio = $media.audioCodec; channels = $media.audioChannels; bitrate = $media.bitrate; streams = @($streams)
+        transcode = $(if (-not $transcode) { $null } else { [ordered]@{
+            video = $transcode.videoDecision; audio = $transcode.audioDecision; subtitles = $transcode.subtitleDecision
+            from = $transcode.sourceVideoCodec; to = $transcode.videoCodec; audio_from = $transcode.sourceAudioCodec; audio_to = $transcode.audioCodec
+            container = $transcode.container; protocol = $transcode.protocol; speed = $transcode.speed; progress = $transcode.progress
+            throttled = [bool]$transcode.throttled; hw_decode = $transcode.transcodeHwDecoding; hw_encode = $transcode.transcodeHwEncoding } })
+    }
+}
+
 function Get-PlexSession($s) {
     $kind = $s.type; $player = $s.Player; $session = $s.Session; $transcode = $s.TranscodeSession
     $media = if ($s.Media) { @($s.Media)[0] } else { $null }
@@ -904,6 +932,7 @@ function Get-PlexSession($s) {
         hw = [bool]($transcode -and ($transcode.transcodeHwEncoding -or $transcode.transcodeHwFullPipeline))
         quality = $quality; kbps = $session.bandwidth
         local = $(if ($session.location) { $session.location -ne 'wan' } else { $player.local -ne $false }); thumb = $thumb
+        details = Get-PlexDetails $s $player $media $transcode
     }
 }
 
@@ -1030,7 +1059,7 @@ function Update-Plex {
     }
     $key = $state | ConvertTo-Json -Compress -Depth 6
     if ($key -eq $script:plexSent -and ((Get-Date) - $script:plexSentAt).TotalSeconds -lt 10) { return }
-    $reply = Send-Json 'plex' $state 6
+    $reply = Send-Json 'plex' $state 8       # a stream's details nest deeper
     $script:plexSent = $key
     $script:plexSentAt = Get-Date
     $script:plexNeed = @($reply.need_art | Where-Object { $_ })
