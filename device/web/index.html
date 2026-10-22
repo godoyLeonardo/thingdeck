@@ -451,7 +451,8 @@
     background: var(--tile-hi) center / cover no-repeat; display: flex; align-items: center; justify-content: center; }
   .px-art svg { width: 20px; height: 20px; }
   .px-art.sq { height: 44px; }                  /* album covers are square */
-  .px-row .np-bar { height: 4px; margin-top: 7px; }
+  .px-prog { display: flex; align-items: center; margin-top: 6px; }   /* the state icon, then the progress */
+  .px-prog .np-bar { flex: 1; height: 4px; }
   .px-info { flex: none; width: 124px; display: flex; flex-direction: column; align-items: flex-end; margin-left: 10px; }
   .px-tag { font: 600 calc(10.5px * var(--ts)) GeistMono, monospace; letter-spacing: .04em; text-transform: uppercase;
     padding: 3px 7px; border-radius: 6px; background: var(--tile-hi); white-space: nowrap; }
@@ -459,9 +460,9 @@
   .px-tag.ds { color: var(--acc); }
   .px-tag.tc { color: var(--warn); }
   .px-q { margin-top: 6px; font: 500 calc(11.5px * var(--ts)) GeistMono, monospace; color: var(--muted); white-space: nowrap; }
-  .px-st { margin-top: 6px; height: 18px; color: var(--muted); }
-  .px-st svg { width: 16px; height: 16px; }
-  .px-st .spin { width: 12px; height: 12px; }
+  .px-st { flex: none; display: flex; width: 14px; margin-right: 6px; color: var(--muted); }
+  .px-st svg { width: 14px; height: 14px; }
+  .px-st .spin { width: 11px; height: 11px; }
   .px-lib { display: flex; align-items: center; padding: 6px 0; }
   .px-lib .ev-title { font-size: calc(14.5px * var(--ts)); }
   .px-lib .ev-sub { font-size: calc(11.5px * var(--ts)); }
@@ -470,8 +471,10 @@
   /* Plex reads from across the desk: its text a step above the shared row and card sizes */
   .px-row .ev-title { font-size: calc(18px * var(--ts)); }
   .px-row .ev-sub { font-size: calc(14px * var(--ts)); }
+  .px-row .px-who { font-size: calc(16px * var(--ts)); }
   .px-tag { font-size: calc(12px * var(--ts)); }
-  .px-q { font-size: calc(12.5px * var(--ts)); }
+  .px-q { font-size: calc(15px * var(--ts)); }
+  .px-q + .px-q { margin-top: 1px; }
   .px-lib .ev-title { font-size: calc(17px * var(--ts)); }
   .px-lib .ev-sub { font-size: calc(13px * var(--ts)); }
   .px-num { font-size: calc(17px * var(--ts)); }
@@ -2590,10 +2593,10 @@ function plexRow(s) {
       : '>' + icon(s.kind === 'track' ? 'note' : 'play')) + '</div>' +
     '<div class="ev-main"><div class="ev-title">' + esc(s.title || '') + '</div>' +
     (s.kind === 'episode' || s.kind === 'track' ? '<div class="ev-sub">' + esc(s.sub || '') + '</div>' : '') +   // a movie's is its year
-    '<div class="ev-sub">' + who + (s.local === false ? ' · <b>Remote</b>' : '') + '</div><div class="np-bar"><i></i></div></div>' +
+    '<div class="ev-sub px-who">' + who + (s.local === false ? ' · <b>Remote</b>' : '') + '</div>' +
+    '<div class="px-prog"><div class="px-st">' + state + '</div><div class="np-bar"><i></i></div></div></div>' +
     '<div class="px-info"><div class="px-tag ' + tag[0] + '">' + tag[1] + '</div>' +
-    '<div class="px-q">' + esc([s.quality, rate].filter(function (x) { return x; }).join(' · ')) + '</div>' +
-    '<div class="px-st">' + state + '</div></div></div>';
+    [s.quality, rate].filter(function (x) { return x; }).map(function (x) { return '<div class="px-q">' + esc(x) + '</div>'; }).join('') + '</div></div>';
 }
 function plexLibrary(l) {
   var sub = l.kind === 'show' ? fmtCount(l.episodes) + ' episodes'
