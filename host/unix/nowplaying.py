@@ -910,7 +910,6 @@ def plex_details(s, player, media, transcode):
                for st in part.get('Stream') or [] if st.get('streamType') in PLEX_STREAMS and st.get('selected', st['streamType'] == 1)]
     return {
         'library': s.get('librarySectionTitle'), 'year': s.get('year'), 'rating': s.get('contentRating'),
-        'summary': (s.get('summary') or '')[:500] or None,
         'product': player.get('product'), 'platform': player.get('platform'), 'device': player.get('device') or player.get('model'),
         'address': player.get('address'), 'relayed': bool(player.get('relayed')), 'secure': player.get('secure'),
         'container': media.get('container'), 'video': media.get('videoCodec'), 'resolution': media.get('videoResolution'),

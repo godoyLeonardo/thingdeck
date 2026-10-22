@@ -574,7 +574,6 @@
   .px-head > div:last-child { flex: 1; min-width: 0; }
   .px-cover { flex: none; width: 84px; height: 126px; margin-right: 16px; border-radius: 8px; background: var(--tile-hi) center / cover; }
   .px-cover.sq { height: 84px; }
-  .px-sum { margin-top: 6px; font-size: calc(13.5px * var(--ts)); line-height: 1.4; color: var(--muted); }
   .sheet-card.px-new { width: 560px; }        /* a new stream: smaller than a details card */
   .sh-line { margin-top: 4px; font-size: calc(14px * var(--ts)); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .sh-line.bad { color: var(--bad); white-space: normal; }
@@ -2545,7 +2544,7 @@ function renderPlexCard() {
     '<div class="sh-line">' + esc(joined([d.container ? String(d.container).toUpperCase() : '', joined([codec(d.video), res, d.fps]).replace(/ · /g, ' '),
       joined([codec(d.audio), channels(d.channels)]).replace(/ · /g, ' '), rate(d.bitrate)])) + '</div>' +
     (transcode ? '<div class="sh-line">' + esc('Transcode: ' + transcode) + '</div>' : '') +
-    '<div class="ag-list sh-list">' + streams + (d.summary ? '<div class="px-sum">' + esc(d.summary) + '</div>' : '') + '</div>' +
+    '<div class="ag-list sh-list">' + streams + '</div>' +
     '<div class="sh-actions"><div class="btn" data-sheet-close="1">Close</div></div>');
   return true;
 }

@@ -890,10 +890,8 @@ function Get-PlexDetails($s, $player, $media, $transcode) {
         $picked = if ($st.ContainsKey('selected')) { [bool]$st.selected } else { $type -eq 1 }
         if ($picked) { [ordered]@{ kind = $PlexStreams[$type]; title = $(if ($st.displayTitle) { $st.displayTitle } else { $st.codec }); decision = $st.decision } }
     }) | Select-Object -First 6
-    $summary = "$($s.summary)"
-    if ($summary.Length -gt 500) { $summary = $summary.Substring(0, 500) }
     [ordered]@{
-        library = $s.librarySectionTitle; year = $s.year; rating = $s.contentRating; summary = $(if ($summary) { $summary } else { $null })
+        library = $s.librarySectionTitle; year = $s.year; rating = $s.contentRating
         product = $player.product; platform = $player.platform; device = $(if ($player.device) { $player.device } else { $player.model })
         address = $player.address; relayed = [bool]$player.relayed; secure = $player.secure
         container = $media.container; video = $media.videoCodec; resolution = $media.videoResolution; fps = $media.videoFrameRate

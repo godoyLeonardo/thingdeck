@@ -391,8 +391,8 @@ is one request with `X-Plex-Container-Size=0`, which gives `totalSize` and no it
 When the server does not answer, the agent tries again after 30 s, so the other pages do
 not wait.
 
-Each stream also has `details` for its card on the page: the library, year, rating and
-summary; the player (product, platform, device, address, relayed, secure); the media
+Each stream also has `details` for its card on the page: the library, year and rating;
+the player (product, platform, device, address, relayed, secure); the media
 (container, codecs, resolution, frame rate, channels, bitrate); the streams picked, with
 Plex's decision for each; and for a transcode, what changes (from and to which codecs),
 its speed and progress, throttling, and hardware decoding and encoding. They come from
