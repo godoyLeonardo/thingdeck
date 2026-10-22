@@ -1369,8 +1369,8 @@ while ($true) {
             }
             if ($reply.need_calendar) { $calendarHash = $null }
         }
-        # GitHub every minute (every 15 s while a workflow runs) while Code is on screen, else every 5 minutes.
-        if (((Get-Date) - $gitHubFetched).TotalSeconds -ge $(if (-not (Test-Visible 'github')) { 300 } elseif ($gitHubBusy) { 15 } else { 60 })) {
+        # GitHub every minute, or every 15 s while a workflow runs and Code is on screen.
+        if (((Get-Date) - $gitHubFetched).TotalSeconds -ge $(if ($gitHubBusy -and (Test-Visible 'github')) { 15 } else { 60 })) {
             $gitHubFetched = Get-Date
             $gitHub = Get-GitHub
             $gitHubBusy = [bool]($gitHub.runs | Where-Object { $_.status -ne 'completed' })

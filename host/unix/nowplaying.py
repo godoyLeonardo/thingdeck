@@ -1576,7 +1576,7 @@ def main():
                     open_link(link)
                 if reply.get('need_calendar'):
                     calendar_hash = None
-            # GitHub every minute, or every 15 s while a workflow runs.
+            # GitHub every minute, or every 15 s while a workflow runs and Code is on screen.
             # Panels that just came on screen: read their data now.
             if 'lights' in hue.opened:
                 hue.fetched = 0.0
@@ -1595,7 +1595,7 @@ def main():
             if hue.github_refresh:
                 github_fetched, hue.github_refresh = None, False
             if github_fetched is None or time.monotonic() - github_fetched >= (
-                    300 if 'github' not in visible else 15 if github_busy else 60):
+                    15 if github_busy and 'github' in visible else 60):
                 github_fetched = time.monotonic()
                 status = github.read()
                 github_busy = any(r['status'] != 'completed' for r in status.get('runs', []))
