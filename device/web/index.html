@@ -2588,7 +2588,8 @@ function plexRow(s) {
   return '<div class="px-row" data-plex="' + esc(s.id) + '"><div class="px-art' + (s.kind === 'track' ? ' sq' : '') + '"' + (s.poster
       ? ' style="background-image:url(/api/plex/art?k=' + encodeURIComponent(s.art) + ')">'
       : '>' + icon(s.kind === 'track' ? 'note' : 'play')) + '</div>' +
-    '<div class="ev-main"><div class="ev-title">' + esc(s.title || '') + '</div><div class="ev-sub">' + esc(s.sub || '') + '</div>' +
+    '<div class="ev-main"><div class="ev-title">' + esc(s.title || '') + '</div>' +
+    (s.kind === 'episode' || s.kind === 'track' ? '<div class="ev-sub">' + esc(s.sub || '') + '</div>' : '') +   // a movie's is its year
     '<div class="ev-sub">' + who + (s.local === false ? ' · <b>Remote</b>' : '') + '</div><div class="np-bar"><i></i></div></div>' +
     '<div class="px-info"><div class="px-tag ' + tag[0] + '">' + tag[1] + '</div>' +
     '<div class="px-q">' + esc([s.quality, rate].filter(function (x) { return x; }).join(' · ')) + '</div>' +
