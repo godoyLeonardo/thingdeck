@@ -391,6 +391,18 @@ is one request with `X-Plex-Container-Size=0`, which gives `totalSize` and no it
 When the server does not answer, the agent tries again after 30 s, so the other pages do
 not wait.
 
+Each stream also has `details` for its card on the page: the library, year, rating and
+summary; the player (product, platform, device, address, relayed, secure); the media
+(container, codecs, resolution, frame rate, channels, bitrate); the streams picked, with
+Plex's decision for each; and for a transcode, what changes (from and to which codecs),
+its speed and progress, throttling, and hardware decoding and encoding. They come from
+the same `/status/sessions` reply, so they cost no request.
+
+The page remembers the stream ids it has seen. A new one, while another page is on screen
+and no other card, reminder or Settings is open, shows a small card with Go to Plex
+(`checkNewStreams`); it closes by itself after 20 s. Before Plex first answers, and after
+it stops answering, the page remembers nothing, so streams already on don't count.
+
 The bandwidth history has one row per device and sample, at uneven times. The agent
 adds up the rows per 6 s, LAN and WAN apart, and sends bytes per second.
 

@@ -219,13 +219,18 @@ them to the Car Thing **over the USB cable** (`adb forward`; no network):
   it right away (see [Adding GitHub](#adding-github)).
 - **Plex:** the streams on your Plex Media Server, and a dot on the Plex tab while
   someone streams. Each stream shows its poster, the user and player, the progress and
-  the quality. A tag shows how the server sends it: direct play, direct stream, or
-  transcode (HW for a hardware transcode). Under the streams are the jobs that run now,
-  with their progress: library scans and the scheduled tasks (Settings → Scheduled Tasks
-  in Plex). Next to the streams are graphs of the server's CPU and bandwidth, and the
-  size of each library. The graphs need Plex Pass. The page refreshes every 3 seconds
-  while it's on screen, every 30 seconds otherwise (see [Connecting
-  Plex](#connecting-plex)).
+  the quality; tap it for a card with more: the player and its network, the media
+  (container, codecs, resolution, channels, bitrate), the audio and subtitle tracks, and
+  for a transcode, what changes, its speed, and whether the hardware does it. When a new
+  stream starts while another page is on screen, a small card shows it, with **Go to
+  Plex**; it closes by itself after 20 seconds (off the Plex page, the agent reads Plex
+  every 30 seconds, so the card can come that much later). A tag shows how the server
+  sends it: direct play, direct stream, or transcode (HW for a hardware transcode).
+  Under the streams are the jobs that run now, with their progress: library scans and
+  the scheduled tasks (Settings → Scheduled Tasks in Plex). Next to the streams are
+  graphs of the server's CPU and bandwidth, and the size of each library. The graphs
+  need Plex Pass. The page refreshes every 3 seconds while it's on screen, every 30
+  seconds otherwise (see [Connecting Plex](#connecting-plex)).
 - **NAS (TrueNAS):** a dot on the NAS tab, in the accent color while the server answers
   and red when it fails, or a badge in the warning color with the number of updates
   waiting (apps, and a newer TrueNAS); each pool as a tank that fills up (yellow from

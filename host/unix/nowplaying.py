@@ -899,6 +899,33 @@ PLEX_HISTORY = 60       # samples sent for the graphs
 RESOLUTIONS = {'4k': '4K', 'sd': 'SD'}
 
 
+PLEX_STREAMS = {1: 'video', 2: 'audio', 3: 'subtitles'}
+
+
+def plex_details(s, player, media, transcode):
+    """What a stream's card shows: the item, the player and its network, the media, the streams
+    picked (with Plex's decision for each) and, for a transcode, what changes and how fast."""
+    part = (media.get('Part') or [{}])[0]
+    streams = [{'kind': PLEX_STREAMS[st['streamType']], 'title': st.get('displayTitle') or st.get('codec'), 'decision': st.get('decision')}
+               for st in part.get('Stream') or [] if st.get('streamType') in PLEX_STREAMS and st.get('selected', st['streamType'] == 1)]
+    return {
+        'library': s.get('librarySectionTitle'), 'year': s.get('year'), 'rating': s.get('contentRating'),
+        'summary': (s.get('summary') or '')[:500] or None,
+        'product': player.get('product'), 'platform': player.get('platform'), 'device': player.get('device') or player.get('model'),
+        'address': player.get('address'), 'relayed': bool(player.get('relayed')), 'secure': player.get('secure'),
+        'container': media.get('container'), 'video': media.get('videoCodec'), 'resolution': media.get('videoResolution'),
+        'fps': media.get('videoFrameRate'), 'audio': media.get('audioCodec'), 'channels': media.get('audioChannels'),
+        'bitrate': as_int(media.get('bitrate')), 'streams': streams[:6],
+        'transcode': None if not transcode else {
+            'video': transcode.get('videoDecision'), 'audio': transcode.get('audioDecision'),
+            'subtitles': transcode.get('subtitleDecision'), 'from': transcode.get('sourceVideoCodec'),
+            'to': transcode.get('videoCodec'), 'audio_from': transcode.get('sourceAudioCodec'), 'audio_to': transcode.get('audioCodec'),
+            'container': transcode.get('container'), 'protocol': transcode.get('protocol'), 'speed': transcode.get('speed'),
+            'progress': transcode.get('progress'), 'throttled': bool(transcode.get('throttled')),
+            'hw_decode': transcode.get('transcodeHwDecoding'), 'hw_encode': transcode.get('transcodeHwEncoding')},
+    }
+
+
 def plex_session(s):
     """One stream from /status/sessions, as the Car Thing shows it, plus its poster's path."""
     kind, player, session = s.get('type'), s.get('Player') or {}, s.get('Session') or {}
@@ -929,7 +956,8 @@ def plex_session(s):
             'duration_ms': as_int(s.get('duration')), 'decision': decision,
             'hw': bool(transcode and (transcode.get('transcodeHwEncoding') or transcode.get('transcodeHwFullPipeline'))),
             'quality': quality, 'kbps': as_int(session.get('bandwidth')),
-            'local': location != 'wan' if location else player.get('local') is not False, 'thumb': thumb}
+            'local': location != 'wan' if location else player.get('local') is not False, 'thumb': thumb,
+            'details': plex_details(s, player, media, transcode)}
 
 
 class PlexLink:
