@@ -566,9 +566,15 @@
   .sh-actions .btn { flex: none; min-width: 120px; padding: 0 18px; margin-left: 8px; }
   .sh-actions .btn.primary { background: var(--acc); color: var(--on-acc); }
   /* a GitHub card: wider and taller, with a list of jobs that scrolls */
-  .sheet-card.gh-card { width: 720px; max-height: 452px; }
-  .sheet-card.gh-card > * { flex: none; }        /* only the list gives up height */
-  .sheet-card.gh-card > .sh-list { flex: 1 1 auto; }
+  .sheet-card.gh-card, .sheet-card.px-card { width: 720px; max-height: 452px; }
+  .sheet-card.gh-card > *, .sheet-card.px-card > * { flex: none; }        /* only the list gives up height */
+  .sheet-card.gh-card > .sh-list, .sheet-card.px-card > .sh-list { flex: 1 1 auto; }
+  /* a Plex stream's card: the poster at the top left, then what plays, where and how */
+  .px-head { display: flex; align-items: flex-start; }
+  .px-head > div:last-child { flex: 1; min-width: 0; }
+  .px-cover { flex: none; width: 84px; height: 126px; margin-right: 16px; border-radius: 8px; background: var(--tile-hi) center / cover; }
+  .px-cover.sq { height: 84px; }
+  .px-sum { margin-top: 6px; font-size: calc(13.5px * var(--ts)); line-height: 1.4; color: var(--muted); }
   .sh-line { margin-top: 4px; font-size: calc(14px * var(--ts)); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .sh-line.bad { color: var(--bad); white-space: normal; }
   .sh-sum { display: flex; align-items: center; margin-top: 10px; font: 600 calc(11.5px * var(--ts)) GeistMono, monospace;
@@ -1801,6 +1807,7 @@ function openEvent(id) {
 }
 function closeSheet() {
   closeGitHubCard();
+  closePlexCard();
   sheetOpen = false;
   sheetMode = null;
   $('sheet').className = '';
@@ -2472,13 +2479,81 @@ function updateMonitor() {
 // ---- Plex (widget "plex"): the agent reads the server in plex.txt on the local network
 var plex = { state: 'unknown' };
 function fmtCount(v) { return v == null ? '–' : String(v).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+// A stream in a card (tap its row): what plays, where, and how Plex sends it. The position moves
+// every second between the agent's updates; a stream that stops stays in the card as ended.
+var CODECS = { h264: 'H.264', hevc: 'HEVC', av1: 'AV1', vp9: 'VP9', mpeg4: 'MPEG-4', mpeg2video: 'MPEG-2', aac: 'AAC', ac3: 'AC3',
+  eac3: 'EAC3', dca: 'DTS', 'dts-hd': 'DTS-HD', truehd: 'TrueHD', flac: 'FLAC', mp3: 'MP3', opus: 'Opus', vorbis: 'Vorbis', alac: 'ALAC' };
+function codec(c) { return c ? CODECS[String(c).toLowerCase()] || String(c).toUpperCase() : ''; }
+function channels(n) { return { 1: 'mono', 2: 'stereo', 6: '5.1', 8: '7.1' }[n] || (n ? n + ' ch' : ''); }
+function rate(kbps) { return kbps ? (kbps >= 1000 ? (kbps / 1000).toFixed(1) + ' Mbps' : kbps + ' kbps') : ''; }
+function joined(parts) { return parts.filter(function (x) { return x; }).join(' · '); }
+var pxCard = null, plexAt = 0;      // the open card: {id, last, tick}; when the last Plex update came
+function openPlexStream(id) {
+  pxCard = { id: id, last: null };
+  $('sheetcard')._html = null;           // other cards set innerHTML themselves
+  if (!renderPlexCard()) { pxCard = null; return; }
+  $('sheetcard').className = 'sheet-card px-card';
+  $('sheet').className = 'show';
+  sheetOpen = true;
+  sheetMode = 'plex';
+  pxCard.tick = setInterval(renderPlexCard, 1000);      // the position moves
+}
+function closePlexCard() {
+  if (!pxCard) return;
+  clearInterval(pxCard.tick);
+  pxCard = null;
+}
+function plexCover(s) {
+  return s.poster ? '<div class="px-cover' + (s.kind === 'track' ? ' sq' : '') + '" style="background-image:url(/api/plex/art?k=' +
+    encodeURIComponent(s.art) + ')"></div>' : '';
+}
+function plexDelivery(s) {
+  var t = (s.details || {}).transcode;
+  return s.decision === 'transcode' ? 'Transcode' + (t && (t.hw_decode || t.hw_encode) ? ' (hardware ' +
+      [t.hw_decode ? 'decode' : '', t.hw_encode ? 'encode' : ''].filter(function (x) { return x; }).join(' and ') + ')' : s.hw ? ' (hardware)' : '')
+    : s.decision === 'direct stream' ? 'Direct stream' : 'Direct play';
+}
+function renderPlexCard() {
+  if (!pxCard) return false;
+  var s = (plex.sessions || []).filter(function (x) { return x.id === pxCard.id; })[0], ended = !s;
+  if (ended && !pxCard.last) return false;
+  if (ended) s = pxCard.last; else pxCard.last = s;
+  var d = s.details || {}, t = d.transcode, dur = s.duration_ms;
+  var pos = Math.min(dur || Infinity, (s.position_ms || 0) + (!ended && s.state === 'playing' ? Date.now() - plexAt : 0));
+  var state = ended ? 'Ended' : { paused: 'Paused', buffering: 'Buffering' }[s.state] || 'Playing';
+  var player = joined([s.player, d.product && d.product !== s.player ? d.product : '', d.platform, d.device]);
+  var res = d.resolution ? { '4k': '4K', sd: 'SD' }[String(d.resolution).toLowerCase()] || (/^\d+$/.test(d.resolution) ? d.resolution + 'p' : d.resolution) : '';
+  var transcode = t ? joined([t.video === 'transcode' ? 'video ' + codec(t.from) + ' → ' + codec(t.to) : t.video === 'copy' ? 'video copied' : '',
+    t.audio === 'transcode' ? 'audio ' + codec(t.audio_from) + ' → ' + codec(t.audio_to) : t.audio === 'copy' ? 'audio copied' : '',
+    t.subtitles === 'burn' ? 'subtitles burned in' : '', t.speed ? Number(t.speed).toFixed(1) + '× speed' : '',
+    t.throttled ? 'throttled: well ahead' : '']) : '';
+  var streams = (d.streams || []).map(function (st) {
+    return '<div class="sh-line">' + esc(st.kind.charAt(0).toUpperCase() + st.kind.slice(1) + ': ' + (st.title || '?') +
+      (st.decision ? ' (' + ({ copy: 'copied', transcode: 'transcoded', burn: 'burned in', directplay: 'direct' }[st.decision] || st.decision) + ')' : '')) + '</div>';
+  }).join('');
+  redraw($('sheetcard'), '<div class="px-head">' + plexCover(s) + '<div>' +
+      '<div class="m-label">' + esc(joined(['Plex stream', d.library])) + '</div>' +
+      '<div class="sh-title">' + esc(s.title || '') + '</div>' +
+      '<div class="sh-where">' + esc(joined([s.sub, s.kind === 'episode' && d.year ? String(d.year) : '', d.rating])) + '</div>' +
+      '<div class="sh-when">' + esc(joined([state, dur ? fmtTime(pos) + ' of ' + fmtTime(dur) + ' (' + Math.round(pos / dur * 100) + '%)' : fmtTime(pos)])) + '</div>' +
+      '<div class="sh-where">' + esc(joined([s.user, player])) + '</div></div></div>' +
+    '<div class="sh-line">' + esc(joined([s.local === false ? 'Remote' : 'Local network', d.address, d.relayed ? 'relayed (slower)' : '',
+      d.secure === true ? 'secure' : d.secure === false ? 'not secure' : ''])) + '</div>' +
+    '<div class="sh-line">' + esc(joined([plexDelivery(s), s.quality, rate(s.kbps)])) + '</div>' +
+    '<div class="sh-line">' + esc(joined([d.container ? String(d.container).toUpperCase() : '', joined([codec(d.video), res, d.fps]).replace(/ · /g, ' '),
+      joined([codec(d.audio), channels(d.channels)]).replace(/ · /g, ' '), rate(d.bitrate)])) + '</div>' +
+    (transcode ? '<div class="sh-line">' + esc('Transcode: ' + transcode) + '</div>' : '') +
+    '<div class="ag-list sh-list">' + streams + (d.summary ? '<div class="px-sum">' + esc(d.summary) + '</div>' : '') + '</div>' +
+    '<div class="sh-actions"><div class="btn" data-sheet-close="1">Close</div></div>');
+  return true;
+}
 function plexRow(s) {
   var tag = s.decision === 'transcode' ? ['tc', 'Transcode' + (s.hw ? ' · HW' : '')]
     : s.decision === 'direct stream' ? ['ds', 'Direct stream'] : ['dp', 'Direct play'];
   var state = s.state === 'paused' ? icon('pause') : s.state === 'buffering' ? '<i class="spin"></i>' : icon('play');
   var rate = s.kbps ? (s.kbps >= 1000 ? (s.kbps / 1000).toFixed(1) + ' Mbps' : s.kbps + ' kbps') : '';
   var who = [s.user, s.player].filter(function (x) { return x; }).map(esc).join(' · ');
-  return '<div class="px-row"><div class="px-art' + (s.kind === 'track' ? ' sq' : '') + '"' + (s.poster
+  return '<div class="px-row" data-plex="' + esc(s.id) + '"><div class="px-art' + (s.kind === 'track' ? ' sq' : '') + '"' + (s.poster
       ? ' style="background-image:url(/api/plex/art?k=' + encodeURIComponent(s.art) + ')">'
       : '>' + icon(s.kind === 'track' ? 'note' : 'play')) + '</div>' +
     '<div class="ev-main"><div class="ev-title">' + esc(s.title || '') + '</div><div class="ev-sub">' + esc(s.sub || '') + '</div>' +
@@ -2800,7 +2875,7 @@ document.addEventListener('pointerdown', function (e) {
   startX = e.clientX; startY = e.clientY;
   startInBar = !!e.target.closest('#bar, .cal-tabs');
   startOnSlider = !!e.target.closest('[data-hue-bar], [data-hue-lbar]');   // dragging a light's brightness, not swiping
-  downEl = e.target.closest('.tile[data-i], .preset[data-i], #dial, .tab, #status, [data-set], [data-sys], [data-sec], [data-media], [data-join], [data-guard], [data-kill], [data-ev], [data-sheet-close], [data-sheet-card], [data-audio], [data-audio-dev], [data-gh], #tabmore, [data-hue-room], [data-hue-toggle], [data-hue-ltoggle], [data-hue-scene], [data-hue-alloff], [data-hue-pair], [data-hue-bar], [data-hue-lbar], [data-tab-move], [data-tabs-reset], [data-tab-hide], [data-goto-media], [data-rm-join], [data-rm-dismiss], [data-cal], [data-weeks], [data-gh-open]');
+  downEl = e.target.closest('.tile[data-i], .preset[data-i], #dial, .tab, #status, [data-set], [data-sys], [data-sec], [data-media], [data-join], [data-guard], [data-kill], [data-ev], [data-sheet-close], [data-sheet-card], [data-audio], [data-audio-dev], [data-gh], #tabmore, [data-hue-room], [data-hue-toggle], [data-hue-ltoggle], [data-hue-scene], [data-hue-alloff], [data-hue-pair], [data-hue-bar], [data-hue-lbar], [data-tab-move], [data-tabs-reset], [data-tab-hide], [data-goto-media], [data-rm-join], [data-rm-dismiss], [data-cal], [data-weeks], [data-gh-open], [data-plex]');
   if (downEl) downEl.classList.add('down');
 });
 document.addEventListener('pointercancel', function () { if (downEl) downEl.classList.remove('down'); downEl = null; });
@@ -2824,6 +2899,7 @@ document.addEventListener('pointerup', function (e) {
   else if (el.hasAttribute('data-ev')) openEvent(el.getAttribute('data-ev'));
   else if (el.hasAttribute('data-audio')) openAudio();
   else if (el.hasAttribute('data-gh')) openGitHub(el.getAttribute('data-gh'));
+  else if (el.hasAttribute('data-plex')) openPlexStream(el.getAttribute('data-plex'));
   else if (el.hasAttribute('data-gh-open')) { fire(el); post('/api/github/open', { id: el.getAttribute('data-gh-open') }); closeSheet(); }
   else if (el.id === 'tabmore') scrollTabs();
   else if (el.hasAttribute('data-tab-move')) { var mv = el.getAttribute('data-tab-move').split('|'); moveTab(mv[0], parseInt(mv[1], 10)); }
@@ -2924,6 +3000,7 @@ function connect() {
       updateGitHub();
     } else if (m.type === 'plex') {
       plex = d;
+      plexAt = Date.now();
       updatePlex();
       updateTabDots();
     } else if (m.type === 'weather') {
