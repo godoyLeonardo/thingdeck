@@ -328,6 +328,13 @@ comes with its step counts, the step that runs and the step that failed, not wit
 step. While the run or a check goes on, the page asks again every 5 s; with no answer in
 15 s, the card says so.
 
+The page remembers the runs it has seen, by their links. A new run, or a run that runs
+again, while another page is on screen and no other card, reminder or Settings is open,
+shows a small card with Go to Code (`checkNewRuns`); it closes by itself after 20 s. The
+agent reads GitHub every minute, so the card can come up to a minute late. Before GitHub
+first answers, after an error with no runs, and for another repository, the page
+remembers nothing, so the runs already there don't count.
+
 ### What updates when
 
 The command poll's reply carries `visible`, the widgets of the page on screen

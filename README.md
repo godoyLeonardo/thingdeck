@@ -214,9 +214,11 @@ them to the Car Thing **over the USB cable** (`adb forward`; no network):
   pull request, its branches, author and size, whether it can merge, who reviewed it and
   who still has to, and each check with its state and time, failing and running ones
   first. While a run or a check goes on, the card updates every 5 seconds. **Open on
-  computer** opens the run or pull request in the browser there. It refreshes every
-  minute, or every 15 seconds while a workflow runs; pull down on either list to fetch
-  it right away (see [Adding GitHub](#adding-github)).
+  computer** opens the run or pull request in the browser there. When a workflow run
+  starts while another page is on screen, a small card shows it, with **Go to Code**; it
+  closes by itself after 20 seconds. It refreshes every minute, or every 15 seconds
+  while a workflow runs; pull down on either list to fetch it right away (see [Adding
+  GitHub](#adding-github)).
 - **Plex:** the streams on your Plex Media Server, and a dot on the Plex tab while
   someone streams. Each stream shows its poster, the user and player, the progress and
   the quality; tap it for a card with more: the player and its network, the media

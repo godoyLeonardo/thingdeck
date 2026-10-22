@@ -2317,6 +2317,30 @@ function updateGitHub() {
   redraw(box, html);
 }
 setInterval(updateGitHub, 15000);       // the times ("3m") move on between updates
+// A workflow run that starts while another page is on screen: a notice with the run and Go to
+// Code. A run counts when its link is new, or when it ran before and runs again. The runs there
+// when GitHub first answers (again after an error, or for another repository) don't count.
+var ghSeen = null;      // {repo, done: {link: completed}} of the runs last seen, or null
+function checkNewRuns() {
+  var g = github, runs = g.runs || [], seen = ghSeen;
+  if (g.state !== 'ok' || g.error && !runs.length) { ghSeen = null; return; }
+  ghSeen = { repo: g.repo, done: {} };
+  runs.forEach(function (r) { ghSeen.done[r.url] = r.status === 'completed'; });
+  if (!seen || seen.repo !== g.repo) return;
+  var fresh = runs.filter(function (r) { return !(r.url in seen.done) || seen.done[r.url] && r.status !== 'completed'; });
+  if (!fresh.length) return;
+  var r = fresh[0];
+  var state = r.status === 'in_progress' ? 'Running' : r.status !== 'completed' ? 'Queued'
+    : (RUN_STATES[r.conclusion] || 'Done') + ' · ' + since(r.updated);      // it ran between two reads
+  showNotice('github', '<div class="m-label">' + esc((r.url in seen.done ? 'Workflow run again' : 'New workflow run') + ' · ' +
+        (g.repo || '').split('/').pop()) + '</div>' +
+      '<div class="sh-title">' + esc(r.workflow || '') + '</div>' +
+      '<div class="sh-when">' + esc(state) + '</div>' +
+      '<div class="sh-where">' + esc(joined([r.branch, r.event])) + '</div>' +
+      '<div class="sh-line">' + esc(r.title || '') + '</div>' +
+      (fresh.length > 1 ? '<div class="sh-line">' + esc('and ' + (fresh.length - 1) + ' more') + '</div>' : ''),
+    'Go to Code');
+}
 
 // ---- Philips Hue (widget "lights"): the agent talks to the bridge; taps queue commands
 var hue = { state: 'unknown' }, hueDrag = null;
@@ -3043,6 +3067,7 @@ function connect() {
       ghPull(0, false);
       github = d;
       updateGitHub();
+      checkNewRuns();
     } else if (m.type === 'plex') {
       plex = d;
       plexAt = Date.now();
