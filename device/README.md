@@ -357,9 +357,11 @@ heartbeat, the calendars, audio, Hue, Plex, TrueNAS and GitHub.
 The Car Thing has no network, so the agent talks to the Hue Bridge (local API v2,
 `https://<bridge>/clip/v2/…` with the `hue-application-key` header) and posts the
 result to `POST /api/hue`: `{state: "ok", rooms: [...]}` with each room and zone, its
-`grouped_light` id, on/brightness, its lights (on, brightness, CIE `xy` or `mirek`)
-and its scenes; or `{state: "none" | "pairing" | "error"}`. Structure (rooms, zones,
-devices, scenes) is read every 30 s, levels every 2 s and right after a command.
+`grouped_light` id, on/brightness, its lights (on, brightness, CIE `xy`, and `mirek` only
+while the light is in white mode, since a color light keeps reporting the `xy` of its last
+color) and its scenes; or `{state: "none" | "pairing" | "error"}`. Structure (rooms, zones,
+devices) is read every 30 s; levels and which scene is active every second while Lights is
+on screen, every 30 s otherwise, and 0.7 s after a command.
 The bridge's certificate comes from Philips' own authority, so the agent accepts it
 for the bridge's address only.
 
@@ -368,7 +370,11 @@ Commands go the other way through a queue: the UI posts `POST /api/hue/command`
 `{op: "all_off"}`, `{op: "pair"}`), and the agent collects them with
 `GET /api/commands` 4 times a second (once elsewhere). `HostHue` merges commands for
 the same light or group, so a drag or a fast dial turn sends one brightness, and
-updates its state right away (the next state from the agent corrects it). The
+updates its state right away (the next state from the agent corrects it). The agent
+paces what it sends: a room, zone or scene command at most once a second (they go to
+every light in it, and the bridge queues faster ones, leaving the lights seconds behind),
+a single light's ten times a second; meanwhile commands wait, merged per room or light,
+so the latest value goes out. The
 widget `"lights"` draws a card per room (tinted with the average color of its lit
 lights, from `xy` or `mirek`); `POST /api/hue/select` makes a room the dial's
 target, and the action `{"hue": "up" | "down" | "toggle" | "all_off"}` (the
