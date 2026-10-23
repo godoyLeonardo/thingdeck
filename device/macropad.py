@@ -1186,10 +1186,6 @@ class HostMixer:
     # What the dial does on All (the system volume), and without the Windows agent's apps.
     MEDIA = {'up': {'media': 'vol_up'}, 'down': {'media': 'vol_down'}, 'next': {'media': 'mute'}, 'toggle': {'media': 'mute'}}
 
-    def shows(self, what):
-        """Whether this action is about the mixer, so the pad goes to the page with it: the
-        knob (moving the target) and turning an app, not the system volume on All."""
-        return self.updated is not None and (what == 'next' or self.app(self.selected) is not None)
 
     def action(self, what):
         """The dial or a tile, {"mixer": ...}: "next" moves the dial's target from All to each
@@ -1721,12 +1717,7 @@ class Pad:
         elif 'hue' in a:
             self.hue.action(a['hue'])
         elif 'mixer' in a:
-            # The mixer is on the page with the audio pill (Media): go there to see it.
-            pages = self.pages()
-            media = next((i for i, p in enumerate(pages) if p.get('audio')), None)
-            if media is not None and media != self.page and self.mixer.shows(a['mixer']):
-                self.set_page(media)
-            then = self.mixer.action(a['mixer'])
+            then = self.mixer.action(a['mixer'])      # the UI opens the mixer over the page you're on
             if then:
                 self._run(then)
         elif 'notify' in a:
