@@ -343,6 +343,9 @@
   .lc-name { flex: 1; min-width: 0; font-size: calc(18px * var(--ts)); font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .lc-sub { position: relative; font-size: calc(12.5px * var(--ts)); color: var(--muted); margin-top: 2px; white-space: nowrap;
     overflow: hidden; text-overflow: ellipsis; }
+  .lc-more { position: relative; align-self: flex-end; margin-top: auto; padding: 0 16px; height: 36px; line-height: 36px; border-radius: 18px;
+    background: var(--tile-hi); font-size: calc(14px * var(--ts)); font-weight: 600; color: var(--text); }
+  .lc-more.down { filter: brightness(1.25); }
   .lcard.alloff { align-items: center; justify-content: center; color: var(--muted); font-size: calc(16px * var(--ts)); font-weight: 600; }
   .lcard.alloff svg { width: 30px; height: 30px; margin-bottom: 6px; }
   .lcard.down, .lcard.fire { background: var(--tile-hi); }
@@ -2518,13 +2521,15 @@ function updateLights() {
   if (hue.state === 'ok') {
     html = (hue.rooms || []).map(function (r) {
       var lit = r.lights.filter(function (l) { return l.on; }).length, active = r.scenes.filter(function (s) { return s.active; })[0];
-      var sub = [r.kind === 'zone' ? 'Zone' : '', lit ? lit + ' of ' + r.lights.length + ' on' : r.lights.length + (r.lights.length === 1 ? ' light' : ' lights'), active ? active.name : '']
-        .filter(function (x) { return x; }).join(' · ');
-      return '<div class="lcard' + (r.on ? '' : ' off') + (r.id === hue.selected ? ' sel' : '') + '" data-hue-room="' + esc(r.id) + '"' +
+      var sub = [r.kind === 'zone' ? 'Zone' : '', lit ? lit + ' of ' + r.lights.length + ' on' : r.lights.length + (r.lights.length === 1 ? ' light' : ' lights'),
+        active ? active.name : '', r.on && r.brightness != null ? pct(r.brightness) : ''].filter(function (x) { return x; }).join(' · ');
+      // The card turns the room on and off (and puts it on the dial); Details opens the rest.
+      return '<div class="lcard' + (r.on ? '' : ' off') + (r.id === hue.selected ? ' sel' : '') + '" data-hue-card="' + esc(r.id) + '"' +
         ' style="--lc:' + (roomRGB(r) || 'var(--acc)') + '"><div class="lglow"></div>' +
         '<div class="lc-top"><div class="lc-name">' + esc(r.name) + '</div>' +
-        (r.group ? '<div class="hswitch' + (r.on ? ' on' : '') + '" data-hue-toggle="' + esc(r.group) + '"></div>' : '') + '</div>' +
-        '<div class="lc-sub">' + esc(sub) + '</div>' + (r.group ? hueBar('data-hue-bar', r.group, r.on, r.brightness) : '') + '</div>';
+        (r.group ? '<div class="hswitch' + (r.on ? ' on' : '') + '"></div>' : '') + '</div>' +
+        '<div class="lc-sub">' + esc(sub) + '</div>' +
+        '<div class="lc-more" data-hue-room="' + esc(r.id) + '">Details</div></div>';
     }).join('') + '<div class="lcard alloff" data-hue-alloff="1">' + icon('power') + 'All off</div>';
     box.className = 'lights';
   } else {
@@ -3077,7 +3082,7 @@ document.addEventListener('pointerdown', function (e) {
   startX = e.clientX; startY = e.clientY;
   startInBar = !!e.target.closest('#bar, .cal-tabs');
   startOnSlider = !!e.target.closest('[data-hue-bar], [data-hue-lbar], [data-mix-bar]');   // dragging a light's brightness, not swiping
-  downEl = e.target.closest('.tile[data-i], .preset[data-i], #dial, .tab, #status, [data-set], [data-sys], [data-sec], [data-media], [data-join], [data-guard], [data-kill], [data-ev], [data-sheet-close], [data-sheet-card], [data-audio], [data-audio-dev], [data-gh], #tabmore, [data-hue-room], [data-hue-toggle], [data-hue-ltoggle], [data-hue-scene], [data-hue-alloff], [data-hue-pair], [data-hue-bar], [data-hue-lbar], [data-tab-move], [data-tabs-reset], [data-tab-hide], [data-goto-media], [data-rm-join], [data-rm-dismiss], [data-cal], [data-weeks], [data-gh-open], [data-plex], [data-go], [data-mixer], [data-mix-sel], [data-mix-mute], [data-mix-bar]');
+  downEl = e.target.closest('.tile[data-i], .preset[data-i], #dial, .tab, #status, [data-set], [data-sys], [data-sec], [data-media], [data-join], [data-guard], [data-kill], [data-ev], [data-sheet-close], [data-sheet-card], [data-audio], [data-audio-dev], [data-gh], #tabmore, [data-hue-room], [data-hue-card], [data-hue-toggle], [data-hue-ltoggle], [data-hue-scene], [data-hue-alloff], [data-hue-pair], [data-hue-bar], [data-hue-lbar], [data-tab-move], [data-tabs-reset], [data-tab-hide], [data-goto-media], [data-rm-join], [data-rm-dismiss], [data-cal], [data-weeks], [data-gh-open], [data-plex], [data-go], [data-mixer], [data-mix-sel], [data-mix-mute], [data-mix-bar]');
   if (downEl) downEl.classList.add('down');
 });
 document.addEventListener('pointercancel', function () { if (downEl) downEl.classList.remove('down'); downEl = null; });
@@ -3138,6 +3143,13 @@ document.addEventListener('pointerup', function (e) {
   else if (el.hasAttribute('data-hue-alloff')) { fire(el); hueCmd({ op: 'all_off' }); }
   else if (el.hasAttribute('data-hue-pair')) hueCmd({ op: 'pair' });
   else if (el.hasAttribute('data-hue-room')) openRoom(el.getAttribute('data-hue-room'));
+  else if (el.hasAttribute('data-hue-card')) {
+    var room = hueRoom(el.getAttribute('data-hue-card'));
+    if (room) {
+      post('/api/hue/select', { id: room.id });                // the dial's Lights mode now controls this room
+      if (room.group) hueToggle(room.group, false);
+    }
+  }
   else if (el.hasAttribute('data-audio-dev')) chooseAudio(el.getAttribute('data-audio-dev'));
   else if (el.hasAttribute('data-guard')) openGuard();
   else if (el.hasAttribute('data-kill')) pressKill();
