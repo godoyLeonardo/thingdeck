@@ -1987,10 +1987,28 @@ function updateMixerPill() {
 }
 function renderMixerSheet() {
   if (mixer.state !== 'ok') return closeSheet();
-  var target = mixerTarget() || MIXER_ALL;
+  var target = mixerTarget() || MIXER_ALL, card = $('sheetcard');
   var all = { key: '*', name: 'All', volume: audio && audio.volume != null ? audio.volume : 0, muted: !!(audio && audio.muted), active: true };
-  redraw($('sheetcard'), '<div class="m-label">App volume · the knob moves the dial</div><div class="ag-list mx-list">' +
-    [all].concat(mixerApps()).map(function (a) {
+  var list = [all].concat(mixerApps());
+  // While only volumes and mutes change (a dial turn, a drag), set them in place: rebuilding
+  // the whole screen on every notch made the bars trail behind on the Car Thing's CPU.
+  var shape = list.map(function (a) { return [a.key, a.name, a.icon || '', a.active].join('|'); }).join(',') + '#' + target.key + '#' + iconStyle();
+  var rows = card.querySelectorAll('.mx-row');
+  if (card._mixShape === shape && rows.length === list.length) {
+    list.forEach(function (a, i) {
+      var row = rows[i], bar = row.querySelector('.hbar'), label = a.muted ? 'Muted' : a.volume + '%';
+      row.classList.toggle('muted', !!a.muted);
+      bar.querySelector('i').style.width = a.volume + '%';
+      if (bar.querySelector('span').textContent !== label) bar.querySelector('span').textContent = label;
+      var mute = row.querySelector('.mx-mute');
+      if (mute._muted !== !!a.muted) { mute._muted = !!a.muted; mute.innerHTML = icon(a.muted ? 'mute' : 'speaker'); }
+    });
+    return;
+  }
+  card._mixShape = shape;
+  card._html = null;
+  redraw(card, '<div class="m-label">App volume · the knob moves the dial</div><div class="ag-list mx-list">' +
+    list.map(function (a) {
       var k = esc(a.key);
       return '<div class="mx-row' + (a.key === target.key ? ' sel' : '') + (a.muted ? ' muted' : '') + (a.active ? '' : ' idle') + '">' +
         '<div class="mx-app" data-mix-sel="' + k + '">' + (a.key === '*' ? icon('speaker') : appIcon(a)) + '<span>' +
@@ -2006,6 +2024,7 @@ function openMixer() {
   sheetMode = 'mixer';
   sheetOpen = true;
   $('sheetcard')._html = null;
+  $('sheetcard')._mixShape = null;
   $('sheetcard').className = 'sheet-card sheet-full';
   renderMixerSheet();
   $('sheet').className = 'show';
@@ -2041,7 +2060,7 @@ document.addEventListener('pointercancel', function () { mixDrag = null; });
 function mixerDial(d) {
   if (d.open && !standbyShown && !lockShown && (sheetMode === 'mixer' || !sheetOpen || sheetMode === 'notice')) {
     var mine = sheetMode !== 'mixer' || mixerByDial;       // opened by the dial: close it again later
-    if (sheetMode !== 'mixer') openMixer(); else renderMixerSheet();
+    if (sheetMode !== 'mixer') openMixer();        // else the mixer event before this one has drawn it
     if (mine) {
       clearTimeout(mixerByDial);
       mixerByDial = setTimeout(function () { mixerByDial = null; if (sheetMode === 'mixer' && !mixDrag) closeSheet(); }, 6000);
