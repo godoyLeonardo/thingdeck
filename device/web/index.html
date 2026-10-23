@@ -381,7 +381,7 @@
   .hl-row { display: flex; align-items: center; min-height: 48px; }
   .hl-row .hl-name { width: 170px; font-size: calc(15px * var(--ts)); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .hl-row .hbar { flex: 1; margin: 0 0 0 12px; height: 30px; }
-  .hl-row .hswitch { margin-left: 12px; }
+  .hl-row .hl-pill span { font-family: inherit; font-weight: 600; }
   #huect { width: 100%; margin: 0; }
   #huect::-webkit-slider-runnable-track { height: 10px; border-radius: 5px;
     background: linear-gradient(to right, #cfe3ff, #fff6e6, #ffc46b, #ff9a3c); }
@@ -2559,8 +2559,11 @@ function renderRoomSheet() {
       }).join('') + '</div>' : '') +
       '<div class="m-label">Lights</div>' + r.lights.map(function (l) {
         return '<div class="hl-row' + (l.on ? '' : ' off') + '" style="--lc:rgb(' + lightRGB(l).join(',') + ')"><div class="hl-name">' + esc(l.name) + '</div>' +
-          (l.brightness != null ? hueBar('data-hue-lbar', l.id, l.on, l.brightness) : '<div style="flex:1"></div>') +
-          '<div class="hswitch' + (l.on ? ' on' : '') + '" data-hue-ltoggle="' + esc(l.id) + '"></div></div>';
+          // The bar is the light's switch too (drag to the left end: off); a light without
+          // brightness gets a pill that turns it on and off.
+          (l.brightness != null ? hueBar('data-hue-lbar', l.id, l.on, l.brightness)
+            : '<div class="hbar hl-pill" data-hue-ltoggle="' + esc(l.id) + '"><i style="width:' + (l.on ? 100 : 0) + '%"></i><span>' + (l.on ? 'On' : 'Off') + '</span></div>') +
+          '</div>';
       }).join('') +
     '</div><div class="sh-actions"><div class="btn" data-sheet-close="1">Close</div></div>';
   var slider = $('huect');
@@ -2585,13 +2588,14 @@ function hueToggle(groupOrLight, isLight) {
 }
 // Brightness bars: drag (or tap) to set; sends while dragging, merged on the device.
 function hueBarSet(e, final) {
-  var r = hueDrag.rect, v = Math.max(1, Math.min(100, Math.round((e.clientX - r.left) / r.width * 100)));
+  // A light's bar is its switch too: at the left end it turns the light off.
+  var r = hueDrag.rect, v = Math.max(hueDrag.light ? 0 : 1, Math.min(100, Math.round((e.clientX - r.left) / r.width * 100)));
   hueDrag.bar.querySelector('i').style.width = v + '%';
-  hueDrag.bar.querySelector('span').textContent = v + '%';
+  hueDrag.bar.querySelector('span').textContent = v ? v + '%' : 'Off';
   var now = Date.now();
   if (final || now - hueDrag.sent > 150) {
     hueDrag.sent = now;
-    hueCmd({ op: hueDrag.light ? 'light' : 'group', id: hueDrag.id, on: true, brightness: v });
+    hueCmd(v ? { op: hueDrag.light ? 'light' : 'group', id: hueDrag.id, on: true, brightness: v } : { op: 'light', id: hueDrag.id, on: false });
   }
 }
 document.addEventListener('pointerdown', function (e) {
