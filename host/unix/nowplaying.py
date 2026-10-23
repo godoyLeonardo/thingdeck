@@ -2,11 +2,11 @@
 """thingdeck agent for Linux and macOS.
 
 Sends the Car Thing the computer's time (for its clock) and lock state, system stats
-(CPU, memory, GPU, network), the focused app, the volume and audio devices, the
-calendars listed in calendars.txt, the Plex server in plex.txt, the TrueNAS server in truenas.txt, the weather for weather.txt,
+(CPU, memory, GPU, network), the focused app, the volume and audio devices (and on Linux
+each app's volume), the calendars listed in calendars.txt, the Plex server in plex.txt, the TrueNAS server in truenas.txt, the weather for weather.txt,
 and what it is playing, over USB through
 `adb forward`. It also opens meeting links, kills the focused app and switches audio
-devices when the Car Thing asks. What is playing comes from:
+devices and app volumes when the Car Thing asks. What is playing comes from:
   Linux  playerctl (any MPRIS player: Spotify, browsers, VLC, ...)
   macOS  media-control, else nowplaying-cli; if neither returns anything (macOS 15.4+
          restricts the API they use), AppleScript for Spotify and Music
@@ -561,6 +561,263 @@ class AudioLink:
             self.listed = 0.0
 
 
+# ------------------------------------------------------------------ app volume
+
+# Per-app volume on Linux, like the Windows agent's Volume Mixer: the PipeWire or PulseAudio
+# streams (sink inputs) grouped by program. The Car Thing gets each app's name, volume, mute
+# and whether it plays, and its icon once; it sends back absolute volumes and mutes through
+# the command poll (see HueLink.update).
+ICON_SIZE = 48
+MAX_ICON = 256 * 1024
+
+
+def sink_inputs():
+    """Every stream playing to an output, as {index, volume, muted, corked, props}; None without pactl."""
+    out = run(['pactl', '-f', 'json', 'list', 'sink-inputs'])
+    if out is not None:
+        try:
+            return [{'index': s['index'], 'muted': bool(s.get('mute')), 'corked': bool(s.get('corked')),
+                     'volume': max([as_int((c.get('value_percent') or '').rstrip('%')) or 0
+                                    for c in (s.get('volume') or {}).values()] or [0]),     # its loudest channel
+                     'props': s.get('properties') or {}} for s in json.loads(out)]
+        except (ValueError, KeyError, TypeError, AttributeError):
+            pass        # pactl 16.1 can write broken JSON: read the text instead
+    out = run(['env', 'LC_ALL=C', 'pactl', 'list', 'sink-inputs'])      # pactl before 16 has no JSON
+    if out is None:
+        return None
+    streams = []
+    for block in re.split(r'^Sink Input #', out, flags=re.M)[1:]:
+        volume = re.search(r'^\s*Volume:(.*)$', block, re.M)
+        streams.append({'index': as_int(block.split('\n', 1)[0]),
+                        'muted': bool(re.search(r'^\s*Mute: yes', block, re.M)),
+                        'corked': bool(re.search(r'^\s*Corked: yes', block, re.M)),
+                        'volume': max([int(v) for v in re.findall(r'(\d+)%', volume.group(1))] or [0]) if volume else 0,
+                        'props': dict(re.findall(r'^\s+([\w.-]+) = "(.*)"$', block, re.M))})
+    return streams
+
+
+def data_dirs():
+    """Where .desktop files and icon themes are: XDG's, and Flatpak's and Snap's exports."""
+    dirs = [os.environ.get('XDG_DATA_HOME') or os.path.expanduser('~/.local/share')]
+    dirs += (os.environ.get('XDG_DATA_DIRS') or '/usr/local/share:/usr/share').split(':')
+    dirs += [os.path.expanduser('~/.local/share/flatpak/exports/share'), '/var/lib/flatpak/exports/share',
+             '/var/lib/snapd/desktop']
+    found = []
+    for d in dirs:
+        if d and d not in found and os.path.isdir(d):
+            found.append(d)
+    return found
+
+
+def desktop_entry(path, wanted='[Desktop Entry]'):
+    """The keys of one section of a .desktop file (or another file in its format)."""
+    entry, section = {}, None
+    try:
+        with open(path, encoding='utf-8', errors='replace') as f:
+            for line in f:
+                line = line.strip()
+                if line.startswith('['):
+                    section = line
+                elif section == wanted and '=' in line:
+                    k, _, v = line.partition('=')
+                    entry.setdefault(k.strip(), v.strip())
+    except OSError:
+        pass
+    return entry
+
+
+def find_desktop(props, binary):
+    """The app's .desktop entry: by its app id (Flatpak's), its program's name, the program
+    its Exec runs or its window class, else by its name."""
+    files = []
+    for d in data_dirs():
+        files += glob.glob(os.path.join(d, 'applications', '**', '*.desktop'), recursive=True)
+    by_id = {os.path.basename(f)[:-len('.desktop')].lower(): f for f in reversed(files)}   # the first directory wins
+    for name in (props.get('pipewire.access.portal.app_id'), props.get('application.id'), binary):
+        if name and name.lower() in by_id:
+            return desktop_entry(by_id[name.lower()])
+    app_name, by_name = (props.get('application.name') or '').lower(), None
+    for f in files:
+        entry = desktop_entry(f)
+        program = next((os.path.basename(t) for t in (entry.get('Exec') or '').split() if t != 'env' and '=' not in t), '')
+        if binary and (program == binary or (entry.get('StartupWMClass') or '').lower() == binary.lower()):
+            return entry
+        if by_name is None and app_name and (entry.get('Name') or '').lower() == app_name:
+            by_name = entry
+    return by_name
+
+
+def icon_themes():
+    """The icon theme in use (KDE's, else GNOME's setting), the themes it inherits, and hicolor."""
+    theme = desktop_entry(os.path.expanduser('~/.config/kdeglobals'), '[Icons]').get('Theme')
+    if not theme:
+        theme = (run(['gsettings', 'get', 'org.gnome.desktop.interface', 'icon-theme'], timeout=3) or '').strip().strip("'")
+    themes, queue = [], [theme] if theme else []
+    while queue:
+        t = queue.pop(0).strip()
+        if t and t not in themes and len(themes) < 8:
+            themes.append(t)
+            for base in icon_bases():
+                inherits = desktop_entry(os.path.join(base, t, 'index.theme'), '[Icon Theme]').get('Inherits')
+                if inherits:
+                    queue += inherits.split(',')
+                    break
+    return [t for t in themes if t != 'hicolor'] + ['hicolor']
+
+
+def icon_bases():
+    return [os.path.expanduser('~/.icons')] + [os.path.join(d, 'icons') for d in data_dirs()]
+
+
+def best_icon(paths, svg):
+    """A 48 px PNG, else an SVG (when rsvg-convert can draw it), else the nearest larger PNG,
+    else the largest smaller one; app icons before others."""
+    def rank(path):
+        path = path.replace(os.sep, '/')
+        size = re.search(r'/(\d+)(?:x\d+)?(?:@\d+x?)?/', path)
+        size = int(size.group(1)) if size else 0
+        if path.endswith('.svg'):
+            order = (1, 0)
+        elif size == ICON_SIZE:
+            order = (0, 0)
+        elif size > ICON_SIZE:
+            order = (2, size)
+        else:
+            order = (3, -size)
+        return order + ('/apps/' not in path,)
+    paths = [p for p in paths if svg or not p.endswith('.svg')]
+    return min(paths, key=rank) if paths else None
+
+
+def find_icon(name):
+    """The file for an icon name, from the icon theme, hicolor or /usr/share/pixmaps."""
+    if not name:
+        return None
+    svg = bool(shutil.which('rsvg-convert'))
+    if os.path.isabs(name):         # Snap apps and some others give the file itself
+        return name if os.path.isfile(name) and (name.endswith('.png') or svg and name.endswith('.svg')) else None
+    pattern = glob.escape(name)
+    for theme in icon_themes():
+        found = []
+        for base in icon_bases():
+            for ext in ('png', 'svg'):
+                found += glob.glob(os.path.join(glob.escape(base), glob.escape(theme), '*', '%s.%s' % (pattern, ext)))
+                found += glob.glob(os.path.join(glob.escape(base), glob.escape(theme), '*', '*', '%s.%s' % (pattern, ext)))
+        best = best_icon(found, svg)
+        if best:
+            return best
+    return best_icon([p for p in ('/usr/share/pixmaps/%s.png' % name, '/usr/share/pixmaps/%s.svg' % name)
+                      if os.path.isfile(p)], svg)
+
+
+def icon_png(path):
+    """An icon file as PNG bytes: a PNG as it is, an SVG drawn at 48 px by rsvg-convert."""
+    if path.endswith('.svg'):
+        try:
+            out = subprocess.run(['rsvg-convert', '-w', str(ICON_SIZE), '-h', str(ICON_SIZE), '-a', path],
+                                 stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=5)
+        except (OSError, subprocess.TimeoutExpired):
+            return None
+        data = out.stdout if out.returncode == 0 else b''
+    else:
+        try:
+            with open(path, 'rb') as f:
+                data = f.read(MAX_ICON + 1)
+        except OSError:
+            return None
+    return data if data[:4] == b'\x89PNG' and len(data) <= MAX_ICON else None
+
+
+class MixerLink:
+    """Sends the apps every second when they change, and at least every 5 s, with the icons
+    the Car Thing asked for; runs its commands."""
+
+    def __init__(self):
+        self.known = {}         # app key -> {'name', 'icon' (its file), 'icon_id'}: looked up once per app
+        self.streams = {}       # app key -> its sink input indexes, for the commands
+        self.sent, self.sent_at, self.need_icons = None, 0.0, []
+
+    @staticmethod
+    def lookup(props, binary, key):
+        """The app's name and icon, from the stream and the app's .desktop entry."""
+        entry = find_desktop(props, binary) or {}
+        name = props.get('application.name') or ''
+        if not name or name == name.lower():        # "spotify" is the program's name: its menu entry's reads better
+            name = entry.get('Name') or name or binary or key
+        icon = None
+        for n in (props.get('application.icon_name'), entry.get('Icon'), binary):
+            icon = find_icon(n)
+            if icon:
+                break
+        # The icon's id: the file it comes from, so the Car Thing knows when it has the right one.
+        return {'name': name, 'icon': icon, 'icon_id': hashlib.sha1(icon.encode('utf-8')).hexdigest()[:8] if icon else None}
+
+    def read(self):
+        """The apps, playing first, then by name; None without pactl."""
+        if sys.platform == 'darwin':
+            return None
+        streams = sink_inputs()
+        if streams is None:
+            return None
+        apps, indexes = {}, {}
+        for s in streams:
+            p = s['props']
+            binary = os.path.basename(p.get('application.process.binary') or '')
+            key = (binary or p.get('application.name') or 'stream %s' % s['index']).lower()
+            if key not in self.known:
+                self.known[key] = self.lookup(p, binary, key)
+            if key not in apps:
+                apps[key] = {'key': key, 'name': self.known[key]['name'], 'volume': 0, 'muted': True,
+                             'active': False, 'icon_id': self.known[key]['icon_id']}
+                indexes[key] = []
+            app = apps[key]
+            app['volume'] = max(app['volume'], s['volume'])     # the loudest of its streams
+            app['muted'] = app['muted'] and s['muted']
+            app['active'] = app['active'] or not s['corked']
+            indexes[key].append(s['index'])
+        self.streams = indexes
+        return sorted(apps.values(), key=lambda a: (not a['active'], a['name'].lower()))
+
+    def update(self):
+        if time.monotonic() - self.sent_at < 1:
+            return
+        apps = self.read()
+        if apps is None:
+            return          # no pactl
+        key = json.dumps(apps, sort_keys=True)
+        if key == self.sent and not self.need_icons and time.monotonic() - self.sent_at < 5:
+            return
+        body = {'apps': apps}
+        if self.need_icons:
+            body['icons'] = {}
+            for k in self.need_icons:
+                icon = (self.known.get(k) or {}).get('icon')
+                png = icon and icon_png(icon)
+                if png:
+                    body['icons'][k] = base64.b64encode(png).decode('ascii')
+        reply = send('mixer', body)
+        self.sent, self.sent_at = key, time.monotonic()
+        self.need_icons = [k for k in reply.get('need_icons') or [] if k]
+
+    def command(self, cmd):
+        """From the Car Thing: {key, volume? (0..100), mute? (bool)}; the key "*" is All, the
+        default output itself."""
+        volume = '%d%%' % max(0, min(100, int(cmd['volume']))) if cmd.get('volume') is not None else None
+        mute = ('1' if cmd['mute'] else '0') if cmd.get('mute') is not None else None
+        if cmd.get('key') == '*':
+            if volume:
+                run(['pactl', 'set-sink-volume', '@DEFAULT_SINK@', volume])
+            if mute:
+                run(['pactl', 'set-sink-mute', '@DEFAULT_SINK@', mute])
+            return          # the audio update shows it
+        for index in self.streams.get(str(cmd.get('key')), []):
+            if volume:
+                run(['pactl', 'set-sink-input-volume', str(index), volume])
+            if mute:
+                run(['pactl', 'set-sink-input-mute', str(index), mute])
+        self.sent_at = 0.0  # show the result right away
+
+
 # ------------------------------------------------------------------ calendars
 
 # Each line is an iCal address, such as Google Calendar's "Secret address in iCal format".
@@ -581,8 +838,9 @@ HUE_FILE = os.path.join(os.path.dirname(CALENDAR_FILE), 'hue.json')
 
 
 class HueLink:
-    def __init__(self):
+    def __init__(self, mixer=None):
         self.config = None             # {'bridge', 'key'}
+        self.mixer = mixer             # runs the poll's "mixer" commands
         self.github_refresh = False    # set from the command poll, cleared by the main loop
         self.opened = set()            # panels that just came on screen, for the main loop
         self.calendar_soon = False     # the Car Thing says an event starts within 15 minutes
@@ -720,6 +978,12 @@ class HueLink:
         commands = polled.get('hue') or []
         self.github_refresh = self.github_refresh or bool(polled.get('github_refresh'))   # the Code page's refresh button
         self.calendar_soon = bool(polled.get('calendar_soon'))
+        for c in polled.get('mixer') or []:     # the App volume mixer and the Volume dial mode
+            if isinstance(c, dict) and self.mixer:
+                try:
+                    self.mixer.command(c)
+                except (ValueError, TypeError) as e:
+                    log('mixer:', e)
         if polled.get('github_details'):        # a card opened on the Code page
             threading.Thread(target=send_github_details, args=(polled['github_details'],), daemon=True).start()
         now_visible = set(polled.get('visible') or [])
@@ -1515,6 +1779,11 @@ def main():
         print(json.dumps(stats.read(), indent=2))
         print(json.dumps(focus(), indent=2, ensure_ascii=False))
         print(json.dumps((mac_audio if sys.platform == 'darwin' else linux_audio)(True), indent=2, ensure_ascii=False))
+        mixer = MixerLink()
+        apps = mixer.read()
+        if apps is not None:
+            print(json.dumps({'mixer': apps, 'icon_files': {k: v['icon'] for k, v in mixer.known.items()}},
+                             indent=2, ensure_ascii=False))
         try:
             print(json.dumps(PlexLink().read(), indent=2, ensure_ascii=False))
         except (OSError, ValueError, KeyError, TypeError) as e:
@@ -1535,7 +1804,8 @@ def main():
     last_host, last_host_sent = None, 0.0
     last_stats, last_focus, kill_result = 0.0, None, None
     audio = AudioLink()
-    hue = HueLink()
+    mixer = MixerLink()
+    hue = HueLink(mixer)
     plex = PlexLink()
     truenas = TrueNasLink()
     weather = WeatherLink()
@@ -1554,6 +1824,7 @@ def main():
                 last_signature, cover_sent_for, last_host, calendar_hash = None, '', None, None
                 github_fetched = None
                 audio.sent = audio.lists_sent = None
+                mixer.sent, mixer.sent_at = None, 0.0
                 hue.sent, hue.fetched = None, 0.0
                 plex.sent, plex.next = None, 0.0
                 truenas.sent, truenas.next = None, 0.0
@@ -1647,6 +1918,7 @@ def main():
                     cover_sent_for = ''
                 last_signature, last_sent = signature, time.monotonic()
             audio.update()
+            mixer.update()
             hue.update()
             plex.update()
             truenas.update()
