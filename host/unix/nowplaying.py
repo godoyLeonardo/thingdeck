@@ -22,6 +22,7 @@ THINGDECK_PORT (host side of the forward, default 28765), THINGDECK_CALENDARS
 import ast
 import base64
 import calendar
+import collections
 import datetime
 import glob
 import hashlib
@@ -835,6 +836,7 @@ OPENABLE_URL = re.compile(
 # passes rooms, zones, lights and scenes on. The bridge's address and key are in hue.json
 # next to calendars.txt, written when you pair from the Car Thing's Lights page.
 HUE_FILE = os.path.join(os.path.dirname(CALENDAR_FILE), 'hue.json')
+HUE_PACE = {'group': 1.0, 'light': 0.1}     # seconds between commands to the bridge (see HueLink.update)
 
 
 class HueLink:
@@ -842,6 +844,8 @@ class HueLink:
         self.config = None             # {'bridge', 'key'}
         self.mixer = mixer             # runs the poll's "mixer" commands
         self.github_refresh = False    # set from the command poll, cleared by the main loop
+        self.queue = collections.OrderedDict()                  # (op, id) -> command waiting for its turn
+        self.paced = {'group': 0.0, 'light': 0.0}               # when each kind last went out
         self.opened = set()            # panels that just came on screen, for the main loop
         self.calendar_soon = False     # the Car Thing says an event starts within 15 minutes
         self.pairing = None            # {'until', 'next', 'bridge'} while waiting for the button
@@ -994,7 +998,24 @@ class HueLink:
         visible.update(now_visible)
         if not self.config and not self.pairing:
             self.load()
+        # The bridge takes about one room or scene command a second (they go to every light in
+        # it) and ten for single lights; faster, it queues them and the lights lag behind for
+        # seconds. So commands wait here, merged per room or light (the latest value wins).
         for cmd in commands:
+            if not isinstance(cmd, dict):
+                continue
+            if cmd.get('op') in ('group', 'light', 'scene'):
+                self.queue.setdefault((cmd['op'], cmd.get('id')), {}).update(cmd)
+            else:
+                self.queue[(cmd.get('op'), len(self.queue), time.monotonic())] = cmd
+        for key in list(self.queue):
+            cmd = self.queue[key]
+            bucket = 'light' if cmd.get('op') == 'light' else 'group' if cmd.get('op') in ('group', 'scene') else None
+            if bucket and time.monotonic() - self.paced[bucket] < HUE_PACE[bucket]:
+                continue
+            del self.queue[key]
+            if bucket:
+                self.paced[bucket] = time.monotonic()
             try:
                 self.run(cmd)
             except (OSError, ValueError, KeyError) as e:

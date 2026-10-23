@@ -851,6 +851,9 @@ $hue = $null                 # @{ bridge; key } from hue.json
 $huePairing = $null          # @{ until; next } while waiting for the bridge's button
 $hueFetched = [DateTime]::MinValue; $hueListed = [DateTime]::MinValue; $hueLists = $null
 $hueSent = $null; $hueSentAt = [DateTime]::MinValue
+$hueQueue = [ordered]@{}       # "op|id" -> the command waiting for its turn (see Update-Hue)
+$HuePace = @{ group = 1.0; light = 0.1 }                                  # seconds between commands
+$huePaced = @{ group = [DateTime]::MinValue; light = [DateTime]::MinValue }
 
 function Read-HueConfig {
     if (-not (Test-Path $HueFile)) { return $null }
@@ -994,8 +997,22 @@ function Update-Hue {
     $script:visible = @($polled.visible | Where-Object { $_ })
     foreach ($w in $script:visible) { if ($was -notcontains $w) { Show-Panel $w } }
     if (-not $script:hue -and -not $script:huePairing) { $script:hue = Read-HueConfig }
+    # The bridge takes about one room or scene command a second (they go to every light in it)
+    # and ten for single lights; faster, it queues them and the lights lag behind for seconds.
+    # So commands wait here, merged per room or light (the latest value wins), and go out paced.
     foreach ($cmd in @($commands)) {
         if (-not $cmd) { continue }
+        if ($cmd.op -notin 'group', 'light', 'scene') { $script:hueQueue["now|$([guid]::NewGuid())"] = $cmd; continue }
+        $key = "$($cmd.op)|$($cmd.id)"
+        if ($script:hueQueue.Contains($key)) { foreach ($p in $cmd.PSObject.Properties) { $script:hueQueue[$key] | Add-Member -Force $p.Name $p.Value } }
+        else { $script:hueQueue[$key] = $cmd }
+    }
+    foreach ($key in @($script:hueQueue.Keys)) {
+        $cmd = $script:hueQueue[$key]
+        $bucket = if ($cmd.op -eq 'light') { 'light' } elseif ($cmd.op -in 'group', 'scene') { 'group' } else { $null }
+        if ($bucket -and ((Get-Date) - $script:huePaced[$bucket]).TotalSeconds -lt $HuePace[$bucket]) { continue }
+        $script:hueQueue.Remove($key)
+        if ($bucket) { $script:huePaced[$bucket] = Get-Date }
         try {
             if ($cmd.op -ne 'pair' -and -not $script:hue) { throw 'Pair the Hue Bridge first' }
             Invoke-HueCommand $cmd
