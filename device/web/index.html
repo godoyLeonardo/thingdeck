@@ -3184,7 +3184,7 @@ function connect() {
     } else if (m.type === 'turn') {
       spin(d.dir);
       var mode = (cfg.dial_modes || [])[st.dial];      // the volume dial: show the bar right away
-      if (mode && mode.cw && mode.cw.media === 'vol_up') showVolume();
+      if (mode && mode.cw && (mode.cw.media === 'vol_up' || (mode.cw.mixer === 'up' && !mixerTarget()))) showVolume();   // on All: the system volume
     } else if (m.type === 'hw') {
       if (d.button === 'knob' || d.button === 'menu') fire($('dial'));     // back changes the page, which shows by itself
     } else if (m.type === 'nowplaying') {

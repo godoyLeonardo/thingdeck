@@ -1183,31 +1183,35 @@ class HostMixer:
             self.selected = None if key == '*' else key
             self.publish()
 
+    # What the dial does on All (the system volume), and without the Windows agent's apps.
+    MEDIA = {'up': {'media': 'vol_up'}, 'down': {'media': 'vol_down'}, 'next': {'media': 'mute'}, 'toggle': {'media': 'mute'}}
+
+    def shows(self, what):
+        """Whether this action is about the mixer, so the pad goes to the page with it: the
+        knob (moving the target) and turning an app, not the system volume on All."""
+        return self.updated is not None and (what == 'next' or self.app(self.selected) is not None)
+
     def action(self, what):
         """The dial or a tile, {"mixer": ...}: "next" moves the dial's target from All to each
-        app making sound and back to All; "up" / "down" change the target's volume (on All,
-        the returned media key does it); "toggle" mutes the target app. Returns an action for
-        the pad to run, or None."""
+        app making sound and back to All; "up" / "down" change the target's volume; "toggle"
+        mutes the target. On All, and without the agent's apps (not Windows, no agent), it is
+        the volume keys and mute. Returns an action for the pad to run, or None."""
+        if what not in self.MEDIA:
+            raise ValueError('unknown mixer action %r' % what)
         if self.updated is None:
-            raise ValueError('App volume needs the Windows agent')
+            return self.MEDIA[what]
         app = self.app(self.selected)
         if what == 'next':
-            cycle = [None] + [a['key'] for a in self.apps if a['active']]
+            cycle = [None] + [a['key'] for a in self.apps]        # All, then the list: playing apps first
             at = cycle.index(self.selected) if self.selected in cycle else 0
             self.selected = cycle[(at + 1) % len(cycle)]
             self.publish()
-        elif what in ('up', 'down'):
-            if not app:
-                self.ui.publish('mixer_dial', {'key': '*', 'open': True})
-                return {'media': 'vol_up' if what == 'up' else 'vol_down'}
-            self.command({'key': app['key'], 'delta': MIXER_STEP if what == 'up' else -MIXER_STEP})
+        elif not app:
+            return self.MEDIA[what]          # the system volume: the usual volume bar shows it
         elif what == 'toggle':
-            if not app:
-                self.ui.publish('mixer_dial', {'key': '*', 'open': True})
-                return {'media': 'mute'}
             self.command({'key': app['key'], 'mute': 'toggle'})
         else:
-            raise ValueError('unknown mixer action %r' % what)
+            self.command({'key': app['key'], 'delta': MIXER_STEP if what == 'up' else -MIXER_STEP})
         self.ui.publish('mixer_dial', {'key': self.selected or '*', 'open': True})
         return None
 
@@ -1720,7 +1724,7 @@ class Pad:
             # The mixer is on the page with the audio pill (Media): go there to see it.
             pages = self.pages()
             media = next((i for i, p in enumerate(pages) if p.get('audio')), None)
-            if media is not None and media != self.page:
+            if media is not None and media != self.page and self.mixer.shows(a['mixer']):
                 self.set_page(media)
             then = self.mixer.action(a['mixer'])
             if then:
