@@ -22,6 +22,7 @@ import sys
 import threading
 import time
 import urllib.parse
+import zlib
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import ics       # ics.py next to this file: the calendar reader for the agenda
@@ -1068,6 +1069,158 @@ class HostWeather:
             self.ui.publish('weather', self.published)
 
 
+MIXER_TTL = 15          # seconds without an update before the app list counts as gone (sent at least every 5 s)
+MIXER_STEP = 4          # volume points per dial notch
+MIXER_HOLD = 2.0        # seconds a value set here wins over the agent's (older) readings
+MIXER_ICONS = 64        # app icons kept
+
+
+class HostMixer:
+    """Per-app volume on Windows, like the Volume Mixer: the agent posts the apps that play
+    through the default output (name, volume, mute, playing), and their icons once when asked.
+    Changes from the UI and the dial queue here for the agent's command poll, merged per app;
+    the UI shows them right away."""
+
+    def __init__(self, ui):
+        self.ui = ui
+        self.lock = threading.Lock()
+        self.apps, self.updated = [], None
+        self.icons = collections.OrderedDict()   # key -> png bytes
+        self.asked = set()                        # icons asked for (each once: some apps have none)
+        self.commands = collections.OrderedDict() # key -> {key, volume?, mute?}
+        self.held = {}                            # key -> (fields, until): just set here
+        self.selected = None                      # the app the dial's App volume mode controls; None: All
+
+    def snapshot(self):
+        if self.updated is None:
+            return {'state': 'unknown'}
+        return {'state': 'ok', 'apps': self.apps, 'selected': self.selected}
+
+    def publish(self):
+        self.ui.publish('mixer', self.snapshot())
+
+    def update(self, body):
+        """Store the agent's apps (and icons). Returns the icon keys it should send."""
+        apps = []
+        for a in body.get('apps') or []:
+            if isinstance(a, dict) and a.get('key'):
+                apps.append({'key': str(a['key']), 'name': str(a.get('name') or a['key']),
+                             'volume': max(0, min(100, int(a.get('volume') or 0))),
+                             'muted': bool(a.get('muted')), 'active': bool(a.get('active'))})
+        icons = body.get('icons') if isinstance(body.get('icons'), dict) else {}
+        now = time.monotonic()
+        with self.lock:
+            for key, png in icons.items():
+                try:
+                    self.icons[str(key)] = base64.b64decode(png)
+                except (ValueError, TypeError):
+                    continue
+                while len(self.icons) > MIXER_ICONS:
+                    self.icons.popitem(last=False)
+            for app in apps:
+                held = self.held.get(app['key'])
+                if held and held[1] > now:
+                    app.update(held[0])
+                png = self.icons.get(app['key'])
+                app['icon'] = '%08x' % zlib.crc32(png) if png else None     # in the icon's URL, so a new one loads
+            self.held = {k: v for k, v in self.held.items() if v[1] > now}
+            self.apps, self.updated = apps, now
+            need = [a['key'] for a in apps if a['key'] not in self.icons and a['key'] not in self.asked and a['key'] != 'system']
+            self.asked.update(need)
+        self.publish()
+        return need
+
+    def app(self, key):
+        return next((a for a in self.apps if a['key'] == key), None)
+
+    def command(self, cmd):
+        """From the UI or the dial: {key, volume (0..100) | delta | mute (bool or "toggle")}.
+        The key "*" is All, the system volume: absolute volume and mute only."""
+        if not isinstance(cmd, dict):
+            raise ValueError('bad mixer command')
+        if cmd.get('key') == '*':
+            change = {'key': '*'}
+            if 'volume' in cmd:
+                change['volume'] = max(0, min(100, int(round(float(cmd['volume'])))))
+            if isinstance(cmd.get('mute'), bool):
+                change['mute'] = cmd['mute']
+            if len(change) == 1:
+                raise ValueError('nothing to change')
+            with self.lock:
+                self.commands.setdefault('*', {'key': '*'}).update(change)
+            return None
+        with self.lock:
+            app = self.app(str(cmd.get('key')))
+            if not app:
+                raise ValueError('no such app')
+            change = {}
+            if 'volume' in cmd or 'delta' in cmd:
+                base = app['volume'] if 'delta' in cmd else 0
+                change['volume'] = max(0, min(100, int(round(base + float(cmd.get('delta', cmd.get('volume')))))))
+                if change['volume'] > 0 and app['muted']:
+                    change['mute'] = False        # turning it up unmutes, like the Volume Mixer
+            if 'mute' in cmd:
+                change['mute'] = (not app['muted']) if cmd['mute'] == 'toggle' else bool(cmd['mute'])
+            if not change:
+                raise ValueError('nothing to change')
+            queued = self.commands.setdefault(app['key'], {'key': app['key']})
+            queued.update(change)
+            if 'volume' in change:
+                app['volume'] = change['volume']
+            if 'mute' in change:
+                app['muted'] = change['mute']
+            self.held[app['key']] = ({'volume': app['volume'], 'muted': app['muted']}, time.monotonic() + MIXER_HOLD)
+        self.publish()
+        return app
+
+    def take(self):
+        with self.lock:
+            commands, self.commands = list(self.commands.values()), collections.OrderedDict()
+        return commands
+
+    def select(self, key):
+        if key == '*' or self.app(key):
+            self.selected = None if key == '*' else key
+            self.publish()
+
+    def action(self, what):
+        """The dial or a tile, {"mixer": ...}: "next" moves the dial's target from All to each
+        app making sound and back to All; "up" / "down" change the target's volume (on All,
+        the returned media key does it); "toggle" mutes the target app. Returns an action for
+        the pad to run, or None."""
+        if self.updated is None:
+            raise ValueError('App volume needs the Windows agent')
+        app = self.app(self.selected)
+        if what == 'next':
+            cycle = [None] + [a['key'] for a in self.apps if a['active']]
+            at = cycle.index(self.selected) if self.selected in cycle else 0
+            self.selected = cycle[(at + 1) % len(cycle)]
+            self.publish()
+        elif what in ('up', 'down'):
+            if not app:
+                self.ui.publish('mixer_dial', {'key': '*', 'open': True})
+                return {'media': 'vol_up' if what == 'up' else 'vol_down'}
+            self.command({'key': app['key'], 'delta': MIXER_STEP if what == 'up' else -MIXER_STEP})
+        elif what == 'toggle':
+            if not app:
+                self.ui.publish('mixer_dial', {'key': '*', 'open': True})
+                return {'media': 'mute'}
+            self.command({'key': app['key'], 'mute': 'toggle'})
+        else:
+            raise ValueError('unknown mixer action %r' % what)
+        self.ui.publish('mixer_dial', {'key': self.selected or '*', 'open': True})
+        return None
+
+    def icon(self, key):
+        with self.lock:
+            return self.icons.get(key)
+
+    def expire(self):
+        if self.updated is not None and time.monotonic() - self.updated > MIXER_TTL:
+            self.updated, self.apps = None, []
+            self.publish()
+
+
 class Broadcaster:
     def __init__(self):
         self.lock = threading.Lock()
@@ -1126,6 +1279,7 @@ class Pad:
         self.github = GitHubStatus(self.ui, self.opener)
         self.audio = HostAudio(self.ui)
         self.hue = HostHue(self.ui)
+        self.mixer = HostMixer(self.ui)
         self.plex = HostPlex(self.ui)
         self.truenas = HostTrueNAS(self.ui, self.host)
         self.weather = HostWeather(self.ui)
@@ -1562,6 +1716,15 @@ class Pad:
             self._run(mode.get('press') or {})
         elif 'hue' in a:
             self.hue.action(a['hue'])
+        elif 'mixer' in a:
+            # The mixer is on the page with the audio pill (Media): go there to see it.
+            pages = self.pages()
+            media = next((i for i, p in enumerate(pages) if p.get('audio')), None)
+            if media is not None and media != self.page:
+                self.set_page(media)
+            then = self.mixer.action(a['mixer'])
+            if then:
+                self._run(then)
         elif 'notify' in a:
             self.toast(a['notify'], a.get('level', 'info'))
         else:
@@ -1802,7 +1965,7 @@ class Handler(BaseHTTPRequestHandler):
             self._send(200, {'config': pad.config, 'state': pad.state(), 'presets': pad.presets(),
                              'nowplaying': pad.np.meta, 'stats': pad.stats.snapshot(), 'agenda': pad.agenda.published,
                              'audio': pad.audio.state, 'github': pad.github.published,
-                             'hue': pad.hue.snapshot(), 'plex': pad.plex.published, 'truenas': pad.truenas.published,
+                             'hue': pad.hue.snapshot(), 'mixer': pad.mixer.snapshot(), 'plex': pad.plex.published, 'truenas': pad.truenas.published,
                              'weather': pad.weather.published})
         elif path == '/api/nowplaying':
             self._send(200, {'nowplaying': pad.np.meta})
@@ -1819,12 +1982,19 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(200, poster[1], poster[0], {'Cache-Control': 'max-age=86400'})
             else:
                 self._send(404, {'error': 'no poster'})
+        elif path == '/api/mixer/icon':
+            key = (urllib.parse.parse_qs(self.path.partition('?')[2]).get('k') or [''])[0]
+            png = pad.mixer.icon(key)
+            if png:
+                self._send(200, png, 'image/png', {'Cache-Control': 'max-age=3600'})
+            else:
+                self._send(404, {'error': 'no icon'})
         elif path == '/api/calendar/event':
             eid = (urllib.parse.parse_qs(self.path.partition('?')[2]).get('id') or [''])[0]
             self._send(200, pad.agenda.details.get(eid) or {'notes': '', 'calendar': ''})
         elif path == '/api/commands':
             refresh, pad.github.refresh = pad.github.refresh, False
-            self._send(200, {'hue': pad.hue.take(), 'github_refresh': refresh,   # the agent collects these several times a second
+            self._send(200, {'hue': pad.hue.take(), 'mixer': pad.mixer.take(), 'github_refresh': refresh,   # the agent collects these several times a second
                              'github_details': pad.github.take_ask(), 'visible': pad.visible_widgets(),
                              'calendar_soon': pad.agenda.soon()})
         elif path == '/api/events':
@@ -1909,6 +2079,15 @@ class Handler(BaseHTTPRequestHandler):
                 pad.hue.command(body)
             except ValueError as e:
                 return self._send(400, {'error': str(e)})
+        elif path == '/api/mixer':
+            return self._send(200, {'ok': True, 'need_icons': pad.mixer.update(body)})
+        elif path == '/api/mixer/command':
+            try:
+                pad.mixer.command(body)
+            except ValueError as e:
+                return self._send(400, {'error': str(e)})
+        elif path == '/api/mixer/select':
+            pad.mixer.select(str(body.get('key')))
         elif path == '/api/hue/select':
             pad.hue.select(str(body.get('id')))
         elif path == '/api/plex':
@@ -2150,6 +2329,7 @@ def main():
             pad.plex.expire()
             pad.truenas.expire()
             pad.weather.expire()
+            pad.mixer.expire()
             pad.refresh_hidden()
             pad.agenda.refresh()
     finally:
