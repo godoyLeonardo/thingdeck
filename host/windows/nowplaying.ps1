@@ -914,18 +914,18 @@ function Send-HueState($state) {
     $script:hueSentAt = Get-Date
 }
 
-# Rooms and zones with their lights and scenes. The structure (rooms, devices, scenes) is
-# read every 30 s; the light levels every second while Lights is on screen (30 s otherwise),
-# and 0.7 s after a command.
+# Rooms and zones with their lights and scenes. The structure (rooms, devices) is read every
+# 30 s; the light levels and which scene is active every second while Lights is on screen (30 s
+# otherwise), and 0.7 s after a command.
 function Read-Hue {
     if (-not $script:hueLists -or ((Get-Date) - $script:hueListed).TotalSeconds -ge 30) {
         $script:hueLists = @{
             rooms = @((Invoke-Hue 'GET' '/clip/v2/resource/room').data) + @((Invoke-Hue 'GET' '/clip/v2/resource/zone').data)
             devices = @((Invoke-Hue 'GET' '/clip/v2/resource/device').data)
-            scenes = @((Invoke-Hue 'GET' '/clip/v2/resource/scene').data)
         }
         $script:hueListed = Get-Date
     }
+    $script:hueLists.scenes = @((Invoke-Hue 'GET' '/clip/v2/resource/scene').data)      # their "active" changes with the lights
     $lights = @{}; foreach ($l in (Invoke-Hue 'GET' '/clip/v2/resource/light').data) { $lights[$l.id] = $l }
     $groups = @{}; foreach ($g in (Invoke-Hue 'GET' '/clip/v2/resource/grouped_light').data) { $groups[$g.id] = $g }
     $deviceLights = @{}

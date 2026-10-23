@@ -909,12 +909,13 @@ class HueLink:
             self.load()
 
     def read(self):
-        """Rooms and zones with their lights and scenes; the structure every 30 s, levels every call."""
+        """Rooms and zones with their lights and scenes; the structure every 30 s, levels and the
+        active scene every call."""
         if self.lists is None or time.monotonic() - self.listed >= 30:
             self.lists = {'rooms': self.call('GET', '/clip/v2/resource/room')['data'] + self.call('GET', '/clip/v2/resource/zone')['data'],
-                          'devices': self.call('GET', '/clip/v2/resource/device')['data'],
-                          'scenes': self.call('GET', '/clip/v2/resource/scene')['data']}
+                          'devices': self.call('GET', '/clip/v2/resource/device')['data']}
             self.listed = time.monotonic()
+        self.lists['scenes'] = self.call('GET', '/clip/v2/resource/scene')['data']      # "active" changes with the lights
         lights = {l['id']: l for l in self.call('GET', '/clip/v2/resource/light')['data']}
         groups = {g['id']: g for g in self.call('GET', '/clip/v2/resource/grouped_light')['data']}
         device_lights = {d['id']: [s['rid'] for s in d.get('services', []) if s['rtype'] == 'light'] for d in self.lists['devices']}
