@@ -256,6 +256,7 @@ Add-Type @'
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using System.Text;
 
 namespace ThingdeckAudio {
     [ComImport, Guid("A95664D2-9614-4F35-A746-DE8DB63617E6"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
@@ -452,6 +453,21 @@ namespace ThingdeckAudio {
             return list;
         }
         public static Session[] Sessions() { return ReadSessions().ToArray(); }
+
+        // A process's program file with only "limited query" access, which Windows allows for
+        // more processes (games, other users' apps) than Process.Path, which reads its memory.
+        [DllImport("kernel32.dll")] static extern IntPtr OpenProcess(int access, bool inherit, uint pid);
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode)] static extern bool QueryFullProcessImageName(IntPtr process, int flags, StringBuilder name, ref int size);
+        [DllImport("kernel32.dll")] static extern bool CloseHandle(IntPtr handle);
+        public static string ProcessPath(uint pid) {
+            IntPtr process = OpenProcess(0x1000, false, pid);        // PROCESS_QUERY_LIMITED_INFORMATION
+            if (process == IntPtr.Zero) return null;
+            try {
+                var name = new StringBuilder(1024);
+                int size = name.Capacity;
+                return QueryFullProcessImageName(process, 0, name, ref size) ? name.ToString() : null;
+            } finally { CloseHandle(process); }
+        }
         // Set the volume (0..100, or -1 to keep it) and the mute (-1 keep, 0 off, 1 on) of the sessions of these processes.
         public static void SetSessions(uint[] pids, int volume, int mute) {
             foreach (var s in ReadSessions()) {
@@ -515,9 +531,12 @@ function Get-MixerProc([uint32]$id) {
     if ($script:mixerProcs.ContainsKey($id)) { return $script:mixerProcs[$id] }
     $p = Get-Process -Id $id -ErrorAction SilentlyContinue
     $info = if (-not $p) { @{ key = "pid$id"; name = "Process $id"; path = $null } } else {
-        $path = $p.Path        # null for elevated processes
-        $desc = if ($path) { (Get-Item $path -ErrorAction SilentlyContinue).VersionInfo.FileDescription } else { $null }
-        @{ key = $p.ProcessName.ToLower(); name = $(if ($desc -and $desc.Trim()) { $desc.Trim() } else { $p.ProcessName }); path = $path }
+        $path = $p.Path        # null for elevated and protected processes: then ask for less
+        if (-not $path) { $path = [ThingdeckAudio.Audio]::ProcessPath($id) }
+        $desc = if ($path) { (Get-Item -LiteralPath $path -ErrorAction SilentlyContinue).VersionInfo.FileDescription } else { $null }
+        @{ key = $p.ProcessName.ToLower(); name = $(if ($desc -and $desc.Trim()) { $desc.Trim() } else { $p.ProcessName }); path = $path
+            # The icon's id: the program file it comes from, so the Car Thing knows when it has the right one.
+            icon = $(if ($path) { (Get-Hash $path).Substring(0, 8) } else { $null }) }
     }
     $script:mixerProcs[$id] = $info
     $info
@@ -529,7 +548,7 @@ function Read-Mixer {
     foreach ($s in [ThingdeckAudio.Audio]::Sessions()) {
         $proc = if ($s.System) { @{ key = 'system'; name = 'System sounds'; path = $null } } else { Get-MixerProc $s.Pid }
         if (-not $apps.Contains($proc.key)) {
-            $apps[$proc.key] = [ordered]@{ key = $proc.key; name = $proc.name; volume = 0; muted = $true; active = $false }
+            $apps[$proc.key] = [ordered]@{ key = $proc.key; name = $proc.name; volume = 0; muted = $true; active = $false; icon_id = $proc.icon }
             $pids[$proc.key] = @()
         }
         $app = $apps[$proc.key]
