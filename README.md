@@ -17,8 +17,9 @@ as soon as you plug it in.
   page; hold 2 or 3 for the previous or next track (a page can set its own). Live pages
   show a big clock and the date at the top instead of their labels, and the buttons
   still work; a tile page of your own shows the labels.
-- **Dial:** volume, Hue lights (the room you last tapped), scroll, zoom, scrub (arrow keys),
-  browser tabs, undo/redo. The menu (M) button switches dial mode.
+- **Dial:** volume, Hue lights (the room you last tapped), app volume (Windows: the
+  knob moves it between all and each app making sound), scroll, zoom, scrub (arrow
+  keys), browser tabs, undo/redo. The menu (M) button switches dial mode.
 - **Windows, macOS and Linux:** each tile can have per-OS shortcuts. The pad
   detects Windows by itself; pick macOS or Linux once in Settings (see
   [Host OS](#host-os)).
@@ -70,8 +71,8 @@ The Car Thing's screen is 800×480. These use made-up demo data; to retake them,
 | **Settings → General:** brightness, host OS, layout | **Settings → Appearance** |
 | ![Settings, Tabs: the pages in order with up and down arrows](docs/screenshots/tabs.png) | ![A meeting reminder over the Media page: a countdown with Join meeting and Dismiss](docs/screenshots/reminder.png) |
 | **Settings → Tabs:** the order, and which tabs show | **Reminder:** 5 minutes before an event, on any page |
-| ![Standby screen: the clock and "Computer is asleep", with a Reconnect button](docs/screenshots/standby.png) | |
-| **Standby:** while the computer sleeps | |
+| ![Standby screen: the clock and "Computer is asleep", with a Reconnect button](docs/screenshots/standby.png) | ![App volume: All and each app with its icon, a volume bar and a mute button; the dial on Spotify](docs/screenshots/mixer.png) |
+| **Standby:** while the computer sleeps | **App volume (Windows):** each app, and the dial on one |
 
 ## Requirements
 
@@ -119,7 +120,7 @@ them.
 | Control | Default |
 |---|---|
 | Buttons 1–4 (top edge) | Presets: first page, page left, page right, last page · hold 2: previous track, hold 3: next track |
-| Dial turn | Current dial mode (Volume, Lights, Scroll, Zoom, Scrub, Tabs, Undo/Redo) |
+| Dial turn | Current dial mode (Volume, Lights, App volume, Scroll, Zoom, Scrub, Tabs, Undo/Redo) |
 | Dial press | Dial mode action (mute, middle click, reset zoom, …) |
 | Dial hold | Play/Pause |
 | Back button | Next page, wrapping from the last back to the first (from Settings: the first) · hold: first page |
@@ -252,6 +253,13 @@ them to the Car Thing **over the USB cable** (`adb forward`; no network):
     move too).
   - Linux: `pactl` (PipeWire or PulseAudio).
   - macOS: the volume always; switching devices needs `brew install switchaudio-osx`.
+- **App volume (Windows):** like the Volume Mixer or a Stream Deck volume dial. The
+  mixer button next to the output on the Media page opens a list: **All** (the system
+  volume) and each app playing through the output, with its icon, a bar to drag and a
+  mute button. The dial's **App volume** mode turns the one marked *Dial*, All at first;
+  pressing the knob moves it on to each app making sound and back to All (tapping a name
+  picks one too). Used from another page, it takes you to Media and opens the mixer, which
+  closes again a few seconds after the dial's last use.
 - **Clock:** the agent sets the Car Thing's clock and time zone (DST included).
   The time shows large with the date at the top of the live pages (Media, Lights,
   Calendar, Status, Code, Plex, NAS), and on the standby and lock

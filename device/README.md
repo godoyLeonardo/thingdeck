@@ -503,6 +503,30 @@ mute changes, and right away when the volume dial turns. A page with `"audio": t
 which posts `POST /api/audio/set {id}`. The pick goes to the agent as `set: {id,
 kind}` in the reply to its next audio update, so switching takes under a second.
 
+### App volume (Windows)
+
+The Windows agent reads the default output's audio sessions (`IAudioSessionManager2`, one
+`ISimpleAudioVolume` each, as the Volume Mixer does) every second and groups them by
+process name: an app's volume is its loudest session's, it counts as muted when all are,
+and as playing when one is active. Its name is the program's file description ("Google
+Chrome"), else the process name; the system sounds session is "System sounds". It posts
+`POST /api/mixer {apps: [{key, name, volume, muted, active}]}` when that changes and at
+least every 5 s; the reply's `need_icons` asks for each app's icon once, a 48 px PNG of the
+program's icon sent in the next update (`icons: {key: base64}`), served at
+`GET /api/mixer/icon?k=…&v=…` (`v` is a CRC of the PNG, so a new icon loads).
+
+`HostMixer` keeps the list (15 s without an update: gone) and a command queue merged per
+app, which the agent collects with the command poll (`mixer: [{key, volume?, mute?}]`) and
+applies to every session of that process; the key `*` is All, the output's own volume
+(`IAudioEndpointVolume`). A value set on the pad wins over the agent's readings for 2 s, so
+the bar doesn't jump back while you drag or turn. The action `{"mixer": ...}`: `"next"`
+moves the dial's target from All (`selected: null`) to each app making sound, in the list's
+order, and back to All; `"up"` / `"down"` change the target's volume by 4 (on All, it sends
+the volume keys); `"toggle"` mutes the target. The default config's App volume mode uses
+them on turn and press. Run from a page other than the one with `"audio": true`, the action
+goes to that page first, and the UI opens the mixer (`mixer_dial` events, with `open`) and
+closes it again 6 s after the dial's last use.
+
 ## config.json
 
 Top level:
@@ -552,6 +576,7 @@ pr` (also used for GitHub statuses), and `bulb power`.
 | Dial press | `{"dial_press": true}` (runs the current dial mode's `press`) |
 | Message | `{"notify": "hello", "level": "ok"}` (shows a toast on the screen) |
 | Hue | `{"hue": "up"}` / `"down"` / `"toggle"` / `"all_off"` (the selected room; needs the agent paired with a Hue Bridge) |
+| App volume | `{"mixer": "next"}` / `"up"` / `"down"` / `"toggle"` (the dial's target: All or one app; Windows agent) |
 
 **Per-OS overrides:** any action can carry `windows`, `mac` and/or `linux`
 objects. When the host matches, the override replaces the action, keeping
@@ -572,8 +597,8 @@ page, or `adb shell`).
 | Method | Path | Body | Purpose |
 |---|---|---|---|
 | GET | `/api/ping` | | Health check (used by `shim.html`) |
-| GET | `/api/state` | | Config, state, presets, now playing, stats, agenda, audio, github, hue, plex, truenas, weather |
-| GET | `/api/events` | | SSE stream: `state`, `config`, `fired`, `turn`, `hw`, `toast`, `nowplaying`, `stats`, `agenda`, `audio`, `github`, `github_details`, `hue`, `hue_dial`, `plex`, `truenas`, `weather`, `view` |
+| GET | `/api/state` | | Config, state, presets, now playing, stats, agenda, audio, github, hue, mixer, plex, truenas, weather |
+| GET | `/api/events` | | SSE stream: `state`, `config`, `fired`, `turn`, `hw`, `toast`, `nowplaying`, `stats`, `agenda`, `audio`, `github`, `github_details`, `hue`, `hue_dial`, `mixer`, `mixer_dial`, `plex`, `truenas`, `weather`, `view` |
 | GET | `/api/info` | | Uptime, temperature, memory, load, brightness |
 | POST | `/api/tap` | `{"page", "index"}` | Run a tile |
 | POST | `/api/preset` | `{"index"}` | Run a preset |
@@ -597,11 +622,15 @@ page, or `adb shell`).
 | POST | `/api/hue` | `{"state", "rooms"?, "error"?}` | From the host agent |
 | POST | `/api/hue/command` | `{"op", "id"?, "on"?, "brightness"?, "mirek"?}` | Queue a Hue command for the agent |
 | POST | `/api/hue/select` | `{"id"}` | Make a room the target of the Lights dial mode |
+| POST | `/api/mixer` | `{"apps": [...], "icons"?}` | From the Windows agent every second on a change. Replies `{"need_icons": [keys]}` |
+| POST | `/api/mixer/command` | `{"key", "volume" \| "delta" \| "mute"}` | Set an app's volume or mute (`key` `*`: All); `mute` can be `"toggle"` |
+| POST | `/api/mixer/select` | `{"key"}` | Make an app (or `*`, All) the target of the App volume dial mode |
+| GET | `/api/mixer/icon?k=…` | | An app's icon |
 | POST | `/api/plex` | `{"state", "server"?, "sessions"?, "load"?, "net"?, "libraries"?, "activities"?, "posters"?, "error"?}` | From the host agent every 3 s. Replies `{"need_art": [keys]}` |
 | GET | `/api/plex/art?k=…` | | A stream's poster |
 | POST | `/api/truenas` | `{"state", "system"?, "pools"?, "disks"?, "alerts"?, "apps"?, "jobs"?, "error"?}` | From the host agent every 10 s on screen, 60 s otherwise |
 | POST | `/api/weather` | `{"state", "place"?, "temp"?, "code"?, "day"?, "unit"?, "error"?}` | From the host agent every 15 min |
-| GET | `/api/commands` | | For the host agent: queued commands (`{"hue": [...], "github_refresh": bool, "github_details": ask or null}`, emptied on read), the panels on screen (`"visible"`) and `"calendar_soon"` |
+| GET | `/api/commands` | | For the host agent: queued commands (`{"hue": [...], "mixer": [...], "github_refresh": bool, "github_details": ask or null}`, emptied on read), the panels on screen (`"visible"`) and `"calendar_soon"` |
 | POST | `/api/github/refresh` | | Ask the agent to read GitHub now (pull down on the Code page) |
 | POST | `/api/run` | any action | Run an action |
 | POST | `/api/system` | `{"do": "reconnect" \| "restart" \| "reboot"}` | Reconnect USB (software replug) / restart service / reboot |
