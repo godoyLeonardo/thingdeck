@@ -503,7 +503,7 @@ mute changes, and right away when the volume dial turns. A page with `"audio": t
 which posts `POST /api/audio/set {id}`. The pick goes to the agent as `set: {id,
 kind}` in the reply to its next audio update, so switching takes under a second.
 
-### App volume (Windows)
+### App volume (Windows, Linux)
 
 The Windows agent reads the default output's audio sessions (`IAudioSessionManager2`, one
 `ISimpleAudioVolume` each, as the Volume Mixer does) every second and groups them by
@@ -517,6 +517,21 @@ reply's `need_icons` asks once for each app whose cached icon has another id, a 
 of the program's icon sent in the next update (`icons: {key: base64}`), served at
 `GET /api/mixer/icon?k=…&v=…` (`v` is a CRC of the PNG, so a new icon loads).
 
+The Linux agent does the same with PipeWire or PulseAudio through `pactl`: each second it
+reads the sink inputs (`pactl -f json list sink-inputs`; the text output with pactl before
+16) and groups them by `application.process.binary`, else `application.name`: an app's
+volume is its streams' loudest channel, it counts as muted when all are, and as playing
+when one isn't corked. All sinks count, not only the default one. Its name is
+`application.name`, or its `.desktop` entry's `Name` when that is all lowercase (a
+program's name, such as "spotify"); the entry is found by the Flatpak app id, the program,
+its `Exec` or `StartupWMClass`, else by the name. The icon is `application.icon_name`,
+else the entry's `Icon`, else the program, from the icon theme (KDE's or GNOME's setting,
+what it inherits, then hicolor) or `/usr/share/pixmaps`: a 48 px PNG, else an SVG drawn at
+48 px by `rsvg-convert` when installed, else the nearest PNG (256 KB at most); `icon_id`
+is a hash of that file's path. Commands run `pactl set-sink-input-volume` / `-mute` on each
+of the app's streams, and `set-sink-volume` / `set-sink-mute @DEFAULT_SINK@` for `*`. macOS
+has no per-app volume API, so the agent there sends no apps.
+
 `HostMixer` keeps the list (15 s without an update: gone) and a command queue merged per
 app, which the agent collects with the command poll (`mixer: [{key, volume?, mute?}]`) and
 applies to every session of that process; the key `*` is All, the output's own volume
@@ -524,7 +539,7 @@ applies to every session of that process; the key `*` is All, the output's own v
 the bar doesn't jump back while you drag or turn. The action `{"mixer": ...}`: `"next"`
 moves the dial's target from All (`selected: null`) to each app, in the list's order
 (playing first), and back to All; `"up"` / `"down"` change the target's volume by 4;
-`"toggle"` mutes the target. On All, and without the agent's apps (not Windows, no agent),
+`"toggle"` mutes the target. On All, and without the agent's apps (macOS, no agent),
 they are the volume keys and mute, so the default config's Volume mode uses them on turn
 and press everywhere. The knob, and turning an app, make the UI open the mixer full screen
 over the page on screen (`mixer_dial` events, with `open`) and close it again 6 s after
@@ -579,7 +594,7 @@ pr` (also used for GitHub statuses), and `bulb power`.
 | Dial press | `{"dial_press": true}` (runs the current dial mode's `press`) |
 | Message | `{"notify": "hello", "level": "ok"}` (shows a toast on the screen) |
 | Hue | `{"hue": "up"}` / `"down"` / `"toggle"` / `"all_off"` (the selected room; needs the agent paired with a Hue Bridge) |
-| Volume, per app | `{"mixer": "next"}` / `"up"` / `"down"` / `"toggle"` (the dial's target, All or one app, on Windows; the volume keys and mute elsewhere) |
+| Volume, per app | `{"mixer": "next"}` / `"up"` / `"down"` / `"toggle"` (the dial's target, All or one app, on Windows and Linux; the volume keys and mute elsewhere) |
 
 **Per-OS overrides:** any action can carry `windows`, `mac` and/or `linux`
 objects. When the host matches, the override replaces the action, keeping
@@ -625,7 +640,7 @@ page, or `adb shell`).
 | POST | `/api/hue` | `{"state", "rooms"?, "error"?}` | From the host agent |
 | POST | `/api/hue/command` | `{"op", "id"?, "on"?, "brightness"?, "mirek"?}` | Queue a Hue command for the agent |
 | POST | `/api/hue/select` | `{"id"}` | Make a room the target of the Lights dial mode |
-| POST | `/api/mixer` | `{"apps": [...], "icons"?}` | From the Windows agent every second on a change. Replies `{"need_icons": [keys]}` |
+| POST | `/api/mixer` | `{"apps": [...], "icons"?}` | From the Windows and Linux agents every second on a change. Replies `{"need_icons": [keys]}` |
 | POST | `/api/mixer/command` | `{"key", "volume" \| "delta" \| "mute"}` | Set an app's volume or mute (`key` `*`: All); `mute` can be `"toggle"` |
 | POST | `/api/mixer/select` | `{"key"}` | Make an app (or `*`, All) the target of the App volume dial mode |
 | GET | `/api/mixer/icon?k=…` | | An app's icon |
