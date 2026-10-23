@@ -17,9 +17,9 @@ as soon as you plug it in.
   page; hold 2 or 3 for the previous or next track (a page can set its own). Live pages
   show a big clock and the date at the top instead of their labels, and the buttons
   still work; a tile page of your own shows the labels.
-- **Dial:** volume, Hue lights (the room you last tapped), app volume (Windows: the
-  knob moves it between all and each app making sound), scroll, zoom, scrub (arrow
-  keys), browser tabs, undo/redo. The menu (M) button switches dial mode.
+- **Dial:** volume (on Windows, per app too: the knob moves it from all to each app),
+  Hue lights (the room you last tapped), scroll, zoom, scrub (arrow keys), browser
+  tabs, undo/redo. The menu (M) button switches dial mode.
 - **Windows, macOS and Linux:** each tile can have per-OS shortcuts. The pad
   detects Windows by itself; pick macOS or Linux once in Settings (see
   [Host OS](#host-os)).
@@ -120,7 +120,7 @@ them.
 | Control | Default |
 |---|---|
 | Buttons 1–4 (top edge) | Presets: first page, page left, page right, last page · hold 2: previous track, hold 3: next track |
-| Dial turn | Current dial mode (Volume, Lights, App volume, Scroll, Zoom, Scrub, Tabs, Undo/Redo) |
+| Dial turn | Current dial mode (Volume, Lights, Scroll, Zoom, Scrub, Tabs, Undo/Redo) |
 | Dial press | Dial mode action (mute, middle click, reset zoom, …) |
 | Dial hold | Play/Pause |
 | Back button | Next page, wrapping from the last back to the first (from Settings: the first) · hold: first page |
@@ -256,10 +256,12 @@ them to the Car Thing **over the USB cable** (`adb forward`; no network):
 - **App volume (Windows):** like the Volume Mixer or a Stream Deck volume dial. The
   mixer button next to the output on the Media page opens a list: **All** (the system
   volume) and each app playing through the output, with its icon, a bar to drag and a
-  mute button. The dial's **App volume** mode turns the one marked *Dial*, All at first;
-  pressing the knob moves it on to each app making sound and back to All (tapping a name
-  picks one too). Used from another page, it takes you to Media and opens the mixer, which
-  closes again a few seconds after the dial's last use.
+  mute button. In the **Volume** dial mode the dial turns the one marked *Dial*, All at
+  first, and pressing the knob moves it on to each app in the list and back to All
+  (tapping a name picks one too). The knob opens the mixer, from another page too (it goes
+  to Media first), and it closes again a few seconds after the dial's last use; turning
+  the system volume on All works on any page without moving you. Elsewhere than Windows,
+  or without the agent, the knob mutes as before.
 - **Clock:** the agent sets the Car Thing's clock and time zone (DST included).
   The time shows large with the date at the top of the live pages (Media, Lights,
   Calendar, Status, Code, Plex, NAS), and on the standby and lock

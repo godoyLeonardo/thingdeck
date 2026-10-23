@@ -520,12 +520,13 @@ app, which the agent collects with the command poll (`mixer: [{key, volume?, mut
 applies to every session of that process; the key `*` is All, the output's own volume
 (`IAudioEndpointVolume`). A value set on the pad wins over the agent's readings for 2 s, so
 the bar doesn't jump back while you drag or turn. The action `{"mixer": ...}`: `"next"`
-moves the dial's target from All (`selected: null`) to each app making sound, in the list's
-order, and back to All; `"up"` / `"down"` change the target's volume by 4 (on All, it sends
-the volume keys); `"toggle"` mutes the target. The default config's App volume mode uses
-them on turn and press. Run from a page other than the one with `"audio": true`, the action
-goes to that page first, and the UI opens the mixer (`mixer_dial` events, with `open`) and
-closes it again 6 s after the dial's last use.
+moves the dial's target from All (`selected: null`) to each app, in the list's order
+(playing first), and back to All; `"up"` / `"down"` change the target's volume by 4;
+`"toggle"` mutes the target. On All, and without the agent's apps (not Windows, no agent),
+they are the volume keys and mute, so the default config's Volume mode uses them on turn
+and press everywhere. The knob, and turning an app, go to the page with `"audio": true`
+first (`HostMixer.shows`), and the UI opens the mixer (`mixer_dial` events, with `open`)
+and closes it again 6 s after the dial's last use; turning All moves nothing.
 
 ## config.json
 
@@ -576,7 +577,7 @@ pr` (also used for GitHub statuses), and `bulb power`.
 | Dial press | `{"dial_press": true}` (runs the current dial mode's `press`) |
 | Message | `{"notify": "hello", "level": "ok"}` (shows a toast on the screen) |
 | Hue | `{"hue": "up"}` / `"down"` / `"toggle"` / `"all_off"` (the selected room; needs the agent paired with a Hue Bridge) |
-| App volume | `{"mixer": "next"}` / `"up"` / `"down"` / `"toggle"` (the dial's target: All or one app; Windows agent) |
+| Volume, per app | `{"mixer": "next"}` / `"up"` / `"down"` / `"toggle"` (the dial's target, All or one app, on Windows; the volume keys and mute elsewhere) |
 
 **Per-OS overrides:** any action can carry `windows`, `mac` and/or `linux`
 objects. When the host matches, the override replaces the action, keeping
