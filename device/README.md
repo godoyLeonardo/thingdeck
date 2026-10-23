@@ -524,9 +524,9 @@ moves the dial's target from All (`selected: null`) to each app, in the list's o
 (playing first), and back to All; `"up"` / `"down"` change the target's volume by 4;
 `"toggle"` mutes the target. On All, and without the agent's apps (not Windows, no agent),
 they are the volume keys and mute, so the default config's Volume mode uses them on turn
-and press everywhere. The knob, and turning an app, go to the page with `"audio": true`
-first (`HostMixer.shows`), and the UI opens the mixer (`mixer_dial` events, with `open`)
-and closes it again 6 s after the dial's last use; turning All moves nothing.
+and press everywhere. The knob, and turning an app, make the UI open the mixer full screen
+over the page on screen (`mixer_dial` events, with `open`) and close it again 6 s after
+the dial's last use; turning All only shows the usual volume bar.
 
 ## config.json
 

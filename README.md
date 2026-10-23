@@ -254,14 +254,13 @@ them to the Car Thing **over the USB cable** (`adb forward`; no network):
   - Linux: `pactl` (PipeWire or PulseAudio).
   - macOS: the volume always; switching devices needs `brew install switchaudio-osx`.
 - **App volume (Windows):** like the Volume Mixer or a Stream Deck volume dial. The
-  mixer button next to the output on the Media page opens a list: **All** (the system
-  volume) and each app playing through the output, with its icon, a bar to drag and a
-  mute button. In the **Volume** dial mode the dial turns the one marked *Dial*, All at
+  mixer button next to the output on the Media page opens it, full screen: **All** (the
+  system volume) and each app playing through the output, with its icon, a bar to drag and
+  a mute button. In the **Volume** dial mode the dial turns the one marked *Dial*, All at
   first, and pressing the knob moves it on to each app in the list and back to All
-  (tapping a name picks one too). The knob opens the mixer, from another page too (it goes
-  to Media first), and it closes again a few seconds after the dial's last use; turning
-  the system volume on All works on any page without moving you. Elsewhere than Windows,
-  or without the agent, the knob mutes as before.
+  (tapping a name picks one too). The knob opens the mixer over whatever page you're on,
+  and it closes again a few seconds after the dial's last use. Elsewhere than Windows, or
+  without the agent, the knob mutes as before.
 - **Clock:** the agent sets the Car Thing's clock and time zone (DST included).
   The time shows large with the date at the top of the live pages (Media, Lights,
   Calendar, Status, Code, Plex, NAS), and on the standby and lock
