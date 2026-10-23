@@ -612,6 +612,11 @@
   #mixerpill svg { width: 24px; height: 24px; }
   #mixerpill.down { background: var(--tile-hi); }
   #mixerpill + #audiopill { margin-left: 8px; }
+  /* the mixer fills the screen, over whatever page is on */
+  .sheet-card.mixer-full { position: fixed; left: 0; top: 0; right: 0; bottom: 0; width: auto; max-height: none; border-radius: 0;
+    padding: 16px 26px 14px; box-shadow: none; }
+  .mixer-full > .m-label { font-size: calc(13px * var(--ts)); }
+  .mixer-full .sh-actions .btn { height: 56px; line-height: 56px; min-width: 200px; border-radius: 14px; font-size: calc(19px * var(--ts)); }
   .mx-list { flex: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; touch-action: pan-y; margin: 4px -10px 0; padding: 0; }   /* rows reach into the card padding, never wider than the list */
   .mx-list::-webkit-scrollbar { display: none; }
   .mx-row { display: flex; align-items: center; min-height: 60px; padding: 4px 8px; border-radius: 12px; border: 2px solid transparent; }
@@ -1946,10 +1951,10 @@ function updateAudioPill() {
 }
 
 // ---- per-app volume (Windows agent): All (the system volume) and the apps playing through the
-// default output, each with a bar to drag and a mute button. The dial's App volume mode turns
-// the one marked Dial: All by default; its press moves on to each app making sound and back to
-// All (tapping a name picks one too). Used from another page, it goes to this one and opens the
-// mixer, which closes again 6 s after the dial's last use.
+// default output, each with a bar to drag and a mute button, full screen. In the Volume dial mode
+// the dial turns the one marked Dial: All by default; the knob moves on to each app and back to
+// All (tapping a name picks one too), opening the mixer over any page; opened that way, it closes
+// again 6 s after the dial's last use.
 var mixer = { state: 'unknown' }, mixDrag = null, mixerByDial = null;
 function mixerApps() { return mixer.state === 'ok' ? mixer.apps || [] : []; }
 function mixerApp(key) { return mixerApps().filter(function (a) { return a.key === key; })[0]; }
@@ -1984,6 +1989,7 @@ function openMixer() {
   sheetMode = 'mixer';
   sheetOpen = true;
   $('sheetcard')._html = null;
+  $('sheetcard').className = 'sheet-card mixer-full';
   renderMixerSheet();
   $('sheet').className = 'show';
 }
