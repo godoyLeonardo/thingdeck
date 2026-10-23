@@ -370,7 +370,7 @@ the local network, using the bridge's own API (no Hue account or cloud involved)
 The agent finds the bridge (through Philips' discovery service), gets a key, and
 saves both in `hue.json` next to `calendars.txt`. Your rooms show up a moment later.
 To pair again, delete `hue.json` and tap Pair. Light changes made elsewhere (the
-Hue app, a switch) show on the Car Thing within about 2 seconds. Lights only work
+Hue app, a switch) show on the Car Thing within about a second while Lights is on screen. Lights only work
 while the computer is on and the agent is running, and they need a Hue Bridge;
 lights used only through Bluetooth can't be reached.
 

@@ -340,7 +340,7 @@ remembers nothing, so the runs already there don't count.
 The command poll's reply carries `visible`, the widgets of the page on screen
 (`Pad.visible_widgets()`; none on the standby or lock screen). The agent reads those
 often and the rest slowly:
-Hue 2 s / 30 s, Plex 3 s / 30 s, TrueNAS 10 s / 60 s, GitHub 15 s while a workflow runs / 1 min, and
+Hue 1 s / 30 s (and 0.7 s after a command: the bridge reports a change a moment late; `HostHue` keeps a change made on the pad for 3 s against older readings, so a card doesn't flip back), Plex 3 s / 30 s, TrueNAS 10 s / 60 s, GitHub 15 s while a workflow runs / 1 min, and
 the GPU part of the stats 2 s / 30 s (the rest of the stats, the song, audio, the host
 heartbeat keep their pace). A widget that comes on screen is read at once (the calendars
 at most twice a minute). The calendars are read every minute while the Calendar page is on
