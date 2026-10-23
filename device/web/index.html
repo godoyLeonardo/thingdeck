@@ -602,6 +602,33 @@
   .vh-bar i { display: block; height: 100%; width: 0; background: var(--acc); transition: width .12s; }
   #volhud.muted .vh-bar i { background: var(--muted); }
   #volhud.muted .vh-num { color: var(--muted); }
+  .vh-name { flex: none; max-width: 150px; margin-left: 12px; font-size: calc(17px * var(--ts)); font-weight: 600; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis; }
+  .vh-name:empty { display: none; }
+  .vh-icon img { width: 28px; height: 28px; }
+  /* per-app volume (Windows): the mixer button in the Media top bar, and its sheet */
+  #mixerpill { flex: none; align-self: center; margin-left: auto; display: none; align-items: center; justify-content: center;
+    width: 52px; height: 44px; border-radius: 22px; background: var(--tile); color: var(--text); }
+  #mixerpill svg { width: 24px; height: 24px; }
+  #mixerpill.down { background: var(--tile-hi); }
+  #mixerpill + #audiopill { margin-left: 8px; }
+  .mx-list { flex: 1; min-height: 0; overflow-y: auto; margin: 4px -4px 0; padding: 0 4px; }
+  .mx-list::-webkit-scrollbar { display: none; }
+  .mx-row { display: flex; align-items: center; min-height: 60px; padding: 4px 8px; margin: 0 -8px; border-radius: 12px; border: 2px solid transparent; }
+  .mx-row.sel { border-color: var(--acc); }
+  .mx-app { flex: none; width: 168px; display: flex; align-items: center; min-width: 0; }
+  .mx-app img, .mx-app svg { flex: none; width: 30px; height: 30px; margin-right: 10px; color: var(--muted); }
+  .mx-app span { flex: 1; min-width: 0; font-size: calc(16px * var(--ts)); font-weight: 600; line-height: 1.2; overflow: hidden;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .mx-app small { display: block; font: 500 calc(11px * var(--ts)) GeistMono, monospace; color: var(--acc); text-transform: uppercase; }
+  .mx-row .hbar { flex: 1; margin: 0 10px; height: 40px; }
+  .mx-row.muted .hbar i { opacity: .25; }
+  .mx-row.idle .mx-app span { color: var(--muted); }
+  .mx-mute { flex: none; width: 48px; height: 44px; border-radius: 12px; background: var(--tile-hi); display: flex; align-items: center;
+    justify-content: center; color: var(--text); }
+  .mx-mute svg { width: 22px; height: 22px; }
+  .mx-row.muted .mx-mute { background: var(--acc-soft); color: var(--acc); }
+  .mx-mute.down { filter: brightness(1.2); }
   .vh-num { width: 42px; text-align: right; font-size: calc(21px * var(--ts)); font-weight: 700; font-variant-numeric: tabular-nums; }
   /* the song playing, in the clock header of pages other than Media; tap for Media */
   #topnp { flex: 0 1 auto; min-width: 0; max-width: 48%; align-self: center; margin-left: auto; display: flex; align-items: center;
@@ -858,7 +885,7 @@
 </head>
 <body>
   <div id="top">
-    <div id="topclock"><span class="tc-time"></span><span class="tc-suffix"></span><span class="tc-date"></span><span id="topweather" class="hidden"></span><div id="topnp" data-goto-media="1"></div><div id="audiopill" data-audio="1"></div></div>
+    <div id="topclock"><span class="tc-time"></span><span class="tc-suffix"></span><span class="tc-date"></span><span id="topweather" class="hidden"></span><div id="topnp" data-goto-media="1"></div><div id="mixerpill" data-mixer="1"></div><div id="audiopill" data-audio="1"></div></div>
     <div id="presets"></div>
     <div id="dial">
       <svg viewBox="0 0 26 26" fill="none"><circle cx="13" cy="13" r="10.5" style="stroke:var(--muted)" stroke-width="2"/><line x1="13" y1="4.5" x2="13" y2="9.5" style="stroke:var(--acc)" stroke-width="2.4" stroke-linecap="round"/></svg>
@@ -926,7 +953,7 @@
     <div id="clock" class="hidden"></div>
     <div id="status"><i></i><span id="statustext">…</span></div>
   </div>
-  <div id="volhud"><div class="vh-icon"></div><div class="vh-bar"><i></i></div><div class="vh-num"></div></div>
+  <div id="volhud"><div class="vh-icon"></div><div class="vh-name"></div><div class="vh-bar"><i></i></div><div class="vh-num"></div></div>
   <div id="toast"></div>
   <div id="reminder"><div class="rm-card"><div class="m-label" id="rm-label">Meeting</div><div class="rm-when" id="rm-when"></div>
     <div class="rm-title" id="rm-title"></div><div class="rm-sub" id="rm-sub"></div>
@@ -972,6 +999,7 @@ function load() {
     audio = j.audio || null;
     github = j.github || github;
     hue = j.hue || hue;
+    mixer = j.mixer || mixer;
     plex = j.plex || plex;
     truenas = j.truenas || truenas;
     weather = j.weather || weather;
@@ -1511,6 +1539,7 @@ var ICON_LINES = {
   pr:         ['<circle cx="6" cy="6" r="2.2"/><circle cx="6" cy="18" r="2.2"/><circle cx="18" cy="18" r="2.2"/><path d="M6 8.2v7.6M18 15.8V10a3 3 0 0 0-3-3h-4m2 2l-2-2 2-2"/>', '🔀'],
   bulb:       ['<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.7.7 1 1.4 1 2.5h6c0-1.1.3-1.8 1-2.5A6 6 0 0 0 12 3z"/>', '💡'],
   power:      ['<path d="M12 3v9M6.3 6.3a8 8 0 1 0 11.4 0"/>', '⏻'],
+  mixer:      ['<path d="M6 4v5M6 13v7M12 4v11M12 19v1M18 4v2M18 10v10"/><circle cx="6" cy="11" r="2"/><circle cx="12" cy="17" r="2"/><circle cx="18" cy="8" r="2"/>', '🎚️'],
   // weather (the large clocks)
   wsun:       ['<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/>', '☀️'],
   wmoon:      ['<path d="M19.5 14.5A7.5 7.5 0 1 1 9.5 4.5a6 6 0 0 0 10 10z"/>', '🌙'],
@@ -1844,6 +1873,7 @@ var audio = null, volTimer = null, currentPage = {};
 function showVolume() {
   if (!audio || audio.volume == null) return;
   var hud = $('volhud');
+  hud.querySelector('.vh-name').textContent = '';
   hud.querySelector('.vh-icon').innerHTML = icon(audio.muted || !audio.volume ? 'mute' : 'speaker');
   hud.querySelector('.vh-bar i').style.width = audio.volume + '%';
   hud.querySelector('.vh-num').textContent = audio.volume;
@@ -1858,6 +1888,7 @@ function setAudio(d) {
   if (before && d && (before.volume !== d.volume || before.muted !== d.muted)) showVolume();
   updateAudioPill();
   if (sheetMode === 'audio') renderAudioSheet();
+  if (sheetMode === 'mixer' && !mixDrag) renderMixerSheet();      // the All row
 }
 function shortDevice(name) {           // "Speakers (2- Focusrite USB Audio)" -> "Focusrite USB Audio"
   var m = /^(.*?) \((.+)\)$/.exec(name || '');
@@ -1911,6 +1942,102 @@ function updateAudioPill() {
   var show = !!(currentPage.audio && audio && (audio.outputs || []).length);
   pill.style.display = show ? '' : 'none';
   if (show) pill.innerHTML = deviceIcon(out ? out.name : '', false) + '<span>' + esc(out ? shortDevice(out.name) : 'Audio') + '</span>';
+  updateMixerPill();
+}
+
+// ---- per-app volume (Windows agent): All (the system volume) and the apps playing through the
+// default output, each with a bar to drag and a mute button. The dial's App volume mode turns
+// the one marked Dial: All by default; its press moves on to each app making sound and back to
+// All (tapping a name picks one too). Used from another page, it goes to this one and opens the
+// mixer, which closes again 6 s after the dial's last use.
+var mixer = { state: 'unknown' }, mixDrag = null, mixerByDial = null;
+function mixerApps() { return mixer.state === 'ok' ? mixer.apps || [] : []; }
+function mixerApp(key) { return mixerApps().filter(function (a) { return a.key === key; })[0]; }
+function mixerTarget() { return mixerApp(mixer.selected) || null; }       // null: All
+var MIXER_ALL = { key: '*', name: 'All' };
+function appIcon(a) {
+  return a && a.icon ? '<img src="/api/mixer/icon?k=' + encodeURIComponent(a.key) + '&v=' + a.icon + '" alt="">' : icon('speaker');
+}
+function updateMixerPill() {
+  var pill = $('mixerpill'), show = !!(currentPage.audio && mixer.state === 'ok');
+  pill.style.display = show ? 'flex' : 'none';
+  if (show) redraw(pill, icon('mixer'));
+}
+function renderMixerSheet() {
+  if (mixer.state !== 'ok') return closeSheet();
+  var target = mixerTarget() || MIXER_ALL;
+  var all = { key: '*', name: 'All', volume: audio && audio.volume != null ? audio.volume : 0, muted: !!(audio && audio.muted), active: true };
+  redraw($('sheetcard'), '<div class="m-label">App volume · the knob moves the dial</div><div class="ag-list mx-list">' +
+    [all].concat(mixerApps()).map(function (a) {
+      var k = esc(a.key);
+      return '<div class="mx-row' + (a.key === target.key ? ' sel' : '') + (a.muted ? ' muted' : '') + (a.active ? '' : ' idle') + '">' +
+        '<div class="mx-app" data-mix-sel="' + k + '">' + (a.key === '*' ? icon('speaker') : appIcon(a)) + '<span>' +
+          (a.key === target.key ? '<small>Dial</small>' : '') + esc(a.name) + '</span></div>' +
+        '<div class="hbar" data-mix-bar="' + k + '"><i style="width:' + a.volume + '%"></i><span>' + (a.muted ? 'Muted' : a.volume + '%') + '</span></div>' +
+        '<div class="mx-mute" data-mix-mute="' + k + '">' + icon(a.muted ? 'mute' : 'speaker') + '</div></div>';
+    }).join('') + '</div><div class="sh-actions"><div class="btn" data-sheet-close="1">Close</div></div>');
+}
+function openMixer() {
+  if (mixer.state !== 'ok') return;
+  clearTimeout(mixerByDial);
+  mixerByDial = null;
+  sheetMode = 'mixer';
+  sheetOpen = true;
+  $('sheetcard')._html = null;
+  renderMixerSheet();
+  $('sheet').className = 'show';
+}
+function setMixer(d) {
+  mixer = d;
+  updateMixerPill();
+  if (sheetMode === 'mixer' && !mixDrag) renderMixerSheet();
+}
+function mixCmd(body) { post('/api/mixer/command', body); }
+// Volume bars: drag (or tap) to set; sends while dragging, merged on the device.
+function mixBarSet(e, final) {
+  var r = mixDrag.rect, v = Math.max(0, Math.min(100, Math.round((e.clientX - r.left) / r.width * 100)));
+  mixDrag.bar.querySelector('i').style.width = v + '%';
+  mixDrag.bar.querySelector('span').textContent = v + '%';
+  var now = Date.now();
+  if (final || now - mixDrag.sent > 120) {
+    mixDrag.sent = now;
+    mixCmd({ key: mixDrag.key, volume: v });
+  }
+}
+document.addEventListener('pointerdown', function (e) {
+  var bar = e.target.closest('[data-mix-bar]');
+  if (!bar) return;
+  mixDrag = { bar: bar, rect: bar.getBoundingClientRect(), sent: 0, key: bar.getAttribute('data-mix-bar') };
+  mixBarSet(e, false);
+});
+document.addEventListener('pointermove', function (e) { if (mixDrag) mixBarSet(e, false); });
+document.addEventListener('pointerup', function (e) { if (mixDrag) { mixBarSet(e, true); mixDrag = null; } });
+document.addEventListener('pointercancel', function () { mixDrag = null; });
+// The dial's App volume mode: opens the mixer (if it isn't), and the volume bar with the
+// target's icon and name.
+function mixerDial(d) {
+  if (d.open && !standbyShown && !lockShown && (sheetMode === 'mixer' || !sheetOpen || sheetMode === 'notice')) {
+    var mine = sheetMode !== 'mixer' || mixerByDial;       // opened by the dial: close it again later
+    if (sheetMode !== 'mixer') openMixer(); else renderMixerSheet();
+    if (mine) {
+      clearTimeout(mixerByDial);
+      mixerByDial = setTimeout(function () { mixerByDial = null; if (sheetMode === 'mixer' && !mixDrag) closeSheet(); }, 6000);
+    }
+  }
+  if (sheetMode !== 'mixer') showMixerHud(d.key);       // the open mixer shows it already
+}
+function showMixerHud(key) {
+  var a = key === '*' ? { key: '*', name: 'All', volume: audio && audio.volume || 0, muted: !!(audio && audio.muted) } : mixerApp(key);
+  if (!a) return;
+  var hud = $('volhud');
+  hud.querySelector('.vh-icon').innerHTML = a.key === '*' ? icon(a.muted ? 'mute' : 'speaker') : appIcon(a);
+  hud.querySelector('.vh-name').textContent = a.name;
+  hud.querySelector('.vh-bar i').style.width = (a.muted ? 0 : a.volume) + '%';
+  hud.querySelector('.vh-num').textContent = a.muted ? 'Off' : a.volume;
+  hud.classList.toggle('muted', !!a.muted);
+  hud.classList.add('show');
+  clearTimeout(volTimer);
+  volTimer = setTimeout(function () { hud.classList.remove('show'); }, 1500);
 }
 function renderAudioSheet() {
   if (!audio) return closeSheet();
@@ -2471,6 +2598,7 @@ function showLightHud(id) {
   var r = hueRoom(id);
   if (!r) return;
   var hud = $('volhud');
+  hud.querySelector('.vh-name').textContent = '';
   hud.querySelector('.vh-icon').innerHTML = icon('bulb');
   hud.querySelector('.vh-bar i').style.width = (r.on ? r.brightness || 0 : 0) + '%';
   hud.querySelector('.vh-num').textContent = r.on ? Math.round(r.brightness || 0) : 'Off';
@@ -2942,8 +3070,8 @@ var startInBar = false, startOnSlider = false;     // drags on the bottom bar, t
 document.addEventListener('pointerdown', function (e) {
   startX = e.clientX; startY = e.clientY;
   startInBar = !!e.target.closest('#bar, .cal-tabs');
-  startOnSlider = !!e.target.closest('[data-hue-bar], [data-hue-lbar]');   // dragging a light's brightness, not swiping
-  downEl = e.target.closest('.tile[data-i], .preset[data-i], #dial, .tab, #status, [data-set], [data-sys], [data-sec], [data-media], [data-join], [data-guard], [data-kill], [data-ev], [data-sheet-close], [data-sheet-card], [data-audio], [data-audio-dev], [data-gh], #tabmore, [data-hue-room], [data-hue-toggle], [data-hue-ltoggle], [data-hue-scene], [data-hue-alloff], [data-hue-pair], [data-hue-bar], [data-hue-lbar], [data-tab-move], [data-tabs-reset], [data-tab-hide], [data-goto-media], [data-rm-join], [data-rm-dismiss], [data-cal], [data-weeks], [data-gh-open], [data-plex], [data-go]');
+  startOnSlider = !!e.target.closest('[data-hue-bar], [data-hue-lbar], [data-mix-bar]');   // dragging a light's brightness, not swiping
+  downEl = e.target.closest('.tile[data-i], .preset[data-i], #dial, .tab, #status, [data-set], [data-sys], [data-sec], [data-media], [data-join], [data-guard], [data-kill], [data-ev], [data-sheet-close], [data-sheet-card], [data-audio], [data-audio-dev], [data-gh], #tabmore, [data-hue-room], [data-hue-toggle], [data-hue-ltoggle], [data-hue-scene], [data-hue-alloff], [data-hue-pair], [data-hue-bar], [data-hue-lbar], [data-tab-move], [data-tabs-reset], [data-tab-hide], [data-goto-media], [data-rm-join], [data-rm-dismiss], [data-cal], [data-weeks], [data-gh-open], [data-plex], [data-go], [data-mixer], [data-mix-sel], [data-mix-mute], [data-mix-bar]');
   if (downEl) downEl.classList.add('down');
 });
 document.addEventListener('pointercancel', function () { if (downEl) downEl.classList.remove('down'); downEl = null; });
@@ -2985,6 +3113,19 @@ document.addEventListener('pointerup', function (e) {
   }
   else if (el.hasAttribute('data-rm-dismiss')) dismissReminder();
   else if (el.hasAttribute('data-hue-bar') || el.hasAttribute('data-hue-lbar')) { }       // handled by the drag code
+  else if (el.hasAttribute('data-mix-bar')) { }                                            // handled by the drag code
+  else if (el.hasAttribute('data-mixer')) openMixer();
+  else if (el.hasAttribute('data-mix-mute')) {
+    var mk = el.getAttribute('data-mix-mute'), ma = mixerApp(mk);
+    if (mk === '*' && audio) { audio.muted = !audio.muted; mixCmd({ key: '*', mute: audio.muted }); renderMixerSheet(); }
+    else if (ma) { mixCmd({ key: ma.key, mute: 'toggle' }); ma.muted = !ma.muted; renderMixerSheet(); }
+  }
+  else if (el.hasAttribute('data-mix-sel')) {
+    var sk = el.getAttribute('data-mix-sel');
+    mixer.selected = sk === '*' ? null : sk;
+    post('/api/mixer/select', { key: sk });
+    renderMixerSheet();
+  }
   else if (el.hasAttribute('data-hue-toggle')) hueToggle(el.getAttribute('data-hue-toggle'), false);
   else if (el.hasAttribute('data-hue-ltoggle')) hueToggle(el.getAttribute('data-hue-ltoggle'), true);
   else if (el.hasAttribute('data-hue-scene')) { fire(el); hueCmd({ op: 'scene', id: el.getAttribute('data-hue-scene') }); }
@@ -3058,6 +3199,10 @@ function connect() {
     } else if (m.type === 'hue') {
       hue = d;
       updateLights();
+    } else if (m.type === 'mixer') {
+      setMixer(d);
+    } else if (m.type === 'mixer_dial') {
+      mixerDial(d);
     } else if (m.type === 'hue_dial') {
       showLightHud(d.room);
     } else if (m.type === 'github_details') {
