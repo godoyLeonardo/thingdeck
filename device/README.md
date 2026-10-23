@@ -511,8 +511,10 @@ process name: an app's volume is its loudest session's, it counts as muted when 
 and as playing when one is active. Its name is the program's file description ("Google
 Chrome"), else the process name; the system sounds session is "System sounds". It posts
 `POST /api/mixer {apps: [{key, name, volume, muted, active}]}` when that changes and at
-least every 5 s; the reply's `need_icons` asks for each app's icon once, a 48 px PNG of the
-program's icon sent in the next update (`icons: {key: base64}`), served at
+least every 5 s. Each app carries an `icon_id`, a hash of its program file's path (found
+with `QueryFullProcessImageName` when `Process.Path` is denied, as for many games); the
+reply's `need_icons` asks once for each app whose cached icon has another id, a 48 px PNG
+of the program's icon sent in the next update (`icons: {key: base64}`), served at
 `GET /api/mixer/icon?k=…&v=…` (`v` is a CRC of the PNG, so a new icon loads).
 
 `HostMixer` keeps the list (15 s without an update: gone) and a command queue merged per
