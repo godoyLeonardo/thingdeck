@@ -969,7 +969,8 @@ class HueLink:
                 for l in (room or {}).get('lights', []):
                     if l['ct']:
                         self.call('PUT', '/clip/v2/resource/light/%s' % l['id'], {'color_temperature': {'mirek': int(cmd['mirek'])}})
-        self.fetched = 0.0           # show the result right away
+        # Read it back soon, but not at once: the bridge reports a change a moment late.
+        self.fetched = time.monotonic() + 0.7 - (1 if 'lights' in visible else 30)
 
     def update(self):
         """Commands from the Car Thing, pairing, and the lights' state every 2 s."""
@@ -1006,7 +1007,7 @@ class HueLink:
                 self.pairing = None
                 self.send({'state': 'error', 'error': str(e)})
             return
-        if time.monotonic() - self.fetched < (2 if 'lights' in visible else 30):
+        if time.monotonic() - self.fetched < (1 if 'lights' in visible else 30):
             return
         self.fetched = time.monotonic()
         if not self.config:

@@ -915,8 +915,8 @@ function Send-HueState($state) {
 }
 
 # Rooms and zones with their lights and scenes. The structure (rooms, devices, scenes) is
-# read every 30 s; the light levels every 2 s while Lights is on screen (30 s otherwise),
-# and right after a command.
+# read every 30 s; the light levels every second while Lights is on screen (30 s otherwise),
+# and 0.7 s after a command.
 function Read-Hue {
     if (-not $script:hueLists -or ((Get-Date) - $script:hueListed).TotalSeconds -ge 30) {
         $script:hueLists = @{
@@ -978,7 +978,8 @@ function Invoke-HueCommand($cmd) {
             }
         }
     }
-    $script:hueFetched = [DateTime]::MinValue        # show the result right away
+    # Read it back soon, but not at once: the bridge reports a change a moment late.
+    $script:hueFetched = (Get-Date).AddSeconds(0.7 - $(if (Test-Visible 'lights') { 1 } else { 30 }))
 }
 
 # Several times a second: commands from the Car Thing, pairing, and the lights' state.
@@ -1005,7 +1006,7 @@ function Update-Hue {
             Send-HueState @{ state = 'error'; error = $_.Exception.Message } }
         return
     }
-    if (((Get-Date) - $script:hueFetched).TotalSeconds -lt $(if (Test-Visible 'lights') { 2 } else { 30 })) { return }
+    if (((Get-Date) - $script:hueFetched).TotalSeconds -lt $(if (Test-Visible 'lights') { 1 } else { 30 })) { return }
     $script:hueFetched = Get-Date
     $state = if (-not $script:hue) { @{ state = 'none' } } else {
         try { Read-Hue } catch {
