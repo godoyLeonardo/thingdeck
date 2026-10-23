@@ -1085,8 +1085,8 @@ class HostMixer:
         self.ui = ui
         self.lock = threading.Lock()
         self.apps, self.updated = [], None
-        self.icons = collections.OrderedDict()   # key -> png bytes
-        self.asked = set()                        # icons asked for (each once: some apps have none)
+        self.icons = collections.OrderedDict()   # key -> (icon id, png bytes)
+        self.asked = set()                        # (key, icon id) asked for, each once: some apps have none
         self.commands = collections.OrderedDict() # key -> {key, volume?, mute?}
         self.held = {}                            # key -> (fields, until): just set here
         self.selected = None                      # the app the dial's App volume mode controls; None: All
@@ -1106,27 +1106,36 @@ class HostMixer:
             if isinstance(a, dict) and a.get('key'):
                 apps.append({'key': str(a['key']), 'name': str(a.get('name') or a['key']),
                              'volume': max(0, min(100, int(a.get('volume') or 0))),
-                             'muted': bool(a.get('muted')), 'active': bool(a.get('active'))})
+                             'muted': bool(a.get('muted')), 'active': bool(a.get('active')),
+                             'icon_id': str(a['icon_id']) if a.get('icon_id') else None})   # which program file the icon comes from
         icons = body.get('icons') if isinstance(body.get('icons'), dict) else {}
         now = time.monotonic()
         with self.lock:
+            ids = {a['key']: a['icon_id'] for a in apps}
             for key, png in icons.items():
                 try:
-                    self.icons[str(key)] = base64.b64decode(png)
+                    self.icons[str(key)] = (ids.get(str(key)), base64.b64decode(png))
                 except (ValueError, TypeError):
                     continue
                 while len(self.icons) > MIXER_ICONS:
                     self.icons.popitem(last=False)
+            need = []
             for app in apps:
                 held = self.held.get(app['key'])
                 if held and held[1] > now:
                     app.update(held[0])
-                png = self.icons.get(app['key'])
-                app['icon'] = '%08x' % zlib.crc32(png) if png else None     # in the icon's URL, so a new one loads
+                cached = self.icons.get(app['key'])
+                if app['icon_id'] and (not cached or cached[0] != app['icon_id']):
+                    cached = None                 # none yet, or one for another program: ask (once) for this one
+                    if (app['key'], app['icon_id']) not in self.asked:
+                        need.append(app['key'])
+                        self.asked.add((app['key'], app['icon_id']))
+                elif not app['icon_id'] and cached and cached[0]:
+                    cached = None                 # the agent knows no program file for it now
+                app['icon'] = '%08x' % zlib.crc32(cached[1]) if cached else None     # in the icon's URL, so a new one loads
+                del app['icon_id']
             self.held = {k: v for k, v in self.held.items() if v[1] > now}
             self.apps, self.updated = apps, now
-            need = [a['key'] for a in apps if a['key'] not in self.icons and a['key'] not in self.asked and a['key'] != 'system']
-            self.asked.update(need)
         self.publish()
         return need
 
@@ -1213,7 +1222,8 @@ class HostMixer:
 
     def icon(self, key):
         with self.lock:
-            return self.icons.get(key)
+            cached = self.icons.get(key)
+            return cached[1] if cached else None
 
     def expire(self):
         if self.updated is not None and time.monotonic() - self.updated > MIXER_TTL:
