@@ -560,7 +560,7 @@
     justify-content: center; background: rgba(0, 0, 0, .6); }
   #sheet.show { display: flex; }
   .sheet-card { width: 640px; max-height: 400px; display: flex; flex-direction: column; background: var(--tile);
-    border-radius: 18px; padding: 16px 22px 16px; box-shadow: 0 12px 40px rgba(0, 0, 0, .5); }
+    border-radius: 18px; padding: 16px 22px 20px; box-shadow: 0 12px 40px rgba(0, 0, 0, .5); }
   .sh-title { font-size: calc(24px * var(--ts)); font-weight: 700; line-height: 1.15; letter-spacing: -.01em; margin-top: 6px; }
   .sh-when { font-size: calc(15px * var(--ts)); font-weight: 600; color: var(--acc); margin-top: 8px; }
   .sh-where { font-size: calc(15px * var(--ts)); margin-top: 4px; }
@@ -615,11 +615,12 @@
   #mixerpill svg { width: 24px; height: 24px; }
   #mixerpill.down { background: var(--tile-hi); }
   #mixerpill + #audiopill { margin-left: 8px; }
-  /* the mixer fills the screen, over whatever page is on */
-  .sheet-card.mixer-full { position: fixed; left: 0; top: 0; right: 0; bottom: 0; width: auto; max-height: none; border-radius: 0;
-    padding: 16px 26px 14px; box-shadow: none; }
-  .mixer-full > .m-label { font-size: calc(13px * var(--ts)); }
-  .mixer-full .sh-actions .btn { height: 56px; line-height: 56px; min-width: 200px; border-radius: 14px; font-size: calc(19px * var(--ts)); }
+  /* full-screen cards (the mixer, a room), over whatever page is on, with a big Close */
+  .sheet-card.sheet-full { position: fixed; left: 0; top: 0; right: 0; bottom: 0; width: auto; max-height: none; border-radius: 0;
+    padding: 16px 26px 22px; box-shadow: none; }
+  .sheet-full > .m-label { font-size: calc(13px * var(--ts)); }
+  .sheet-full .sh-actions { margin-top: 14px; }
+  .sheet-full .sh-actions .btn { height: 56px; line-height: 56px; min-width: 200px; border-radius: 14px; font-size: calc(19px * var(--ts)); }
   .mx-list { flex: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; touch-action: pan-y; margin: 4px -10px 0; padding: 0; }   /* rows reach into the card padding, never wider than the list */
   .mx-list::-webkit-scrollbar { display: none; }
   .mx-row { display: flex; align-items: center; min-height: 60px; padding: 4px 8px; border-radius: 12px; border: 2px solid transparent; }
@@ -1992,7 +1993,7 @@ function openMixer() {
   sheetMode = 'mixer';
   sheetOpen = true;
   $('sheetcard')._html = null;
-  $('sheetcard').className = 'sheet-card mixer-full';
+  $('sheetcard').className = 'sheet-card sheet-full';
   renderMixerSheet();
   $('sheet').className = 'show';
 }
@@ -2575,6 +2576,7 @@ function openRoom(id) {
   post('/api/hue/select', { id: id });        // the dial's Lights mode now controls this room
   sheetMode = 'room';
   sheetOpen = true;
+  $('sheetcard').className = 'sheet-card sheet-full';
   renderRoomSheet();
   $('sheet').className = 'show';
 }
