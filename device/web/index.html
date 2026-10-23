@@ -621,11 +621,13 @@
   #mixerpill svg { width: 24px; height: 24px; }
   #mixerpill.down { background: var(--tile-hi); }
   #mixerpill + #audiopill { margin-left: 8px; }
-  /* full-screen cards (the mixer, a room), over whatever page is on, with a big Close */
+  /* full-screen cards (the mixer, a room), over whatever page is on, with a big Close. Their
+     controls keep clear of the right edge, where the dial gets in the way of a finger; Close,
+     at the bottom, goes to the corner. */
   .sheet-card.sheet-full { position: fixed; left: 0; top: 0; right: 0; bottom: 0; width: auto; max-height: none; border-radius: 0;
-    padding: 16px 26px 22px; box-shadow: none; }
+    padding: 16px 100px 22px 26px; box-shadow: none; }
   .sheet-full > .m-label { font-size: calc(13px * var(--ts)); }
-  .sheet-full .sh-actions { margin-top: 14px; }
+  .sheet-full .sh-actions { margin-top: 14px; margin-right: -74px; }
   .sheet-full .sh-actions .btn { height: 56px; line-height: 56px; min-width: 200px; border-radius: 14px; font-size: calc(19px * var(--ts)); }
   .mx-list { flex: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; touch-action: pan-y; margin: 4px -10px 0; padding: 0; }   /* rows reach into the card padding, never wider than the list */
   .mx-list::-webkit-scrollbar { display: none; }
