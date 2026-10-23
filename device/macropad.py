@@ -615,6 +615,7 @@ class HostAudio:
 
 HUE_OPS = ('pair', 'group', 'light', 'scene', 'all_off')
 HUE_STEP = 8            # brightness % per dial detent
+HUE_HOLD = 3.0          # seconds a change made here wins over the agent's readings (the bridge reports it late)
 
 
 class HostHue:
@@ -630,12 +631,19 @@ class HostHue:
         self.published = {'state': 'unknown'}
         self.commands = []
         self.selected = None      # the room/zone the dial controls
+        self.held = {}            # (op, id) -> ({on?, brightness?}, until): changed here, not read back yet
 
     def update(self, body):
         state = str(body.get('state') or 'error')
         data = {'state': state, 'error': str(body['error']) if body.get('error') else None,
                 'rooms': body.get('rooms') if isinstance(body.get('rooms'), list) else []}
         with self.lock:
+            # Right after a change the bridge still reports the old state for a moment: keep
+            # what was set here on top for a few seconds, so the card doesn't flip back.
+            now = time.monotonic()
+            self.held = {k: v for k, v in self.held.items() if v[1] > now}
+            for (op, hid), (fields, _) in self.held.items():
+                self.optimistic(dict(fields, op=op, id=hid), data.get('rooms') or [])
             self.published = data
         self.publish()
 
@@ -661,16 +669,27 @@ class HostHue:
             else:
                 self.commands.append(cmd)
             self.optimistic(cmd)
+            if cmd['op'] in ('group', 'light'):
+                key = (cmd['op'], cmd.get('id'))
+                fields = dict(self.held.get(key, ({}, 0))[0], **{k: cmd[k] for k in ('on', 'brightness') if k in cmd})
+                if fields:
+                    self.held[key] = (fields, time.monotonic() + HUE_HOLD)
         self.publish()
 
-    def optimistic(self, cmd):
-        """Show a change before the bridge confirms it."""
+    def optimistic(self, cmd, rooms=None):
+        """Show a change before the bridge confirms it. A room's switch flips its lights too, so
+        the count and the glow follow at once."""
         targets = []
-        for room in self.published.get('rooms') or []:
+        if rooms is None:
+            rooms = self.published.get('rooms') or []
+        for room in rooms:
             if cmd['op'] == 'group' and room.get('group') == cmd.get('id'):
                 targets.append(room)
+                if 'on' in cmd:
+                    targets += [l for l in room.get('lights') or [] if l.get('on') != bool(cmd['on'])]
             if cmd['op'] == 'all_off':
                 targets.append(room)
+                targets += room.get('lights') or []
             if cmd['op'] == 'light':
                 targets += [l for l in room.get('lights') or [] if l.get('id') == cmd.get('id')]
         for t in targets:
@@ -678,7 +697,7 @@ class HostHue:
                 t['on'] = False
             if 'on' in cmd:
                 t['on'] = bool(cmd['on'])
-            if 'brightness' in cmd:
+            if 'brightness' in cmd and (t.get('group') or cmd['op'] == 'light'):   # a room's level, not each light's
                 t['brightness'] = cmd['brightness']
 
     def take(self):
