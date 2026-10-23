@@ -246,6 +246,24 @@ def plex(with_posters):
 
 
 TB, GB = 1024 ** 4, 1024 ** 3
+def app_icon(color, letter):
+    """A round 48 px app icon with a letter, for the mixer."""
+    im = Image.new('RGBA', (48, 48), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(im)
+    draw.ellipse((2, 2, 46, 46), fill=color)
+    draw.text((24, 25), letter, fill=(255, 255, 255), anchor='mm', font_size=26)
+    out = io.BytesIO()
+    im.save(out, 'PNG')
+    return base64.b64encode(out.getvalue()).decode('ascii')
+
+
+MIXER = {'apps': [
+    {'key': 'spotify', 'name': 'Spotify', 'volume': 80, 'muted': False, 'active': True},
+    {'key': 'discord', 'name': 'Discord', 'volume': 65, 'muted': False, 'active': True},
+    {'key': 'firefox', 'name': 'Firefox', 'volume': 50, 'muted': True, 'active': False},
+    {'key': 'system', 'name': 'System sounds', 'volume': 100, 'muted': False, 'active': False}],
+    'icons': {'spotify': app_icon((30, 185, 84), 'S'), 'discord': app_icon((88, 101, 242), 'D'), 'firefox': app_icon((255, 113, 57), 'F')}}
+
 WEATHER = {'state': 'ok', 'place': 'Paris', 'temp': 17.4, 'code': 2, 'day': True, 'unit': 'C'}
 
 TRUENAS = {
@@ -304,6 +322,7 @@ class Feeder:
         self.i += 1
         post('stats', stats_sample(self.i))
         post('audio', AUDIO)
+        post('mixer', MIXER)
         if post('nowplaying', SONG).get('need_art'):
             post('nowplaying', dict(SONG, art=base64.b64encode(COVER).decode('ascii'), art_type='image/jpeg'))
         if self.i % 5 == 1:
@@ -356,6 +375,12 @@ def scene(feeder, name):
         time.sleep(1)
         js('openAudio();')
         return close
+    if name == 'mixer':
+        page('Media')
+        post('mixer/select', {'key': 'spotify'})       # the dial on Spotify
+        time.sleep(1)
+        js('openMixer();')
+        return close
     if name == 'volume':
         page('Media')
         time.sleep(1)
@@ -390,7 +415,7 @@ def scene(feeder, name):
     raise SystemExit('unknown screenshot: ' + name)
 
 
-SHOTS = ['media', 'calendar', 'status', 'code', 'event', 'audio', 'volume', 'lock', 'lights', 'room', 'plex', 'nas',
+SHOTS = ['media', 'calendar', 'status', 'code', 'event', 'audio', 'mixer', 'volume', 'lock', 'lights', 'room', 'plex', 'nas',
          'settings', 'tabs', 'general', 'standby', 'reminder']
 
 
