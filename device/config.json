@@ -18,6 +18,7 @@
   "dial_modes": [
     { "name": "Volume", "cw": { "media": "vol_up" }, "ccw": { "media": "vol_down" }, "press": { "media": "mute" } },
     { "name": "Lights", "cw": { "hue": "up" }, "ccw": { "hue": "down" }, "press": { "hue": "toggle" } },
+    { "name": "App volume", "cw": { "mixer": "up" }, "ccw": { "mixer": "down" }, "press": { "mixer": "next" } },
     { "name": "Scroll", "cw": { "wheel": -1 }, "ccw": { "wheel": 1 }, "press": { "click": "middle" } },
     { "name": "Zoom",
       "cw": { "wheel": 1, "mods": "ctrl", "mac": { "key": "cmd+equal" } },
