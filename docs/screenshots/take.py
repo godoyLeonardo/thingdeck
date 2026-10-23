@@ -422,6 +422,9 @@ SHOTS = ['media', 'calendar', 'status', 'code', 'event', 'audio', 'mixer', 'volu
 def main():
     names = sys.argv[1:] or SHOTS
     adb('forward', 'tcp:%d' % PORT, 'tcp:8765')
+    # The demo's streams and runs look new: no "new stream" / "new run" cards during the shoot
+    # (the reload at the end brings them back).
+    js("window.showNotice = function () {}; if (sheetMode === 'notice') closeSheet();")
     feeder = Feeder()
     feeder.start()
     time.sleep(3)                               # covers and posters load
@@ -436,6 +439,7 @@ def main():
     finally:
         feeder.stop.set()
         page('Media')
+        adb('shell', 'python3 /var/macropad/tools/cdp.py reload')     # notices back on
 
 
 if __name__ == '__main__':
