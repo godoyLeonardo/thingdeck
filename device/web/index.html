@@ -2497,8 +2497,10 @@ function gammaRGB(r, g, b) {
   };
   return [f(r), f(g), f(b)];
 }
-function lightRGB(l) {          // the color a light shows, from CIE xy or its white temperature
-  if (l.mirek && !l.xy) {
+// The color a light shows: its white temperature when it's in white mode (the agents send mirek
+// only then: a color light keeps reporting the xy of its last color), else its CIE xy.
+function lightRGB(l) {
+  if (l.mirek) {
     var k = 1e6 / l.mirek / 100, r, g, b;
     r = k <= 66 ? 255 : 329.7 * Math.pow(k - 60, -0.1332);
     g = k <= 66 ? 99.47 * Math.log(k) - 161.12 : 288.1 * Math.pow(k - 60, -0.0755);
