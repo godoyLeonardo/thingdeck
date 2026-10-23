@@ -63,7 +63,7 @@ The Car Thing's screen is 800×480. These use made-up demo data; to retake them,
 | **Event details:** tap any event | **Audio devices:** tap the output in the Media header |
 | ![Volume bar shown over the Media page](docs/screenshots/volume.png) | ![Lock screen with the clock, what's playing and media buttons](docs/screenshots/lock.png) |
 | **Volume bar:** shows when the volume changes | **Lock screen:** while the computer is locked |
-| ![Lights page: Philips Hue rooms and zones tinted with their light color, with switches and brightness bars](docs/screenshots/lights.png) | ![A room card: brightness, warm-to-cool white, scenes and its lights](docs/screenshots/room.png) |
+| ![Lights page: Philips Hue rooms and zones tinted with their light color, with switches, brightness and a Details button](docs/screenshots/lights.png) | ![A room card: brightness, warm-to-cool white, scenes and its lights](docs/screenshots/room.png) |
 | **Lights:** Philips Hue rooms and zones, with the song playing in the top bar | **A room:** brightness, white, scenes, each light |
 | ![Plex page: two streams with posters and transcode tags, a running job, the server's CPU and bandwidth graphs, and the libraries](docs/screenshots/plex.png) | ![NAS page: TrueNAS pools as tanks that fill up, disk temperatures, alerts, apps and running jobs](docs/screenshots/nas.png) |
 | **Plex:** streams and how each is sent, running jobs, server load, libraries | **NAS:** TrueNAS pools, disks, alerts, apps and jobs |
@@ -201,10 +201,11 @@ them to the Car Thing **over the USB cable** (`adb forward`; no network):
     Wayland with the [Window Calls](https://extensions.gnome.org/extension/4724/window-calls/)
     extension, since GNOME doesn't share the focused window otherwise.
 - **Lights (Philips Hue):** a card per room and zone, tinted with the color its lights
-  show, with an on/off switch and a brightness bar (tap or drag). Tap a card for its
-  scenes, a warm-to-cool white slider and each light; tapping a room also makes it
-  the target of the dial's **Lights** mode (turn: brightness, press: on/off, with a
-  bar on screen like the volume one). "All off" turns every room off. See
+  show, with its switch, how many lights are on, the scene and the brightness. Tap a
+  card to turn the room on or off; **Details** opens its brightness bar (tap or drag),
+  scenes, a warm-to-cool white slider and each light. Tapping a room also makes it the
+  target of the dial's **Lights** mode (turn: brightness, press: on/off, with a bar on
+  screen like the volume one). "All off" turns every room off. See
   [Connecting Philips Hue](#connecting-philips-hue).
 - **Code (GitHub):** the latest run of each workflow in one repository (up to 20:
   running, queued, passed, failed or cancelled, with branch, commit and time) and your
