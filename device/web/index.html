@@ -1855,6 +1855,10 @@ function openEvent(id) {
     .then(function (d) { if (sheetMode === 'event') render(d); }).catch(function () {});
 }
 function closeSheet() {
+  if (sheetMode === 'mixer' && mixer.selected) {      // outside the mixer the dial is the system volume again
+    mixer.selected = null;
+    post('/api/mixer/select', { key: '*' });
+  }
   closeGitHubCard();
   closePlexCard();
   clearTimeout(noticeTimer);
@@ -1966,7 +1970,8 @@ function updateAudioPill() {
 // default output, each with a bar to drag and a mute button, full screen. In the Volume dial mode
 // the dial turns the one marked Dial: All by default; the knob moves on to each app and back to
 // All (tapping a name picks one too), opening the mixer over any page; opened that way, it closes
-// again 6 s after the dial's last use.
+// again 6 s after the dial's last use. Closing it puts the dial back on All, so outside the mixer
+// it is always the system volume.
 var mixer = { state: 'unknown' }, mixDrag = null, mixerByDial = null;
 function mixerApps() { return mixer.state === 'ok' ? mixer.apps || [] : []; }
 function mixerApp(key) { return mixerApps().filter(function (a) { return a.key === key; })[0]; }
@@ -3273,6 +3278,7 @@ function connect() {
 }
 load().then(function () { if (st.message) toast(st.message, st.mode === 'error' ? 'fail' : 'warn'); });
 post('/api/view', { settings: false });      // a reload starts outside Settings
+post('/api/mixer/select', { key: '*' });     // and with no mixer open: the dial on All
 connect();
 </script>
 </body>
