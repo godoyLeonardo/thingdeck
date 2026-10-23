@@ -262,8 +262,9 @@ them to the Car Thing **over the USB cable** (`adb forward`; no network):
   a mute button. In the **Volume** dial mode the dial turns the one marked *Dial*, All at
   first, and pressing the knob moves it on to each app in the list and back to All
   (tapping a name picks one too). The knob opens the mixer over whatever page you're on,
-  and it closes again a few seconds after the dial's last use. On macOS (it has no per-app
-  volume), or without the agent, the knob mutes as before.
+  and it closes again a few seconds after the dial's last use; closing it puts the dial
+  back on All, so outside the mixer the dial is always the system volume. On macOS (it
+  has no per-app volume), or without the agent, the knob mutes as before.
   - Windows: each app's audio sessions on the default output, as the Volume Mixer shows them.
   - Linux: each app's PipeWire or PulseAudio streams, through `pactl`; the icons come from
     the icon theme, and an app with only an SVG icon needs `rsvg-convert` (`librsvg2-tools`
