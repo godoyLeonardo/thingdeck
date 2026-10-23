@@ -343,8 +343,14 @@
   .lc-name { flex: 1; min-width: 0; font-size: calc(18px * var(--ts)); font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .lc-sub { position: relative; font-size: calc(12.5px * var(--ts)); color: var(--muted); margin-top: 2px; white-space: nowrap;
     overflow: hidden; text-overflow: ellipsis; }
-  .lc-more { position: relative; align-self: flex-end; margin-top: auto; padding: 0 16px; height: 36px; line-height: 36px; border-radius: 18px;
-    background: var(--tile-hi); font-size: calc(14px * var(--ts)); font-weight: 600; color: var(--text); }
+  /* a room: tap the card for on/off (an off room's name dims); Details, the right third, for the rest */
+  .lcard.room { flex-direction: row; align-items: stretch; padding: 10px; }
+  .lc-main { position: relative; flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; padding: 0 6px; }
+  .lcard.room .lc-name { flex: none; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.2; }
+  .lcard.room .lc-sub { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; margin-top: 4px; }
+  .lcard.room.off .lc-name { color: var(--muted); }
+  .lc-more { position: relative; flex: 0 0 33%; margin-left: 8px; display: flex; align-items: center; justify-content: center; border-radius: 12px;
+    background: var(--tile-hi); font-size: calc(15px * var(--ts)); font-weight: 600; color: var(--text); }
   .lc-more.down { filter: brightness(1.25); }
   .lcard.alloff { align-items: center; justify-content: center; color: var(--muted); font-size: calc(16px * var(--ts)); font-weight: 600; }
   .lcard.alloff svg { width: 30px; height: 30px; margin-bottom: 6px; }
@@ -2525,11 +2531,9 @@ function updateLights() {
       var sub = [r.kind === 'zone' ? 'Zone' : '', lit ? lit + ' of ' + r.lights.length + ' on' : r.lights.length + (r.lights.length === 1 ? ' light' : ' lights'),
         active ? active.name : '', r.on && r.brightness != null ? pct(r.brightness) : ''].filter(function (x) { return x; }).join(' · ');
       // The card turns the room on and off (and puts it on the dial); Details opens the rest.
-      return '<div class="lcard' + (r.on ? '' : ' off') + (r.id === hue.selected ? ' sel' : '') + '" data-hue-card="' + esc(r.id) + '"' +
+      return '<div class="lcard room' + (r.on ? '' : ' off') + (r.id === hue.selected ? ' sel' : '') + '" data-hue-card="' + esc(r.id) + '"' +
         ' style="--lc:' + (roomRGB(r) || 'var(--acc)') + '"><div class="lglow"></div>' +
-        '<div class="lc-top"><div class="lc-name">' + esc(r.name) + '</div>' +
-        (r.group ? '<div class="hswitch' + (r.on ? ' on' : '') + '"></div>' : '') + '</div>' +
-        '<div class="lc-sub">' + esc(sub) + '</div>' +
+        '<div class="lc-main"><div class="lc-name">' + esc(r.name) + '</div><div class="lc-sub">' + esc(sub) + '</div></div>' +
         '<div class="lc-more" data-hue-room="' + esc(r.id) + '">Details</div></div>';
     }).join('') + '<div class="lcard alloff" data-hue-alloff="1">' + icon('power') + 'All off</div>';
     box.className = 'lights';
