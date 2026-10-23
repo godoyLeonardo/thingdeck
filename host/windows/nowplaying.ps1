@@ -311,6 +311,41 @@ namespace ThingdeckAudio {
         int SetPropertyValue(IntPtr a, IntPtr b, IntPtr c);
         int SetDefaultEndpoint([MarshalAs(UnmanagedType.LPWStr)] string id, int role);
     }
+    // Per-app volume: the default output's audio sessions, one or more per app.
+    [ComImport, Guid("77AA99A0-1BD6-484F-8BC7-2C654C9A9B6F"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    interface IAudioSessionManager2 {
+        int GetAudioSessionControl(IntPtr groupingParam, int flags, out IntPtr control);       // IAudioSessionManager
+        int GetSimpleAudioVolume(IntPtr groupingParam, int flags, out IntPtr volume);
+        int GetSessionEnumerator(out IAudioSessionEnumerator sessions);
+    }
+    [ComImport, Guid("E2F5BB11-0570-40CA-ACDD-3AA01277DEE8"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    interface IAudioSessionEnumerator {
+        int GetCount(out int count);
+        int GetSession(int index, out IAudioSessionControl2 session);
+    }
+    [ComImport, Guid("BFB7FF88-7239-4FC9-8FA2-07C950BE9C6D"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    interface IAudioSessionControl2 {
+        int GetState(out int state);                                                          // IAudioSessionControl
+        int GetDisplayName([MarshalAs(UnmanagedType.LPWStr)] out string name);
+        int SetDisplayName([MarshalAs(UnmanagedType.LPWStr)] string name, IntPtr context);
+        int GetIconPath([MarshalAs(UnmanagedType.LPWStr)] out string path);
+        int SetIconPath([MarshalAs(UnmanagedType.LPWStr)] string path, IntPtr context);
+        int GetGroupingParam(out Guid param);
+        int SetGroupingParam(ref Guid param, IntPtr context);
+        int RegisterAudioSessionNotification(IntPtr events);
+        int UnregisterAudioSessionNotification(IntPtr events);
+        int GetSessionIdentifier([MarshalAs(UnmanagedType.LPWStr)] out string id);           // IAudioSessionControl2
+        int GetSessionInstanceIdentifier([MarshalAs(UnmanagedType.LPWStr)] out string id);
+        int GetProcessId(out uint pid);
+        [PreserveSig] int IsSystemSoundsSession();
+    }
+    [ComImport, Guid("87CE5498-68D6-44E5-9215-6DA47EF883D8"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    interface ISimpleAudioVolume {
+        int SetMasterVolume(float level, IntPtr context);
+        int GetMasterVolume(out float level);
+        int SetMute([MarshalAs(UnmanagedType.Bool)] bool mute, IntPtr context);
+        int GetMute([MarshalAs(UnmanagedType.Bool)] out bool mute);
+    }
     [StructLayout(LayoutKind.Sequential)]
     struct PropertyKey { public Guid FormatId; public int PropertyId; }
     [StructLayout(LayoutKind.Explicit, Size = 24)]     // PROPVARIANT is 24 bytes on 64-bit
@@ -347,6 +382,17 @@ namespace ThingdeckAudio {
             volume.GetMute(out muted);
             return (int)Math.Round(level * 100);
         }
+        // Set the default output's volume (0..100, or -1 to keep it) and mute (-1 keep, 0 off, 1 on).
+        public static void SetMaster(int level, int mute) {
+            IMMDevice device;
+            if (Enumerator().GetDefaultAudioEndpoint(Render, 1, out device) != 0) return;
+            var iid = typeof(IAudioEndpointVolume).GUID;
+            object o;
+            device.Activate(ref iid, ClsCtxAll, IntPtr.Zero, out o);
+            var volume = (IAudioEndpointVolume)o;
+            if (level >= 0) volume.SetMasterVolumeLevelScalar(Math.Min(100, level) / 100f, IntPtr.Zero);
+            if (mute >= 0) volume.SetMute(mute == 1, IntPtr.Zero);
+        }
         // The default device id for "output" or "input" (multimedia role), or null.
         public static string DefaultId(string kind) {
             IMMDevice device;
@@ -375,6 +421,44 @@ namespace ThingdeckAudio {
         public static void SetDefault(string id) {
             var policy = (IPolicyConfig)Activator.CreateInstance(Type.GetTypeFromCLSID(new Guid("870AF99C-171D-4F9E-AF0D-E63DF40C2BC9")));
             for (int role = 0; role < 3; role++) Marshal.ThrowExceptionForHR(policy.SetDefaultEndpoint(id, role));
+        }
+
+        // The default output's sessions that haven't ended: (process id, system sounds, active, volume, mute).
+        public class Session { public uint Pid; public bool System, Active, Muted; public float Volume; internal ISimpleAudioVolume Control; }
+        static List<Session> ReadSessions() {
+            var list = new List<Session>();
+            IMMDevice device;
+            if (Enumerator().GetDefaultAudioEndpoint(Render, 1, out device) != 0) return list;
+            var iid = typeof(IAudioSessionManager2).GUID;
+            object o;
+            if (device.Activate(ref iid, ClsCtxAll, IntPtr.Zero, out o) != 0) return list;
+            IAudioSessionEnumerator sessions;
+            if (((IAudioSessionManager2)o).GetSessionEnumerator(out sessions) != 0) return list;
+            int count;
+            sessions.GetCount(out count);
+            for (int i = 0; i < count; i++) {
+                IAudioSessionControl2 control;
+                if (sessions.GetSession(i, out control) != 0) continue;
+                int state;
+                control.GetState(out state);
+                if (state == 2) continue;                              // expired
+                var session = new Session { Active = state == 1, System = control.IsSystemSoundsSession() == 0 };
+                control.GetProcessId(out session.Pid);
+                session.Control = (ISimpleAudioVolume)control;
+                session.Control.GetMasterVolume(out session.Volume);
+                session.Control.GetMute(out session.Muted);
+                list.Add(session);
+            }
+            return list;
+        }
+        public static Session[] Sessions() { return ReadSessions().ToArray(); }
+        // Set the volume (0..100, or -1 to keep it) and the mute (-1 keep, 0 off, 1 on) of the sessions of these processes.
+        public static void SetSessions(uint[] pids, int volume, int mute) {
+            foreach (var s in ReadSessions()) {
+                if (Array.IndexOf(pids, s.Pid) < 0) continue;
+                if (volume >= 0) s.Control.SetMasterVolume(Math.Min(100, volume) / 100f, IntPtr.Zero);
+                if (mute >= 0) s.Control.SetMute(mute == 1, IntPtr.Zero);
+            }
         }
     }
 }
@@ -419,6 +503,95 @@ function Update-Audio {
         } catch { Write-Log "audio: could not switch: $($_.Exception.Message)" }
     }
 }
+# --- Per-app volume, like the Volume Mixer: the default output's sessions grouped by app.
+# The Car Thing gets each app's name, volume, mute and whether it plays, and its icon once.
+# It sends back absolute volumes and mutes through the command poll (see Update-Hue).
+Add-Type -AssemblyName System.Drawing
+$mixerProcs = @{}          # process id -> @{ key; name; path } (looked up once per process)
+$mixerPids = @{}           # app key -> its process ids, for the commands
+$mixerSent = $null; $mixerSentAt = [DateTime]::MinValue; $mixerIcons = @()
+
+function Get-MixerProc([uint32]$id) {
+    if ($script:mixerProcs.ContainsKey($id)) { return $script:mixerProcs[$id] }
+    $p = Get-Process -Id $id -ErrorAction SilentlyContinue
+    $info = if (-not $p) { @{ key = "pid$id"; name = "Process $id"; path = $null } } else {
+        $path = $p.Path        # null for elevated processes
+        $desc = if ($path) { (Get-Item $path -ErrorAction SilentlyContinue).VersionInfo.FileDescription } else { $null }
+        @{ key = $p.ProcessName.ToLower(); name = $(if ($desc -and $desc.Trim()) { $desc.Trim() } else { $p.ProcessName }); path = $path }
+    }
+    $script:mixerProcs[$id] = $info
+    $info
+}
+
+function Read-Mixer {
+    $apps = [ordered]@{}
+    $pids = @{}
+    foreach ($s in [ThingdeckAudio.Audio]::Sessions()) {
+        $proc = if ($s.System) { @{ key = 'system'; name = 'System sounds'; path = $null } } else { Get-MixerProc $s.Pid }
+        if (-not $apps.Contains($proc.key)) {
+            $apps[$proc.key] = [ordered]@{ key = $proc.key; name = $proc.name; volume = 0; muted = $true; active = $false }
+            $pids[$proc.key] = @()
+        }
+        $app = $apps[$proc.key]
+        $app.volume = [Math]::Max($app.volume, [int][Math]::Round($s.Volume * 100))     # the loudest of its sessions
+        $app.muted = $app.muted -and $s.Muted
+        $app.active = $app.active -or $s.Active
+        $pids[$proc.key] += $s.Pid
+    }
+    $script:mixerPids = $pids
+    # Playing apps first, then by name; system sounds last.
+    @($apps.Values | Sort-Object @{ e = { $_.key -eq 'system' } }, @{ e = { -not $_.active } }, @{ e = { $_.name } })
+}
+
+# A 48 px PNG of the app's icon, from its program file.
+function Get-MixerIcon([string]$key) {
+    $proc = $script:mixerProcs.Values | Where-Object { $_.key -eq $key -and $_.path } | Select-Object -First 1
+    if (-not $proc) { return $null }
+    $icon = [System.Drawing.Icon]::ExtractAssociatedIcon($proc.path)
+    $bitmap = New-Object System.Drawing.Bitmap 48, 48
+    $g = [System.Drawing.Graphics]::FromImage($bitmap)
+    $g.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+    $g.DrawImage($icon.ToBitmap(), 0, 0, 48, 48)
+    $g.Dispose()
+    $memory = New-Object System.IO.MemoryStream
+    $bitmap.Save($memory, [System.Drawing.Imaging.ImageFormat]::Png)
+    [Convert]::ToBase64String($memory.ToArray())
+}
+
+# Every second (called more often; it waits on its own): sends the apps when they change, at
+# least every 5 s, with the icons the Car Thing asked for.
+function Update-Mixer {
+    if (((Get-Date) - $script:mixerSentAt).TotalSeconds -lt 1) { return }
+    try { $apps = Read-Mixer } catch { return }
+    $key = $apps | ConvertTo-Json -Compress
+    if ($key -eq $script:mixerSent -and -not $script:mixerIcons.Count -and ((Get-Date) - $script:mixerSentAt).TotalSeconds -lt 5) { return }
+    $body = [ordered]@{ apps = $apps }
+    if ($script:mixerIcons.Count) {
+        $icons = [ordered]@{}
+        foreach ($k in $script:mixerIcons) { try { $png = Get-MixerIcon $k; if ($png) { $icons[$k] = $png } } catch { } }
+        $body.icons = $icons
+    }
+    $reply = Send-Json 'mixer' $body 4
+    $script:mixerSent = $key; $script:mixerSentAt = Get-Date
+    $script:mixerIcons = @($reply.need_icons | Where-Object { $_ })
+}
+
+# Commands from the Car Thing: @{ key; volume? (0..100); mute? (bool) }; the key "*" is All, the
+# default output itself.
+function Invoke-MixerCommand($command) {
+    $volume = if ($null -ne $command.volume) { [int]$command.volume } else { -1 }
+    $mute = if ($null -ne $command.mute) { [int][bool]$command.mute } else { -1 }
+    if ([string]$command.key -eq '*') {
+        [ThingdeckAudio.Audio]::SetMaster($volume, $mute)
+        $script:audioSentAt = [DateTime]::MinValue    # the audio update shows it
+        return
+    }
+    $pids = [uint32[]]@($script:mixerPids[[string]$command.key])
+    if (-not $pids.Count) { return }
+    [ThingdeckAudio.Audio]::SetSessions($pids, $volume, $mute)
+    $script:mixerSentAt = [DateTime]::MinValue        # show the result right away
+}
+
 $nvidiaSmi = (Get-Command nvidia-smi.exe -ErrorAction SilentlyContinue).Source
 $gpuAt = [DateTime]::MinValue; $gpu = $null
 
@@ -795,6 +968,7 @@ function Update-Hue {
     $commands = $polled.hue
     if ($polled.github_refresh) { $script:gitHubFetched = [DateTime]::MinValue }     # the refresh button on the Code page
     if ($polled.github_details) { Send-GitHubDetails $polled.github_details }          # a card opened on the Code page
+    foreach ($c in @($polled.mixer)) { if ($c) { try { Invoke-MixerCommand $c } catch { Write-Log "mixer: $($_.Exception.Message)" } } }
     $script:calendarSoon = [bool]$polled.calendar_soon                                  # an event starts within 15 minutes
     $was = $script:visible
     $script:visible = @($polled.visible | Where-Object { $_ })
@@ -1353,6 +1527,7 @@ while ($true) {
             $plexSent = $null; $plexNext = [DateTime]::MinValue
             $nasSent = $null; $nasNext = [DateTime]::MinValue
             $weatherSent = $null; $weatherNext = [DateTime]::MinValue
+            $mixerSent = $null; $mixerSentAt = [DateTime]::MinValue
         }
         # Stats (and the focused app) every 2 s; the reply may ask to kill that app, open a
         # meeting link or resend the calendars.
@@ -1443,7 +1618,7 @@ while ($true) {
     # The volume four times a second between rounds, so the Car Thing's volume bar follows the dial.
     for ($tick = 0; $tick -lt 4; $tick++) {
         if ($tunnelUp) {
-            try { Update-Audio; Update-Hue; Update-Plex; Update-TrueNas; Update-Weather } catch { Write-Log "update failed: $($_.Exception.Message)"; $tunnelUp = $false }
+            try { Update-Audio; Update-Mixer; Update-Hue; Update-Plex; Update-TrueNas; Update-Weather } catch { Write-Log "update failed: $($_.Exception.Message)"; $tunnelUp = $false }
         }
         Start-Sleep -Milliseconds 250
     }
