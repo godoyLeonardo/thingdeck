@@ -123,7 +123,7 @@ them.
 | Dial turn | Current dial mode (Volume, Lights, Scroll, Zoom, Scrub, Tabs, Undo/Redo) |
 | Dial press | Dial mode action (mute, middle click, reset zoom, …) |
 | Dial hold | Play/Pause |
-| Back button | Next page, wrapping from the last back to the first (from Settings: the first) · hold: first page |
+| Back button | Next page, wrapping from the last back to the first (from Settings: the first); with a card, notice or reminder open, it closes that instead · hold: first page |
 | Menu button (M) | Next dial mode · hold: back to Volume |
 | Swipe left/right on the page | Change page |
 | Bottom bar | Tap a tab (with more than seven, drag the bar or tap › / ‹ for the rest) |
