@@ -3291,12 +3291,24 @@ function connect() {
     } else if (m.type === 'toast') {
       toast(d.text, d.level);
     } else if (m.type === 'view') {
-      if (!d.settings && showSettings) openSettings(false);
+      if (d.close) closeOverlay();
+      else if (!d.settings && showSettings) openSettings(false);
     }
   };
 }
 load().then(function () { if (st.message) toast(st.message, st.mode === 'error' ? 'fail' : 'warn'); });
-post('/api/view', { settings: false });      // a reload starts outside Settings
+post('/api/view', { settings: false, overlay: false });      // a reload starts outside Settings, with nothing open
+// The back button closes what is open over the page (the service asks, see Pad.hardware): it
+// needs to know when something is, so this tells it on every change.
+var overlaySaid = false;
+setInterval(function () {
+  var open = !!(sheetOpen || reminderShown);
+  if (open !== overlaySaid) { overlaySaid = open; post('/api/view', { overlay: open }); }
+}, 200);
+function closeOverlay() {
+  if (sheetOpen) closeSheet();
+  else if (reminderShown) dismissReminder();
+}
 post('/api/mixer/select', { key: '*' });     // and with no mixer open: the dial on All
 connect();
 </script>

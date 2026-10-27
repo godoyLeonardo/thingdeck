@@ -1334,6 +1334,7 @@ class Pad:
         self._dimmed = False
         self._dim_timer = None
         self.settings_open = False     # the screen shows Settings (the page says so, POST /api/view)
+        self.overlay_open = False      # a card, notice or reminder is up over the page (same)
         self.lock = threading.RLock()
         self.hid.on_report_request = self.detect_os
         self.load_saved()
@@ -1843,6 +1844,12 @@ class Pad:
         """name: back|menu|knob, kind: tap|hold."""
         if self.standby():
             return
+        if name == 'back' and kind == 'tap' and self.overlay_open:
+            # A card, notice or reminder is up: the back button closes it instead.
+            self.overlay_open = False
+            self.ui.publish('hw', {'button': name, 'kind': kind})
+            self.ui.publish('view', {'close': True})
+            return
         binding = self.config.get('hardware', {}).get(name, {})
         action = binding.get(kind)
         if action:
@@ -2075,7 +2082,10 @@ class Handler(BaseHTTPRequestHandler):
         elif path == '/api/page':
             pad.set_page(body.get('page', 'next'))
         elif path == '/api/view':
-            pad.settings_open = bool(body.get('settings'))
+            if 'settings' in body:
+                pad.settings_open = bool(body['settings'])
+            if 'overlay' in body:
+                pad.overlay_open = bool(body['overlay'])
         elif path == '/api/dial':
             pad.set_dial(body.get('dial', 'next'))
         elif path == '/api/settings':
