@@ -220,7 +220,7 @@ them to the Car Thing **over the USB cable** (`adb forward`; no network):
   first. While a run or a check goes on, the card updates every 5 seconds. **Open on
   computer** opens the run or pull request in the browser there. When a workflow run
   starts while another page is on screen, a small card shows it, with **Go to Code**; it
-  closes by itself after 20 seconds. It refreshes every minute, or every 15 seconds
+  closes by itself after 15 seconds (Dismiss counts them down). It refreshes every minute, or every 15 seconds
   while a workflow runs; pull down on either list to fetch it right away (see [Adding
   GitHub](#adding-github)).
 - **Plex:** the streams on your Plex Media Server, and a dot on the Plex tab while
@@ -229,7 +229,7 @@ them to the Car Thing **over the USB cable** (`adb forward`; no network):
   (container, codecs, resolution, channels, bitrate), the audio and subtitle tracks, and
   for a transcode, what changes, its speed, and whether the hardware does it. When a new
   stream starts while another page is on screen, a small card shows it, with **Go to
-  Plex**; it closes by itself after 20 seconds (off the Plex page, the agent reads Plex
+  Plex**; it closes by itself after 15 seconds (Dismiss counts them down) (off the Plex page, the agent reads Plex
   every 30 seconds, so the card can come that much later). A tag shows how the server
   sends it: direct play, direct stream, or transcode (HW for a hardware transcode).
   Under the streams are the jobs that run now, with their progress: library scans and

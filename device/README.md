@@ -330,7 +330,7 @@ step. While the run or a check goes on, the page asks again every 5 s; with no a
 
 The page remembers the runs it has seen, by their links. A new run, or a run that runs
 again, while another page is on screen and no other card, reminder or Settings is open,
-shows a small card with Go to Code (`checkNewRuns`); it closes by itself after 20 s. The
+shows a small card with Go to Code (`checkNewRuns`); it closes by itself after 15 s (its Dismiss counts down), and something new for the same page while it is up updates it instead of queueing another. The
 agent reads GitHub every minute, so the card can come up to a minute late. Before GitHub
 first answers, after an error with no runs, and for another repository, the page
 remembers nothing, so the runs already there don't count.
@@ -413,7 +413,7 @@ the same `/status/sessions` reply, so they cost no request.
 
 The page remembers the stream ids it has seen. A new one, while another page is on screen
 and no other card, reminder or Settings is open, shows a small card with Go to Plex
-(`checkNewStreams`); it closes by itself after 20 s. Before Plex first answers, and after
+(`checkNewStreams`); it closes by itself after 15 s (its Dismiss counts down), and something new for the same page while it is up updates it instead of queueing another. Before Plex first answers, and after
 it stops answering, the page remembers nothing, so streams already on don't count.
 
 The bandwidth history has one row per device and sample, at uneven times. The agent
