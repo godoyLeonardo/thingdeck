@@ -589,6 +589,7 @@
   .sh-line { margin-top: 4px; font-size: calc(14px * var(--ts)); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .sh-line.bad { color: var(--bad); white-space: normal; }
   .sheet-card.notice { width: 560px; }        /* something new: smaller than a details card */
+  .nt-left { font-variant-numeric: tabular-nums; color: var(--muted); }
   .sh-sum { display: flex; align-items: center; margin-top: 10px; font: 600 calc(11.5px * var(--ts)) GeistMono, monospace;
     letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
   .sh-sum .spin { margin-right: 8px; }
@@ -1861,31 +1862,45 @@ function closeSheet() {
   }
   closeGitHubCard();
   closePlexCard();
-  clearTimeout(noticeTimer);
+  clearInterval(noticeTimer);
+  noticeWidget = null;
   sheetOpen = false;
   sheetMode = null;
   $('sheet').className = '';
   $('sheetcard').className = 'sheet-card';
 }
 // A notice: a small card for something new on a page that isn't on screen, with a button that
-// goes to that page, and Dismiss. It closes by itself after 20 s. While another card, a
-// reminder or Settings is open, it doesn't show.
-var noticeTimer = null;
+// goes to that page, and Dismiss, which counts down to when it closes by itself (15 s). While
+// another card, a reminder or Settings is open, it doesn't show; something new for the same page
+// while its notice is up updates that notice (keeping its time) rather than queueing another.
+var NOTICE_MS = 15000, noticeUntil = 0, noticeWidget = null, noticeTimer = null;
 function widgetPage(widget) {         // the first page with this widget, or -1
   return orderedEntries().findIndex(function (p) { return (p.widgets || []).indexOf(widget) >= 0; });
 }
 function showNotice(widget, html, go) {
-  if (sheetOpen || reminderShown || standbyShown || lockShown || showSettings) return;
+  var again = sheetMode === 'notice' && noticeWidget === widget;
+  if (!again && (sheetOpen || reminderShown || standbyShown || lockShown || showSettings)) return;
   if ((currentPage.widgets || []).indexOf(widget) >= 0) return;      // on that page already
   $('sheetcard')._html = null;
   $('sheetcard').className = 'sheet-card notice';
   $('sheetcard').innerHTML = html + '<div class="sh-actions">' +
     (widgetPage(widget) >= 0 ? '<div class="btn primary" data-go="' + widget + '">' + esc(go) + '</div>' : '') +
-    '<div class="btn" data-sheet-close="1">Dismiss</div></div>';
+    '<div class="btn" data-sheet-close="1">Dismiss<span class="nt-left"></span></div></div>';
   $('sheet').className = 'show';
   sheetOpen = true;
   sheetMode = 'notice';
-  noticeTimer = setTimeout(function () { if (sheetMode === 'notice') closeSheet(); }, 20000);
+  noticeWidget = widget;
+  if (!again) noticeUntil = Date.now() + NOTICE_MS;
+  tickNotice();
+  clearInterval(noticeTimer);
+  noticeTimer = setInterval(tickNotice, 1000);
+}
+function tickNotice() {
+  if (sheetMode !== 'notice') { clearInterval(noticeTimer); return; }
+  var left = Math.ceil((noticeUntil - Date.now()) / 1000);
+  if (left <= 0) return closeSheet();
+  var el = $('sheetcard').querySelector('.nt-left');
+  if (el) el.textContent = ' · ' + left;
 }
 
 // ---- audio (from the computer agent): a volume bar when the volume or mute changes, and
