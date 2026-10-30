@@ -735,7 +735,12 @@
   .wx-temp small { margin-left: 5px; font-size: .8em; font-weight: 500; color: var(--muted); }
   .wx-rain { font: 500 calc(12px * var(--ts)) GeistMono, monospace; color: var(--acc); }
   .wx-day svg, .wx-day .emoji { width: 30px; height: 30px; }
-  #topweather, .bigweather { cursor: default; }
+  /* The weather opens its card: a tap anywhere on it counts (its thin icon doesn't take
+     touches itself), with room around it for a finger, like the pills. */
+  #topweather, .bigweather[data-weather] { cursor: default; }
+  #topweather { align-self: center; padding: 8px 14px; margin: -8px -14px -8px 2px; }
+  #topweather > *, .bigweather[data-weather] > * { pointer-events: none; }
+  .bigweather[data-weather] { padding: 8px 16px; margin-left: -16px; margin-right: -16px; }
   /* the top bar's weather chip: only on the Media page while something plays (idle, the big clock has it) */
   #topweather { display: none; align-items: center; flex: none; margin-left: 16px; font-size: calc(22px * var(--ts)); font-weight: 600;
     font-variant-numeric: tabular-nums; }
