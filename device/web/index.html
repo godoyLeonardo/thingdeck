@@ -617,11 +617,14 @@
   .vh-name:empty { display: none; }
   .vh-icon img { width: 28px; height: 28px; }
   /* per-app volume (Windows): the mixer button in the Media top bar, and its sheet */
-  #mixerpill { flex: none; align-self: center; margin-left: auto; display: none; align-items: center; justify-content: center;
-    width: 52px; height: 44px; border-radius: 22px; background: var(--tile); color: var(--text); }
-  #mixerpill svg { width: 24px; height: 24px; }
-  #mixerpill.down { background: var(--tile-hi); }
-  #mixerpill + #audiopill { margin-left: 8px; }
+  .mx-head { display: flex; align-items: center; }
+  .mx-head .m-label { flex: 1; }
+  .mx-out { flex: none; display: flex; align-items: center; height: 36px; padding: 0 10px 0 12px; border-radius: 18px; background: var(--tile-hi);
+    font-size: calc(14px * var(--ts)); font-weight: 600; max-width: 300px; }
+  .mx-out svg { flex: none; width: 18px; height: 18px; color: var(--muted); }
+  .mx-out svg:first-child { margin-right: 8px; }
+  .mx-out span { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mx-out.down { filter: brightness(1.2); }
   /* full-screen cards (the mixer, a room), over whatever page is on, with a big Close. Their
      controls keep clear of the right edge, where the dial gets in the way of a finger; Close,
      at the bottom, goes to the corner. */
@@ -718,6 +721,21 @@
   /* the weather under a large clock's date: icon, temperature, sky, today's high / low */
   .bigweather { display: flex; align-items: center; margin-top: 12px; font-size: calc(21px * var(--ts)); color: var(--muted); white-space: nowrap; }
   .bigweather.hidden { display: none; }
+  /* the weather card */
+  .wx-now { display: flex; align-items: center; margin: 6px 0 10px; }
+  .wx-now > svg, .wx-now > .emoji { flex: none; width: 58px; height: 58px; color: var(--acc); font-size: 50px; }
+  .wx-big { flex: none; margin: 0 18px 0 12px; font-size: calc(58px * var(--ts)); font-weight: 700; letter-spacing: -.03em; line-height: 1; }
+  .wx-facts { min-width: 0; font-size: calc(15px * var(--ts)); color: var(--muted); line-height: 1.45; }
+  .wx-facts .wx-sky { font-size: calc(21px * var(--ts)); font-weight: 600; color: var(--text); }
+  .wx-row { display: flex; margin: 4px 0 12px; }
+  .wx-col { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; }
+  .wx-col svg, .wx-col .emoji { width: 26px; height: 26px; margin: 4px 0; color: var(--acc); font-size: 22px; }
+  .wx-when { font: 500 calc(12px * var(--ts)) GeistMono, monospace; color: var(--muted); }
+  .wx-temp { font-size: calc(17px * var(--ts)); font-weight: 700; font-variant-numeric: tabular-nums; }
+  .wx-temp small { margin-left: 5px; font-size: .8em; font-weight: 500; color: var(--muted); }
+  .wx-rain { font: 500 calc(12px * var(--ts)) GeistMono, monospace; color: var(--acc); }
+  .wx-day svg, .wx-day .emoji { width: 30px; height: 30px; }
+  #topweather, .bigweather { cursor: default; }
   /* the top bar's weather chip: only on the Media page while something plays (idle, the big clock has it) */
   #topweather { display: none; align-items: center; flex: none; margin-left: 16px; font-size: calc(22px * var(--ts)); font-weight: 600;
     font-variant-numeric: tabular-nums; }
@@ -903,7 +921,7 @@
 </head>
 <body>
   <div id="top">
-    <div id="topclock"><span class="tc-time"></span><span class="tc-suffix"></span><span class="tc-date"></span><span id="topweather" class="hidden"></span><div id="topnp" data-goto-media="1"></div><div id="mixerpill" data-mixer="1"></div><div id="audiopill" data-audio="1"></div></div>
+    <div id="topclock"><span class="tc-time"></span><span class="tc-suffix"></span><span class="tc-date"></span><span id="topweather" class="hidden" data-weather="1"></span><div id="topnp" data-goto-media="1"></div><div id="audiopill" data-audio="1"></div></div>
     <div id="presets"></div>
     <div id="dial">
       <svg viewBox="0 0 26 26" fill="none"><circle cx="13" cy="13" r="10.5" style="stroke:var(--muted)" stroke-width="2"/><line x1="13" y1="4.5" x2="13" y2="9.5" style="stroke:var(--acc)" stroke-width="2.4" stroke-linecap="round"/></svg>
@@ -1629,7 +1647,7 @@ function renderNowPlaying(page, g) {
   } else if (st.clock) {
     // Nothing playing: a large clock and the date (the top bar hides its own meanwhile).
     top = '<div class="np-idle"><div class="bigclock"><span class="bc-time"></span><span class="bc-suffix"></span></div>' +
-      '<div class="bigdate"></div><div class="bigweather hidden"></div></div>';
+      '<div class="bigdate"></div><div class="bigweather hidden" data-weather="1"></div></div>';
   } else {
     // No clock means no computer agent, so no track info at all.
     top = '<div class="np-art">' + icon('note') + '</div><div class="np-info np-empty">' +
@@ -1995,10 +2013,8 @@ var MIXER_ALL = { key: '*', name: 'All' };
 function appIcon(a) {
   return a && a.icon ? '<img src="/api/mixer/icon?k=' + encodeURIComponent(a.key) + '&v=' + a.icon + '" alt="">' : icon('speaker');
 }
-function updateMixerPill() {
-  var pill = $('mixerpill'), show = !!(currentPage.audio && mixer.state === 'ok');
-  pill.style.display = show ? 'flex' : 'none';
-  if (show) redraw(pill, icon('mixer'));
+function updateMixerPill() {          // the audio pill opens the mixer when there is one: show it like a mixer
+  $('audiopill').classList.toggle('mixer', mixer.state === 'ok');
 }
 function renderMixerSheet() {
   if (mixer.state !== 'ok') return closeSheet();
@@ -2007,7 +2023,8 @@ function renderMixerSheet() {
   var list = [all].concat(mixerApps());
   // While only volumes and mutes change (a dial turn, a drag), set them in place: rebuilding
   // the whole screen on every notch made the bars trail behind on the Car Thing's CPU.
-  var shape = list.map(function (a) { return [a.key, a.name, a.icon || '', a.active].join('|'); }).join(',') + '#' + target.key + '#' + iconStyle();
+  var shape = list.map(function (a) { return [a.key, a.name, a.icon || '', a.active].join('|'); }).join(',') + '#' + target.key + '#' + iconStyle() +
+    '#' + (audio && audio.output);
   var rows = card.querySelectorAll('.mx-row');
   if (card._mixShape === shape && rows.length === list.length) {
     list.forEach(function (a, i) {
@@ -2022,7 +2039,11 @@ function renderMixerSheet() {
   }
   card._mixShape = shape;
   card._html = null;
-  redraw(card, '<div class="m-label">App volume · the knob moves the dial</div><div class="ag-list mx-list">' +
+  var out = currentDevice('output');
+  redraw(card, '<div class="mx-head"><div class="m-label">App volume · the knob moves the dial</div>' +
+    (audio && (audio.outputs || []).length ? '<div class="mx-out" data-audio-pick="1">' + deviceIcon(out ? out.name : '', false) +
+      '<span>' + esc(out ? shortDevice(out.name) : 'Output') + '</span>' + CHEVRON + '<path d="M9 5l7 7-7 7"/></svg></div>' : '') +
+    '</div><div class="ag-list mx-list">' +
     list.map(function (a) {
       var k = esc(a.key);
       return '<div class="mx-row' + (a.key === target.key ? ' sel' : '') + (a.muted ? ' muted' : '') + (a.active ? '' : ' idle') + '">' +
@@ -3040,7 +3061,8 @@ function localTime() {
   return {
     time: h12 ? ((h + 11) % 12 + 1) + ':' + mm : (h < 10 ? '0' : '') + h + ':' + mm,
     suffix: h12 ? (h < 12 ? 'AM' : 'PM') : '',
-    date: DAYS[d.getUTCDay()] + ', ' + d.getUTCDate() + ' ' + MONTHS[d.getUTCMonth()]
+    date: DAYS[d.getUTCDay()] + ', ' + d.getUTCDate() + ' ' + MONTHS[d.getUTCMonth()],
+    short: DAYS[d.getUTCDay()].slice(0, 3) + ' ' + d.getUTCDate() + ' ' + MONTHS[d.getUTCMonth()].slice(0, 3)     // the Media top bar
   };
 }
 function each(selector, fn) {
@@ -3055,7 +3077,7 @@ function tick() {
     var tc = $('topclock');
     tc.querySelector('.tc-time').textContent = t.time;
     tc.querySelector('.tc-suffix').textContent = t.suffix;
-    tc.querySelector('.tc-date').textContent = t.date;
+    tc.querySelector('.tc-date').textContent = document.body.classList.contains('media-page') ? t.short : t.date;
   }
   each('.bigclock', function (el) {
     el.classList.toggle('hidden', !t);
@@ -3090,6 +3112,48 @@ function updateWeather() {
   var chip = ok ? pic + deg(w.temp) : '', top = $('topweather');
   top.classList.toggle('hidden', !ok);
   if (top._html !== chip) top.innerHTML = top._html = chip;
+  if (sheetMode === 'weather') renderWeatherSheet();
+}
+// The weather card (tap the weather): now, the next 12 hours and the next 6 days, full screen.
+function wmoSky(code, day) {
+  var sky = WMO.filter(function (r) { return r[0].indexOf(code) >= 0; })[0];
+  return sky ? { icon: icon(day === false ? sky[2] : sky[1]), words: sky[3] } : { icon: '', words: '' };
+}
+function openWeather() {
+  if (weather.state !== 'ok') return;
+  sheetMode = 'weather';
+  sheetOpen = true;
+  $('sheetcard')._html = null;
+  $('sheetcard').className = 'sheet-card sheet-full';
+  renderWeatherSheet();
+  $('sheet').className = 'show';
+}
+function renderWeatherSheet() {
+  var w = weather;
+  if (w.state !== 'ok') return closeSheet();
+  var deg = function (v) { return v == null ? '–' : Math.round(v) + '°'; };
+  var now = wmoSky(w.code, w.day);
+  var rain = function (p) { return '<div class="wx-rain">' + (p ? Math.round(p) + '%' : '&nbsp;') + '</div>'; };
+  var hours = (w.hours || []).map(function (h, i) {
+    var sky = wmoSky(h.code, h.day);
+    return '<div class="wx-col"><div class="wx-when">' + (i ? esc(h.time || '') : 'Now') + '</div>' + sky.icon +
+      '<div class="wx-temp">' + deg(h.temp) + '</div>' + rain(h.rain) + '</div>';
+  }).join('');
+  var days = (w.days || []).map(function (d, i) {
+    var sky = wmoSky(d.code, true), date = new Date((d.date || '') + 'T12:00:00Z');
+    var name = i === 0 ? 'Today' : isNaN(date) ? '' : DAYS[date.getUTCDay()].slice(0, 3);
+    return '<div class="wx-col wx-day"><div class="wx-when">' + name + '</div>' + sky.icon +
+      '<div class="wx-temp">' + deg(d.high) + '<small>' + deg(d.low) + '</small></div>' + rain(d.rain) + '</div>';
+  }).join('');
+  var facts = [w.feels != null ? 'Feels like ' + deg(w.feels) : '', w.humidity != null ? 'Humidity ' + Math.round(w.humidity) + '%' : '',
+    w.wind != null ? 'Wind ' + Math.round(w.wind) + ' ' + (w.wind_unit || '') : ''].filter(function (x) { return x; }).join(' · ');
+  var sun = [w.sunrise ? 'Sunrise ' + w.sunrise : '', w.sunset ? 'Sunset ' + w.sunset : ''].filter(function (x) { return x; }).join(' · ');
+  redraw($('sheetcard'), '<div class="m-label">Weather' + (w.place ? ' · ' + esc(w.place) : '') + '</div>' +
+    '<div class="wx-now">' + now.icon + '<div class="wx-big">' + deg(w.temp) + '</div><div class="wx-facts">' +
+      '<div class="wx-sky">' + esc(now.words) + '</div><div>' + esc(facts) + '</div><div>' + esc(sun) + '</div></div></div>' +
+    (hours ? '<div class="m-label">Next 12 hours</div><div class="wx-row">' + hours + '</div>' : '') +
+    (days ? '<div class="m-label">Next days</div><div class="wx-row">' + days + '</div>' : '') +
+    '<div class="sh-actions"><div class="btn" data-sheet-close="1">Close</div></div>');
 }
 
 // ---- lock screen: the computer is locked (from the agent). Only media keys go through;
@@ -3135,7 +3199,7 @@ document.addEventListener('pointerdown', function (e) {
   startX = e.clientX; startY = e.clientY;
   startInBar = !!e.target.closest('#bar, .cal-tabs');
   startOnSlider = !!e.target.closest('[data-hue-bar], [data-hue-lbar], [data-mix-bar]');   // dragging a light's brightness, not swiping
-  downEl = e.target.closest('.tile[data-i], .preset[data-i], #dial, .tab, #status, [data-set], [data-sys], [data-sec], [data-media], [data-join], [data-guard], [data-kill], [data-ev], [data-sheet-close], [data-sheet-card], [data-audio], [data-audio-dev], [data-gh], #tabmore, [data-hue-room], [data-hue-card], [data-hue-toggle], [data-hue-ltoggle], [data-hue-scene], [data-hue-alloff], [data-hue-pair], [data-hue-bar], [data-hue-lbar], [data-tab-move], [data-tabs-reset], [data-tab-hide], [data-goto-media], [data-rm-join], [data-rm-dismiss], [data-cal], [data-weeks], [data-gh-open], [data-plex], [data-go], [data-mixer], [data-mix-sel], [data-mix-mute], [data-mix-bar]');
+  downEl = e.target.closest('.tile[data-i], .preset[data-i], #dial, .tab, #status, [data-set], [data-sys], [data-sec], [data-media], [data-join], [data-guard], [data-kill], [data-ev], [data-sheet-close], [data-sheet-card], [data-audio], [data-audio-dev], [data-gh], #tabmore, [data-hue-room], [data-hue-card], [data-hue-toggle], [data-hue-ltoggle], [data-hue-scene], [data-hue-alloff], [data-hue-pair], [data-hue-bar], [data-hue-lbar], [data-tab-move], [data-tabs-reset], [data-tab-hide], [data-goto-media], [data-rm-join], [data-rm-dismiss], [data-cal], [data-weeks], [data-gh-open], [data-plex], [data-go], [data-mixer], [data-mix-sel], [data-mix-mute], [data-mix-bar], [data-audio-pick], [data-weather]');
   if (downEl) downEl.classList.add('down');
 });
 document.addEventListener('pointercancel', function () { if (downEl) downEl.classList.remove('down'); downEl = null; });
@@ -3157,7 +3221,9 @@ document.addEventListener('pointerup', function (e) {
   if (el.hasAttribute('data-sheet-card')) return;                  // a tap inside the details card
   if (el.hasAttribute('data-sheet-close')) closeSheet();
   else if (el.hasAttribute('data-ev')) openEvent(el.getAttribute('data-ev'));
-  else if (el.hasAttribute('data-audio')) openAudio();
+  else if (el.hasAttribute('data-audio')) { if (mixer.state === 'ok') openMixer(); else openAudio(); }   // the mixer has the output too
+  else if (el.hasAttribute('data-audio-pick')) openAudio();
+  else if (el.hasAttribute('data-weather')) openWeather();
   else if (el.hasAttribute('data-gh')) openGitHub(el.getAttribute('data-gh'));
   else if (el.hasAttribute('data-plex')) openPlexStream(el.getAttribute('data-plex'));
   else if (el.hasAttribute('data-go')) { var page = widgetPage(el.getAttribute('data-go')); closeSheet(); if (page >= 0) post('/api/page', { page: page }); }
