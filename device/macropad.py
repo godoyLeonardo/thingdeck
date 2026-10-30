@@ -1062,7 +1062,7 @@ class HostTrueNAS:
 
 
 WEATHER_TTL = 2 * 3600  # seconds a reading stays on screen without a new one (sent every 15 min)
-WEATHER_FIELDS = ('place', 'temp', 'code', 'day', 'unit')
+WEATHER_FIELDS = ('place', 'temp', 'code', 'day', 'unit', 'feels', 'humidity', 'wind', 'wind_unit', 'sunrise', 'sunset', 'hours', 'days')
 
 
 class HostWeather:
