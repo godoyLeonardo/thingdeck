@@ -1666,11 +1666,27 @@ class WeatherLink:
                     raise ValueError("Open-Meteo doesn't know \"%s\": check the first line of weather.txt" % query)
                 self.place = {'query': query, 'lat': hits[0]['latitude'], 'lon': hits[0]['longitude'], 'name': hits[0].get('name')}
         p = self.place
-        w = self.get('https://api.open-meteo.com/v1/forecast?latitude=%s&longitude=%s&current=temperature_2m,weather_code,is_day%s'
-                     % (p['lat'], p['lon'], '&temperature_unit=fahrenheit' if fahrenheit else ''))
-        current = w.get('current') or {}
+        # Now, the next 12 hours and the next 6 days (for the weather card), in the place's own time.
+        w = self.get('https://api.open-meteo.com/v1/forecast?latitude=%s&longitude=%s&timezone=auto'
+                     '&current=temperature_2m,weather_code,is_day,apparent_temperature,relative_humidity_2m,wind_speed_10m'
+                     '&hourly=temperature_2m,weather_code,is_day,precipitation_probability&forecast_hours=12'
+                     '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset'
+                     '&forecast_days=6%s'
+                     % (p['lat'], p['lon'], '&temperature_unit=fahrenheit&wind_speed_unit=mph' if fahrenheit else ''))
+        current, hourly, daily = w.get('current') or {}, w.get('hourly') or {}, w.get('daily') or {}
+        column = lambda table, name, i: (table.get(name) or [None] * (i + 1))[i]
+        clock = lambda stamp: str(stamp or '').rpartition('T')[2]          # "2026-10-30T07:02" -> "07:02"
         return {'state': 'ok', 'place': p['name'], 'temp': current.get('temperature_2m'), 'code': current.get('weather_code'),
-                'day': bool(current.get('is_day')), 'unit': 'F' if fahrenheit else 'C'}
+                'day': bool(current.get('is_day')), 'unit': 'F' if fahrenheit else 'C',
+                'feels': current.get('apparent_temperature'), 'humidity': current.get('relative_humidity_2m'),
+                'wind': current.get('wind_speed_10m'), 'wind_unit': 'mph' if fahrenheit else 'km/h',
+                'sunrise': clock(column(daily, 'sunrise', 0)), 'sunset': clock(column(daily, 'sunset', 0)),
+                'hours': [{'time': clock(t), 'temp': column(hourly, 'temperature_2m', i), 'code': column(hourly, 'weather_code', i),
+                           'day': bool(column(hourly, 'is_day', i)), 'rain': column(hourly, 'precipitation_probability', i)}
+                          for i, t in enumerate(hourly.get('time') or [])],
+                'days': [{'date': t, 'code': column(daily, 'weather_code', i), 'high': column(daily, 'temperature_2m_max', i),
+                          'low': column(daily, 'temperature_2m_min', i), 'rain': column(daily, 'precipitation_probability_max', i)}
+                         for i, t in enumerate(daily.get('time') or [])]}
 
     def update(self):
         if time.monotonic() < self.next:

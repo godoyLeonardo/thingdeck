@@ -1472,12 +1472,29 @@ function Read-Weather {
         }
     }
     $p = $script:weatherPlace
-    $url = 'https://api.open-meteo.com/v1/forecast?latitude={0}&longitude={1}&current=temperature_2m,weather_code,is_day' -f
+    # Now, the next 12 hours and the next 6 days (for the weather card), in the place's own time.
+    $url = ('https://api.open-meteo.com/v1/forecast?latitude={0}&longitude={1}&timezone=auto' +
+        '&current=temperature_2m,weather_code,is_day,apparent_temperature,relative_humidity_2m,wind_speed_10m' +
+        '&hourly=temperature_2m,weather_code,is_day,precipitation_probability&forecast_hours=12' +
+        '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset&forecast_days=6') -f
         $p.lat.ToString([Globalization.CultureInfo]::InvariantCulture), $p.lon.ToString([Globalization.CultureInfo]::InvariantCulture)
-    if ($fahrenheit) { $url += '&temperature_unit=fahrenheit' }
+    if ($fahrenheit) { $url += '&temperature_unit=fahrenheit&wind_speed_unit=mph' }
     $w = Invoke-RestMethod -TimeoutSec 5 -Uri $url
+    $h = $w.hourly; $d = $w.daily
     @{ state = 'ok'; place = $p.name; temp = $w.current.temperature_2m; code = $w.current.weather_code; day = [bool]$w.current.is_day
-        unit = $(if ($fahrenheit) { 'F' } else { 'C' }) }
+        unit = $(if ($fahrenheit) { 'F' } else { 'C' })
+        feels = $w.current.apparent_temperature; humidity = $w.current.relative_humidity_2m; wind = $w.current.wind_speed_10m
+        wind_unit = $(if ($fahrenheit) { 'mph' } else { 'km/h' })
+        sunrise = "$(@($d.sunrise)[0])" -replace '^.*T', ''; sunset = "$(@($d.sunset)[0])" -replace '^.*T', ''      # today's, as HH:MM
+        hours = @(for ($i = 0; $i -lt @($h.time).Count; $i++) {
+            [ordered]@{ time = "$(@($h.time)[$i])".Substring(11); temp = @($h.temperature_2m)[$i]; code = @($h.weather_code)[$i]
+                day = [bool]@($h.is_day)[$i]; rain = @($h.precipitation_probability)[$i] }
+        })
+        days = @(for ($i = 0; $i -lt @($d.time).Count; $i++) {
+            [ordered]@{ date = "$(@($d.time)[$i])"; code = @($d.weather_code)[$i]; high = @($d.temperature_2m_max)[$i]; low = @($d.temperature_2m_min)[$i]
+                rain = @($d.precipitation_probability_max)[$i] }
+        })
+    }
 }
 
 # Every 15 minutes (5 after an error); sends changes, and at least every 30 minutes.
@@ -1494,9 +1511,9 @@ function Update-Weather {
         $script:weatherError = $state.error
         if ($state.error) { Write-Log "weather: $($state.error)" }
     }
-    $key = $state | ConvertTo-Json -Compress
+    $key = $state | ConvertTo-Json -Compress -Depth 4
     if ($key -eq $script:weatherSent -and ((Get-Date) - $script:weatherSentAt).TotalMinutes -lt 30) { return }
-    [void](Send-Json 'weather' $state)
+    [void](Send-Json 'weather' $state 4)
     $script:weatherSent = $key
     $script:weatherSentAt = Get-Date
 }
