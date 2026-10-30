@@ -468,11 +468,16 @@ NVMe 60/70 °C), alerts, apps and running jobs.
 
 The agent reads `weather.txt` (a place, then optionally `fahrenheit`) and asks
 Open-Meteo every 15 minutes (5 after an error) for the current `temperature_2m`,
-`weather_code` and `is_day`. A place name is looked up once with Open-Meteo's geocoder
-(a country after a comma picks among the matches). It posts `POST /api/weather` with
-`{state, place, temp, code, day, unit}` when that changes, and at least every 30
-minutes. `HostWeather` keeps it for 2 hours without an update, so it still shows on the
-standby screen for a while after the computer sleeps. The UI puts it in every
+`weather_code`, `is_day`, `apparent_temperature`, `relative_humidity_2m` and
+`wind_speed_10m`, the next 12 hours (`forecast_hours=12`: temperature, code, day,
+precipitation probability) and the next 6 days (code, high, low, precipitation probability,
+sunrise, sunset), in the place's time zone (`timezone=auto`). A place name is looked up once
+with Open-Meteo's geocoder (a country after a comma picks among the matches). It posts
+`POST /api/weather` with `{state, place, temp, code, day, unit, feels, humidity, wind,
+wind_unit, sunrise, sunset, hours, days}` when that changes, and at least every 30 minutes.
+Tapping `#topweather` (or the idle clock's weather) opens the weather card with all of it.
+`HostWeather` keeps it for 2 hours without an update, so it still shows on the standby
+screen for a while after the computer sleeps. The UI puts it in every
 `.bigweather` (under the large clocks of the idle Media card, the lock and the standby
 screens: an icon and words for the WMO weather code, and the temperature) and in
 `#topweather`, the top bar's icon and temperature, shown on the Media page while

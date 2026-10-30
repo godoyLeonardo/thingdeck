@@ -73,6 +73,8 @@ The Car Thing's screen is 800×480. These use made-up demo data; to retake them,
 | **Settings → Tabs:** the order, and which tabs show | **Reminder:** 5 minutes before an event, on any page |
 | ![Standby screen: the clock and "Computer is asleep", with a Reconnect button](docs/screenshots/standby.png) | ![App volume: All and each app with its icon, a volume bar and a mute button; the dial on Spotify](docs/screenshots/mixer.png) |
 | **Standby:** while the computer sleeps | **App volume (Windows, Linux):** each app, and the dial on one |
+| ![Weather card: now, feels like, humidity, wind, sunrise and sunset, the next 12 hours and the next 6 days](docs/screenshots/weather.png) | |
+| **Weather:** tap the weather on the Media page | |
 
 ## Requirements
 
@@ -251,13 +253,15 @@ them to the Car Thing **over the USB cable** (`adb forward`; no network):
   TrueNAS](#connecting-truenas)).
 - **Volume and audio devices:** when the volume or mute changes (the dial, the Mute
   tile, your keyboard), a volume bar shows at the top for a moment. The Media page
-  header shows the current output; tap it to pick the output and input devices.
+  header shows the current output (with the time, a short date and the weather); tap it
+  to pick the output and input devices (on Windows and Linux it opens the mixer, which
+  has the output at its top).
   - Windows: Core Audio, the same switch the Sound settings use (all roles, so calls
     move too).
   - Linux: `pactl` (PipeWire or PulseAudio).
   - macOS: the volume always; switching devices needs `brew install switchaudio-osx`.
 - **App volume (Windows, Linux):** like the Volume Mixer or a Stream Deck volume dial. The
-  mixer button next to the output on the Media page opens it, full screen: **All** (the
+  output pill on the Media page opens it, full screen: **All** (the
   system volume) and each app playing through the output, with its icon, a bar to drag and
   a mute button. In the **Volume** dial mode the dial turns the one marked *Dial*, All at
   first, and pressing the knob moves it on to each app in the list and back to All
@@ -276,8 +280,10 @@ them to the Car Thing **over the USB cable** (`adb forward`; no network):
 - **Weather:** under the large clocks (Media with nothing playing, the lock and
   standby screens): the temperature and the sky with its icon (sun or moon by the
   time of day); while something plays, the Media page's top bar shows the icon and
-  temperature next to the date. From [Open-Meteo](https://open-meteo.com) every 15
-  minutes (see [Adding the weather](#adding-the-weather)).
+  temperature next to the date. Tap it for the weather card, full screen: feels like,
+  humidity, wind, sunrise and sunset, the next 12 hours and the next 6 days with the
+  chance of rain. From [Open-Meteo](https://open-meteo.com) every 15 minutes (see
+  [Adding the weather](#adding-the-weather)).
 - **Lock screen:** while the computer is locked, the Car Thing shows the clock,
   "🔒 Computer locked", the cover and what's playing, and media buttons. Tiles,
   presets and dial modes that press keys are blocked while locked, so nothing gets
