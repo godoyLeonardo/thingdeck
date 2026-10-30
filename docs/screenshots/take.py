@@ -264,7 +264,21 @@ MIXER = {'apps': [
     {'key': 'system', 'name': 'System sounds', 'volume': 100, 'muted': False, 'active': False}],
     'icons': {'spotify': app_icon((30, 185, 84), 'S'), 'discord': app_icon((88, 101, 242), 'D'), 'firefox': app_icon((255, 113, 57), 'F')}}
 
-WEATHER = {'state': 'ok', 'place': 'Paris', 'temp': 17.4, 'code': 2, 'day': True, 'unit': 'C'}
+def demo_hours():
+    """The next 12 hours from this hour: warming up to the afternoon, a shower at five."""
+    start = datetime.datetime.now().hour
+    codes = {17: 80, 18: 61, 19: 3}
+    return [{'time': '%02d:00' % ((start + i) % 24), 'temp': 14 + 5 * math.sin(((start + i) % 24 - 9) / 24 * 2 * math.pi),
+             'code': codes.get((start + i) % 24, 2 if (start + i) % 24 < 16 else 3), 'day': 7 <= (start + i) % 24 < 20,
+             'rain': {17: 60, 18: 40, 19: 20}.get((start + i) % 24, 0)} for i in range(12)]
+
+
+WEATHER = {'state': 'ok', 'place': 'Paris', 'temp': 17.4, 'code': 2, 'day': True, 'unit': 'C',
+           'feels': 16.8, 'humidity': 62, 'wind': 14, 'wind_unit': 'km/h', 'sunrise': '07:41', 'sunset': '18:22',
+           'hours': demo_hours(),
+           'days': [{'date': (datetime.date.today() + datetime.timedelta(days=i)).isoformat(), 'code': c, 'high': hi, 'low': lo, 'rain': r}
+                    for i, (c, hi, lo, r) in enumerate([(2, 19, 11, 10), (61, 16, 10, 70), (3, 15, 9, 20), (0, 18, 8, 0),
+                                                        (2, 20, 10, 5), (80, 17, 11, 50)])]}
 
 TRUENAS = {
     'state': 'ok',
@@ -381,6 +395,11 @@ def scene(feeder, name):
         time.sleep(1)
         js('openMixer();')
         return close
+    if name == 'weather':
+        page('Media')
+        time.sleep(1)
+        js('openWeather();')
+        return close
     if name == 'volume':
         page('Media')
         time.sleep(1)
@@ -415,7 +434,7 @@ def scene(feeder, name):
     raise SystemExit('unknown screenshot: ' + name)
 
 
-SHOTS = ['media', 'calendar', 'status', 'code', 'event', 'audio', 'mixer', 'volume', 'lock', 'lights', 'room', 'plex', 'nas',
+SHOTS = ['media', 'calendar', 'status', 'code', 'event', 'audio', 'mixer', 'weather', 'volume', 'lock', 'lights', 'room', 'plex', 'nas',
          'settings', 'tabs', 'general', 'standby', 'reminder']
 
 
